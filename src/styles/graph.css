@@ -1,0 +1,167 @@
+.graph-stage {
+  fill: none;
+}
+
+.graph-stage__halo {
+  fill: rgba(255, 255, 255, 0.8);
+}
+
+.graph-stage__lane {
+  stroke: rgba(89, 107, 139, 0.12);
+  stroke-width: 1;
+  stroke-dasharray: 2 12;
+}
+
+.graph-stage__lane-label {
+  fill: rgba(102, 117, 144, 0.58);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.graph-stage__focus {
+  fill: rgba(39, 79, 152, 0.04);
+}
+
+.graph-edge-group {
+  pointer-events: none;
+}
+
+.graph-edge {
+  fill: none;
+  stroke: var(--edge);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.65;
+  transition: stroke 0.18s ease, stroke-width 0.18s ease, opacity 0.18s ease;
+}
+
+.graph-edge.is-dimmed {
+  opacity: 0.3;
+}
+
+.graph-edge.is-active {
+  stroke: var(--edge-active);
+  stroke-width: 2.35;
+  opacity: 1;
+}
+
+.graph-edge-label {
+  fill: var(--text-soft);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.graph-edge-label-bg {
+  fill: rgba(255, 255, 255, 0.84);
+  stroke: rgba(99, 118, 148, 0.12);
+  stroke-width: 1;
+}
+
+.graph-node {
+  cursor: pointer;
+  outline: none;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.graph-node__glow {
+  fill: var(--graph-node-glow, rgba(44, 83, 166, 0.08));
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.graph-node__shape {
+  fill: var(--graph-node-fill, var(--node-fill));
+  stroke: var(--graph-node-border, var(--node-border));
+  stroke-width: 1.25;
+  filter: drop-shadow(0 10px 18px rgba(24, 39, 64, 0.06));
+  transition: fill 0.18s ease, stroke 0.18s ease, transform 0.18s ease, filter 0.18s ease;
+}
+
+.graph-node__pin {
+  fill: var(--graph-node-pin-fill, rgba(40, 95, 223, 0.14));
+  stroke: var(--graph-node-pin-stroke, rgba(40, 95, 223, 0.24));
+  stroke-width: 1;
+}
+
+.graph-node__pin-core {
+  fill: var(--graph-node-pin-core, rgba(40, 95, 223, 0.78));
+}
+
+.graph-node__title {
+  fill: var(--text-strong);
+  font-family: "Georgia", serif;
+  font-size: 15px;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.graph-node__detail {
+  fill: rgba(67, 79, 100, 0.88);
+  font-size: 10px;
+}
+
+.graph-node__affordance {
+  opacity: 0;
+  transform: translateY(4px);
+  transform-origin: center;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.graph-node__affordance-bg {
+  fill: var(--graph-node-affordance-bg, rgba(235, 241, 251, 0.94));
+  stroke: rgba(70, 96, 148, 0.16);
+  stroke-width: 1;
+}
+
+.graph-node__affordance-text {
+  fill: var(--graph-node-affordance-text, rgba(46, 82, 152, 0.76));
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.graph-node.is-root .graph-node__shape {
+  stroke: var(--graph-node-border-strong, var(--node-border-strong));
+  stroke-width: 1.7;
+  fill: var(--graph-node-root-fill, rgba(252, 254, 255, 0.94));
+}
+
+.graph-node.is-root .graph-node__glow {
+  opacity: 1;
+}
+
+.graph-node.is-hovered .graph-node__shape,
+.graph-node:hover .graph-node__shape,
+.graph-node.is-focused .graph-node__shape {
+  stroke: var(--graph-node-active-border, rgba(39, 79, 152, 0.44));
+  filter: drop-shadow(0 14px 26px rgba(29, 52, 97, 0.1));
+}
+
+.graph-node.is-hovered .graph-node__glow,
+.graph-node:hover .graph-node__glow,
+.graph-node.is-focused .graph-node__glow {
+  opacity: 1;
+}
+
+.graph-node.is-hovered .graph-node__affordance,
+.graph-node:hover .graph-node__affordance,
+.graph-node.is-focused .graph-node__affordance {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.graph-node.is-dimmed {
+  opacity: 0.48;
+}
+
+.graph-node.is-active .graph-node__shape {
+  fill: var(--graph-node-active-fill, rgba(251, 253, 255, 0.96));
+  stroke: var(--graph-node-active-border, rgba(39, 79, 152, 0.48));
+  filter: drop-shadow(0 14px 24px rgba(33, 58, 105, 0.1));
+}
+
+.graph-node.is-active .graph-node__pin {
+  fill: var(--graph-node-pin-fill, rgba(40, 95, 223, 0.18));
+}

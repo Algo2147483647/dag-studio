@@ -78,4 +78,4 @@ For the recommended data model and additional examples, see [Data Format Guide](
 - [`src/`](src/): React app source
 - [`public/example.json`](public/example.json): sample graph data
 - [`docs/`](docs/): user and developer documentation
-- [`styles.css`](styles.css) and [`src/styles.css`](src/styles.css): global and app styles
+- [`src/styles/`](src/styles/): split global styles (tokens, layout, controls, graph, console, modals)

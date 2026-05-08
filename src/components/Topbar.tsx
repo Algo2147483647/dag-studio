@@ -128,23 +128,25 @@ export default function Topbar({
               </label>
 
               <p className="control-label">Workspace</p>
-              {mode === "edit" ? (
-                <button
-                  id="console-sidebar-toggle-btn"
-                  className={`ghost-btn settings-action-btn${consoleSidebarOpen ? " settings-action-btn-active" : ""}`}
-                  type="button"
-                  aria-pressed={consoleSidebarOpen}
-                  onClick={onConsoleSidebarToggle}
-                >
-                  {consoleSidebarOpen ? "Hide Console Sidebar" : "Show Console Sidebar"}
-                </button>
-              ) : null}
+              <div className="workspace-action-row">
+                {mode === "edit" ? (
+                  <button
+                    id="console-sidebar-toggle-btn"
+                    className={`ghost-btn settings-action-btn${consoleSidebarOpen ? " settings-action-btn-active" : ""}`}
+                    type="button"
+                    aria-pressed={consoleSidebarOpen}
+                    onClick={onConsoleSidebarToggle}
+                  >
+                    {consoleSidebarOpen ? "Hide Console" : "Show Console"}
+                  </button>
+                ) : null}
+                <button id="init-canvas-btn" className="ghost-btn settings-action-btn" type="button" onClick={onInitializeCanvas}>Initialize</button>
+                <button id="export-btn" className="ghost-btn settings-action-btn" type="button" disabled={!hasGraph} onClick={onExport}>Export SVG</button>
+              </div>
               <label htmlFor="fileInput" className="file-input-label">
                 <span className="file-input-text">{truncateFileName(fileName)}</span>
                 <input type="file" id="fileInput" accept=".json" onClick={onFileInputClick} onChange={onFileInputChange} />
               </label>
-              <button id="init-canvas-btn" className="ghost-btn settings-action-btn" type="button" onClick={onInitializeCanvas}>Initialize Canvas</button>
-              <button id="export-btn" className="primary-btn" type="button" disabled={!hasGraph} onClick={onExport}>Export SVG</button>
               <p id="graph-summary" className="graph-summary">{status}</p>
             </div>
           </div>
