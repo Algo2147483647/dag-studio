@@ -1,6 +1,6 @@
 # DAG Studio
 
-`graph/` is a browser-based graph viewer and lightweight JSON editor for directed graph data.
+DAG Studio is a browser-based graph viewer and lightweight JSON editor for directed graph data.
 
 It is designed for:
 
@@ -11,30 +11,20 @@ It is designed for:
 - inspecting all node fields in a generic viewer
 - saving the updated graph back to JSON
 
+![img](./docs/assets/ScreenShot.png)
+
 ## Run
 
 DAG Studio is now a Vite React and TypeScript app:
 
 ```powershell
-cd D:\Algo\Projects\front-end_toolkit\graph
 npm install
 npm run dev
 ```
 
-Then open:
+Then open the local dev server URL shown by Vite in the terminal.
 
-```text
-http://localhost:5173/graph/index.html
-```
-
-When the page loads, it automatically reads [`public/example.json`](D:\Algo\Projects\front-end_toolkit\graph\public\example.json).
-
-Build and run the graph core tests with:
-
-```powershell
-npm test
-npm run build
-```
+When the page loads, it automatically reads [`public/example.json`](public/example.json).
 
 ## Main Features
 
@@ -99,7 +89,7 @@ Common commands:
 - `children <node> = A,B`
 - `set <node> <field> "value"`
 
-The full console reference lives in [`GraphConsoleDSL.md`](D:\Algo\Projects\front-end_toolkit\graph\GraphConsoleDSL.md).
+The full console reference lives in [`GraphConsoleDSL.md`](GraphConsoleDSL.md).
 
 ## How Navigation Works
 
@@ -430,8 +420,8 @@ If you want the smallest useful file, start here:
 
 ## Files
 
-- main page: [`index.html`](D:\Algo\Projects\front-end_toolkit\graph\index.html)
-- React source: `graph/src/`
-- styles: [`styles.css`](D:\Algo\Projects\front-end_toolkit\graph\styles.css) plus `graph/src/styles.css`
-- sample data: [`public/example.json`](D:\Algo\Projects\front-end_toolkit\graph\public\example.json)
-- console reference: [`GraphConsoleDSL.md`](D:\Algo\Projects\front-end_toolkit\graph\GraphConsoleDSL.md)
+- main page: [`index.html`](index.html)
+- React source: [`src/`](src/)
+- styles: [`styles.css`](styles.css) plus [`src/styles.css`](src/styles.css)
+- sample data: [`public/example.json`](public/example.json)
+- console reference: [`GraphConsoleDSL.md`](GraphConsoleDSL.md)
