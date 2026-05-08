@@ -16,6 +16,7 @@ interface ConsoleSidebarProps {
   activeSuggestionIndex: number;
   onInputChange: (value: string) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+  onPaste: (event: React.ClipboardEvent<HTMLInputElement>) => void;
   onSuggestionSelect: (suggestion: ConsoleSuggestion) => void;
 }
 
@@ -29,6 +30,7 @@ export default function ConsoleSidebar({
   activeSuggestionIndex,
   onInputChange,
   onKeyDown,
+  onPaste,
   onSuggestionSelect,
 }: ConsoleSidebarProps) {
   const outputRef = useRef<HTMLDivElement>(null);
@@ -68,6 +70,7 @@ export default function ConsoleSidebar({
           placeholder={hasGraph && mode === "edit" ? "type a command" : "console unavailable"}
           onChange={(event) => onInputChange(event.currentTarget.value)}
           onKeyDown={onKeyDown}
+          onPaste={onPaste}
         />
       </div>
 

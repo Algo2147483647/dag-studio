@@ -157,16 +157,15 @@ export default function App() {
     }
   }, [state]);
 
-  const handleConsoleRun = useCallback(() => {
-    const source = consoleInput.trim();
+  const runConsoleSource = useCallback((rawSource: string) => {
+    const source = rawSource.trim();
     if (!source) {
       return;
     }
 
-    appendConsoleEntry(setConsoleEntries, "input", `${buildConsolePrompt(consoleContextNodeKey)} ${source}`);
+    appendConsoleInputEntries(setConsoleEntries, buildConsolePrompt(consoleContextNodeKey), source);
     setConsoleHistory((current) => (current[current.length - 1] === source ? current : [...current, source]));
     setConsoleHistoryIndex(null);
-    setConsoleInput("");
 
     if (source === "clear" || source === "cls") {
       setConsoleEntries([{ id: Date.now(), tone: "info", text: "Console cleared." }]);
@@ -246,7 +245,30 @@ export default function App() {
       "success",
       buildConsoleSuccessMessage(executed.instructionCount, executed.mutationCount, executed.contextNodeKey, finalUiEffect?.type),
     );
-  }, [consoleContextNodeKey, consoleInput, state]);
+  }, [consoleContextNodeKey, state]);
+
+  const handleConsoleRun = useCallback(() => {
+    if (!consoleInput.trim()) {
+      return;
+    }
+    runConsoleSource(consoleInput);
+    setConsoleInput("");
+  }, [consoleInput, runConsoleSource]);
+
+  const handleConsolePaste = useCallback((event: React.ClipboardEvent<HTMLInputElement>) => {
+    const pastedText = event.clipboardData.getData("text");
+    if (!/\r?\n/.test(pastedText)) {
+      return;
+    }
+
+    const { selectionStart, selectionEnd, value } = event.currentTarget;
+    const insertStart = selectionStart ?? value.length;
+    const insertEnd = selectionEnd ?? insertStart;
+    const nextValue = `${value.slice(0, insertStart)}${pastedText}${value.slice(insertEnd)}`;
+    event.preventDefault();
+    runConsoleSource(nextValue);
+    setConsoleInput("");
+  }, [runConsoleSource]);
 
   const handleConsoleSidebarResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const startX = event.clientX;
@@ -575,6 +597,7 @@ export default function App() {
                 });
               }
             }}
+            onPaste={handleConsolePaste}
             onSuggestionSelect={(suggestion) => setConsoleInput(suggestion.insertText)}
           />
         )}
@@ -657,6 +680,18 @@ function appendConsoleEntry(
   text: string,
 ): void {
   setEntries((current) => [...current, { id: Date.now() + current.length, tone, text }]);
+}
+
+function appendConsoleInputEntries(
+  setEntries: React.Dispatch<React.SetStateAction<Array<{ id: number; tone: "input" | "success" | "error" | "info"; text: string }>>>,
+  prompt: string,
+  source: string,
+): void {
+  source
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .forEach((line) => appendConsoleEntry(setEntries, "input", `${prompt} ${line}`));
 }
 
 function buildConsolePrompt(contextNodeKey: NodeKey | null): string {
