@@ -129,6 +129,7 @@ The console maintains one implicit **current-node context register**.
 | Mnemonic | Category | Effect |
 | --- | --- | --- |
 | `help` | Reference | Show the available command reference |
+| `ls` | Reference | Print a compact node summary |
 | `show` | UI | Open node detail view |
 | `use` | Context | Set current context node |
 | `mv` | Mutation | Rename a node key |
@@ -139,7 +140,8 @@ The console maintains one implicit **current-node context register**.
 | `rm-edge` | Mutation | Delete one directed edge |
 | `parents` | Mutation | Replace parent set |
 | `children` | Mutation | Replace child set |
-| `set` | Mutation | Replace one node field |
+| `set` | Mutation | Replace one node field with text, scalar, or JSON |
+| `unset` | Mutation | Remove one node field |
 | `json` | UI | Open raw node JSON editor |
 
 ### 6.2 Modifier Table
@@ -154,6 +156,7 @@ The console maintains one implicit **current-node context register**.
 | Command | Layer | Effect |
 | --- | --- | --- |
 | `help` | DSL instruction | Print the available command reference in the console output |
+| `ls` | DSL instruction | Print a compact node summary in the console output |
 | `clear` | Console UI | Clear the console output |
 | `cls` | Console UI | Alias for `clear` |
 
@@ -227,7 +230,30 @@ show .
 
 ---
 
-## 7.3 `use`
+## 7.3 `ls`
+
+### Synopsis
+
+```sh
+ls <node>
+ls .
+```
+
+### Description
+
+Prints a compact summary of the target node in the console output, including title, type, define text, relations, and custom field names.
+
+### Examples
+
+```sh
+ls Tree
+use Tree
+ls .
+```
+
+---
+
+## 7.4 `use`
 
 ### Synopsis
 
@@ -262,7 +288,7 @@ use "Binary Tree"
 
 ---
 
-## 7.4 `mv`
+## 7.5 `mv`
 
 ### Synopsis
 
@@ -304,7 +330,7 @@ mv "Binary Tree" "Binary Search Tree"
 
 ---
 
-## 7.5 `rm`
+## 7.6 `rm`
 
 ### Synopsis
 
@@ -349,7 +375,7 @@ rm -r Tree
 
 ---
 
-## 7.6 `add`
+## 7.7 `add`
 
 ### Synopsis
 
@@ -394,7 +420,7 @@ add RedBlack -p .
 
 ---
 
-## 7.7 `cp`
+## 7.8 `cp`
 
 ### Synopsis
 
@@ -439,7 +465,7 @@ cp . Snapshot -p .
 
 ---
 
-## 7.8 `parents`
+## 7.9 `parents`
 
 ### Synopsis
 
@@ -484,7 +510,7 @@ parents Draft =
 
 ---
 
-## 7.9 `children`
+## 7.10 `children`
 
 ### Synopsis
 
@@ -529,13 +555,15 @@ children Leaf =
 
 ---
 
-## 7.10 `edge`
+## 7.11 `edge`
 
 ### Synopsis
 
 ```sh
 edge <parent> <child>
 edge <parent> <child> <weight>
+edge --create-missing <parent> <child>
+edge --create-missing <parent> <child> <weight>
 ```
 
 ### Description
@@ -562,13 +590,14 @@ Adds a directed edge from the parent node to the child node. When `<weight>` is 
 ```sh
 edge Tree AVL
 edge Tree AVL subtype_of
+edge --create-missing Draft_A Draft_B
 use Tree
 edge . RedBlack balanced_by
 ```
 
 ---
 
-## 7.11 `rm-edge`
+## 7.12 `rm-edge`
 
 ### Synopsis
 
@@ -603,7 +632,7 @@ rm-edge . RedBlack
 
 ---
 
-## 7.12 `set`
+## 7.13 `set`
 
 ### Synopsis
 
@@ -621,7 +650,7 @@ Replaces one field on the target node. This is a compact single-field entry poin
 | --- | --- | --- | --- |
 | `<node>` | Node key | Yes | Target node key or `.` |
 | `<field>` | Field name | Yes | Node field to replace |
-| `<value>` | String literal initially | Yes | New field value |
+| `<value>` | String / scalar / JSON | Yes | New field value |
 
 ### Internal Execution Strategy
 
@@ -631,24 +660,42 @@ Replaces one field on the target node. This is a compact single-field entry poin
 | 2 | Replace exactly one field |
 | 3 | Submit full field object through `updateNodeFields` |
 
-### Recommended V1 Constraints
-
-| Constraint | Reason |
-| --- | --- |
-| Support string value first | Keeps parsing simple |
-| Reserve structured JSON field input for later | Avoids grammar complexity |
-
 ### Examples
 
 ```sh
 set AVL define "Self-balanced binary search tree"
-set Tree label "Tree"
+set Tree title "Tree"
 set . type "concept"
+set AVL score 12
+set AVL enabled true
+set AVL metadata {"height":2,"balanced":true}
 ```
 
 ---
 
-## 7.13 `json`
+## 7.14 `unset`
+
+### Synopsis
+
+```sh
+unset <node> <field>
+```
+
+### Description
+
+Removes one non-relation field from the target node.
+
+### Examples
+
+```sh
+unset AVL note
+use Tree
+unset . metadata
+```
+
+---
+
+## 7.15 `json`
 
 ### Synopsis
 
@@ -770,17 +817,19 @@ children . = AVL,RedBlack
 ```ts
 type ConsoleInstruction =
   | { type: "help"; line: number }
+  | { type: "list"; key: string; line: number }
   | { type: "show"; key: string; line: number }
   | { type: "use"; key: string; line: number }
   | { type: "rename"; oldKey: string; newKey: string; line: number }
   | { type: "delete"; key: string; recursive: boolean; line: number }
   | { type: "add"; key: string; parentKey?: string; line: number }
   | { type: "copy"; sourceKey: string; key: string; parentKey?: string; line: number }
-  | { type: "setEdge"; parentKey: string; childKey: string; weight?: string | number | boolean | null; line: number }
+  | { type: "setEdge"; parentKey: string; childKey: string; weight?: string | number | boolean | null; createMissing?: boolean; line: number }
   | { type: "removeEdge"; parentKey: string; childKey: string; line: number }
   | { type: "setParents"; key: string; keys: string[]; line: number }
   | { type: "setChildren"; key: string; keys: string[]; line: number }
   | { type: "setField"; key: string; field: string; value: string; line: number }
+  | { type: "unsetField"; key: string; field: string; line: number }
   | { type: "json"; key: string; line: number };
 ```
 
@@ -849,6 +898,7 @@ json .
 | --- | --- |
 | P0 | `use` |
 | P0 | `help` |
+| P0 | `ls` |
 | P0 | `show` |
 | P0 | `mv` |
 | P0 | `rm` |
@@ -860,6 +910,7 @@ json .
 | P0 | `parents` |
 | P0 | `children` |
 | P0 | `set` |
+| P0 | `unset` |
 | P0 | `json` |
 
 ### 14.2 Optional V1.1 Extensions

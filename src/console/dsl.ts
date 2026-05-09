@@ -10,16 +10,18 @@ export type ConsoleNodeOperand =
 export type ConsoleInstruction =
   | { type: "help"; line: number }
   | { type: "show"; key: ConsoleNodeOperand; line: number }
+  | { type: "list"; key: ConsoleNodeOperand; line: number }
   | { type: "use"; key: ConsoleNodeOperand; line: number }
   | { type: "rename"; oldKey: ConsoleNodeOperand; newKey: string; line: number }
   | { type: "delete"; key: ConsoleNodeOperand; recursive: boolean; line: number }
   | { type: "add"; key: string; parentKey?: ConsoleNodeOperand; line: number }
   | { type: "copy"; sourceKey: ConsoleNodeOperand; key: string; parentKey?: ConsoleNodeOperand; line: number }
-  | { type: "setEdge"; parentKey: ConsoleNodeOperand; childKey: ConsoleNodeOperand; weight?: string | number | boolean | null; line: number }
+  | { type: "setEdge"; parentKey: ConsoleNodeOperand; childKey: ConsoleNodeOperand; weight?: string | number | boolean | null; createMissing?: boolean; line: number }
   | { type: "removeEdge"; parentKey: ConsoleNodeOperand; childKey: ConsoleNodeOperand; line: number }
   | { type: "setParents"; key: ConsoleNodeOperand; keys: ConsoleNodeOperand[]; line: number }
   | { type: "setChildren"; key: ConsoleNodeOperand; keys: ConsoleNodeOperand[]; line: number }
-  | { type: "setField"; key: ConsoleNodeOperand; field: string; value: string; line: number }
+  | { type: "setField"; key: ConsoleNodeOperand; field: string; value: unknown; line: number }
+  | { type: "unsetField"; key: ConsoleNodeOperand; field: string; line: number }
   | { type: "json"; key: ConsoleNodeOperand; line: number };
 
 type ConsoleToken =
@@ -120,6 +122,8 @@ function parseInstruction(tokens: ConsoleToken[], line: number): { ok: true; ins
       return parseHelpInstruction(tokens, line);
     case "show":
       return parseSingleNodeInstruction(tokens, line, "show");
+    case "ls":
+      return parseSingleNodeInstruction(tokens, line, "list");
     case "use":
       return parseSingleNodeInstruction(tokens, line, "use");
     case "json":
@@ -142,6 +146,8 @@ function parseInstruction(tokens: ConsoleToken[], line: number): { ok: true; ins
       return parseRelationInstruction(tokens, line, "setChildren");
     case "set":
       return parseSetInstruction(tokens, line);
+    case "unset":
+      return parseUnsetInstruction(tokens, line);
     default:
       return { ok: false, error: { line, message: `Unknown instruction "${mnemonic.value}".` } };
   }
@@ -157,7 +163,7 @@ function parseHelpInstruction(tokens: ConsoleToken[], line: number): { ok: true;
 function parseSingleNodeInstruction(
   tokens: ConsoleToken[],
   line: number,
-  type: "show" | "use" | "json",
+  type: "show" | "list" | "use" | "json",
 ): { ok: true; instruction: ConsoleInstruction } | { ok: false; error: ConsoleLineError } {
   if (tokens.length !== 2) {
     return { ok: false, error: { line, message: `${type} expects exactly one node operand.` } };
@@ -243,26 +249,30 @@ function parseCopyInstruction(tokens: ConsoleToken[], line: number) {
 }
 
 function parseEdgeInstruction(tokens: ConsoleToken[], line: number) {
-  if (tokens.length !== 3 && tokens.length !== 4) {
-    return { ok: false, error: { line, message: "edge expects <parent> <child> or <parent> <child> <weight>." } } as const;
+  const createMissingFlag = "--create-missing";
+  const filteredTokens = tokens.filter((token, index) => index === 0 || expectWordToken(token)?.value !== createMissingFlag);
+  const createMissing = filteredTokens.length !== tokens.length;
+
+  if (filteredTokens.length !== 3 && filteredTokens.length !== 4) {
+    return { ok: false, error: { line, message: "edge expects <parent> <child> [weight] and optionally --create-missing." } } as const;
   }
 
-  const parentKey = parseNodeOperand(tokens[1], true);
-  const childKey = parseNodeOperand(tokens[2], true);
+  const parentKey = parseNodeOperand(filteredTokens[1], true);
+  const childKey = parseNodeOperand(filteredTokens[2], true);
   if (!parentKey || !childKey) {
-    return { ok: false, error: { line, message: "edge expects <parent> <child> or <parent> <child> <weight>." } } as const;
+    return { ok: false, error: { line, message: "edge expects <parent> <child> [weight] and optionally --create-missing." } } as const;
   }
 
-  if (tokens.length === 3) {
-    return { ok: true, instruction: { type: "setEdge", parentKey, childKey, line } } as const;
+  if (filteredTokens.length === 3) {
+    return { ok: true, instruction: { type: "setEdge", parentKey, childKey, createMissing, line } } as const;
   }
 
-  const weight = parseScalarLiteralToken(tokens[3]);
+  const weight = parseScalarLiteralToken(filteredTokens[3]);
   if (weight === undefined) {
     return { ok: false, error: { line, message: "edge weight must be a scalar literal." } } as const;
   }
 
-  return { ok: true, instruction: { type: "setEdge", parentKey, childKey, weight, line } } as const;
+  return { ok: true, instruction: { type: "setEdge", parentKey, childKey, weight, createMissing, line } } as const;
 }
 
 function parseRemoveEdgeInstruction(tokens: ConsoleToken[], line: number) {
@@ -299,16 +309,28 @@ function parseRelationInstruction(
 }
 
 function parseSetInstruction(tokens: ConsoleToken[], line: number) {
-  if (tokens.length !== 4) {
+  if (tokens.length < 4) {
     return { ok: false, error: { line, message: "set expects <node> <field> <value>." } } as const;
   }
   const key = parseNodeOperand(tokens[1], true);
   const field = parseLiteralToken(tokens[2]);
-  const value = parseLiteralToken(tokens[3]);
-  if (!key || !field || value === null) {
+  const parsedValue = parseSetValueTokens(tokens.slice(3));
+  if (!key || !field || !parsedValue.ok) {
     return { ok: false, error: { line, message: "set expects <node> <field> <value>." } } as const;
   }
-  return { ok: true, instruction: { type: "setField", key, field, value, line } } as const;
+  return { ok: true, instruction: { type: "setField", key, field, value: parsedValue.value, line } } as const;
+}
+
+function parseUnsetInstruction(tokens: ConsoleToken[], line: number) {
+  if (tokens.length !== 3) {
+    return { ok: false, error: { line, message: "unset expects <node> <field>." } } as const;
+  }
+  const key = parseNodeOperand(tokens[1], true);
+  const field = parseLiteralToken(tokens[2]);
+  if (!key || !field) {
+    return { ok: false, error: { line, message: "unset expects <node> <field>." } } as const;
+  }
+  return { ok: true, instruction: { type: "unsetField", key, field, line } } as const;
 }
 
 function parseNodeList(tokens: ConsoleToken[]): { ok: true; operands: ConsoleNodeOperand[] } | { ok: false; message: string } {
@@ -380,6 +402,58 @@ function parseScalarLiteralToken(token: ConsoleToken | undefined): string | numb
     }
   }
   return value;
+}
+
+function parseSetValueTokens(tokens: ConsoleToken[]): { ok: true; value: unknown } | { ok: false } {
+  if (!tokens.length) {
+    return { ok: false };
+  }
+
+  if (tokens.length === 1) {
+    if (tokens[0].type === "string") {
+      return { ok: true, value: tokens[0].value };
+    }
+    const scalar = parseScalarLiteralToken(tokens[0]);
+    return scalar === undefined ? { ok: false } : { ok: true, value: scalar };
+  }
+
+  const rawValue = stringifyValueTokens(tokens);
+  const trimmedValue = rawValue.trim();
+  if (!trimmedValue) {
+    return { ok: false };
+  }
+
+  if (trimmedValue.startsWith("{") || trimmedValue.startsWith("[") || trimmedValue.startsWith("\"")) {
+    try {
+      return { ok: true, value: JSON.parse(trimmedValue) };
+    } catch {
+      return { ok: false };
+    }
+  }
+
+  if (tokens.every((token) => token.type !== "symbol")) {
+    return { ok: true, value: tokens.map((token) => token.value).join(" ") };
+  }
+
+  return { ok: false };
+}
+
+function stringifyValueTokens(tokens: ConsoleToken[]): string {
+  let output = "";
+
+  tokens.forEach((token, index) => {
+    if (token.type === "symbol") {
+      output += token.value;
+      return;
+    }
+
+    const value = token.type === "string" ? JSON.stringify(token.value) : token.value;
+    const previousToken = tokens[index - 1];
+    const needsLeadingSpace = index > 0 && previousToken?.type !== "symbol";
+    output += `${needsLeadingSpace ? " " : ""}${value}`;
+  });
+
+  return output;
 }
 
 function expectWordToken(token: ConsoleToken | undefined): Extract<ConsoleToken, { type: "word" }> | null {

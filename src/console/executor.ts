@@ -1,4 +1,5 @@
 import { applyGraphCommand, type CommandResult, type GraphCommand } from "../graph/commands";
+import { getRelationKeys } from "../graph/relations";
 import { structuredCloneValue } from "../graph/serialize";
 import type { NodeKey, NormalizedDag } from "../graph/types";
 import type { ConsoleInstruction, ConsoleNodeOperand } from "./dsl";
@@ -56,6 +57,11 @@ export function executeConsoleInstructions(
           uiEffects.push({ type: "show", nodeKey: key, line: instruction.line });
           break;
         }
+        case "list": {
+          const key = resolveExistingNodeKey(instruction.key, contextNodeKey, workingDag, instruction.line);
+          outputMessages.push(buildNodeSummary(key, workingDag));
+          break;
+        }
         case "json": {
           const key = resolveExistingNodeKey(instruction.key, contextNodeKey, workingDag, instruction.line);
           uiEffects.push({ type: "json", nodeKey: key, line: instruction.line });
@@ -103,8 +109,23 @@ export function executeConsoleInstructions(
           break;
         }
         case "setEdge": {
-          const parentKey = resolveExistingNodeKey(instruction.parentKey, contextNodeKey, workingDag, instruction.line);
-          const childKey = resolveExistingNodeKey(instruction.childKey, contextNodeKey, workingDag, instruction.line);
+          const parentKey = instruction.createMissing
+            ? resolveOrCreateNodeKey(instruction.parentKey, contextNodeKey, instruction.line)
+            : resolveExistingNodeKey(instruction.parentKey, contextNodeKey, workingDag, instruction.line);
+          const childKey = instruction.createMissing
+            ? resolveOrCreateNodeKey(instruction.childKey, contextNodeKey, instruction.line)
+            : resolveExistingNodeKey(instruction.childKey, contextNodeKey, workingDag, instruction.line);
+          if (instruction.createMissing) {
+            [parentKey, childKey].forEach((key) => {
+              if (!workingDag[key]) {
+                const addResult = applyGraphCommand(workingDag, { type: "addNode", key });
+                workingDag = addResult.dag;
+                contextNodeKey = remapContextKey(contextNodeKey, addResult);
+                syncUiEffects(uiEffects, addResult);
+                results.push(addResult);
+              }
+            });
+          }
           const result = applyGraphCommand(workingDag, { type: "setEdge", parentKey, childKey, weight: instruction.weight });
           workingDag = result.dag;
           contextNodeKey = remapContextKey(contextNodeKey, result);
@@ -163,6 +184,31 @@ export function executeConsoleInstructions(
           results.push(result);
           break;
         }
+        case "unsetField": {
+          const key = resolveExistingNodeKey(instruction.key, contextNodeKey, workingDag, instruction.line);
+          if (instruction.field === "key") {
+            throw new Error("Use mv to rename a node key.");
+          }
+          if (instruction.field === "parents" || instruction.field === "children") {
+            throw new Error(`Use ${instruction.field} or rm-edge to edit relation fields.`);
+          }
+          const currentNode = workingDag[key];
+          if (!currentNode) {
+            throw new Error(`Node "${key}" does not exist.`);
+          }
+          if (!Object.prototype.hasOwnProperty.call(currentNode, instruction.field)) {
+            outputMessages.push(`Node "${key}" has no field named "${instruction.field}".`);
+            break;
+          }
+          const { key: _oldKey, ...fields } = structuredCloneValue(currentNode);
+          delete fields[instruction.field];
+          const result = applyGraphCommand(workingDag, { type: "updateNodeFields", key, fields });
+          workingDag = result.dag;
+          contextNodeKey = remapContextKey(contextNodeKey, result);
+          syncUiEffects(uiEffects, result);
+          results.push(result);
+          break;
+        }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "The console instruction failed.";
@@ -194,6 +240,14 @@ function resolveExistingNodeKey(
   }
   if (!dag[key]) {
     throw new Error(`Node "${key}" does not exist.`);
+  }
+  return key;
+}
+
+function resolveOrCreateNodeKey(operand: ConsoleNodeOperand, contextNodeKey: NodeKey | null, line: number): NodeKey {
+  const key = operand.type === "context" ? contextNodeKey : operand.value;
+  if (!key) {
+    throw new Error(`Line ${line}: Current context is empty. Use "use <node>" first.`);
   }
   return key;
 }
@@ -243,4 +297,44 @@ export function collectBatchEffects(results: CommandResult[]): { renamedKeys: Ar
   });
 
   return { renamedKeys, deletedKeys: Array.from(deletedKeys) };
+}
+
+function buildNodeSummary(nodeKey: NodeKey, dag: NormalizedDag): string {
+  const node = dag[nodeKey];
+  const lines = [
+    `Node: ${nodeKey}`,
+    `title: ${formatScalarPreview(node.title)}`,
+    `type: ${formatScalarPreview(node.type)}`,
+    `define: ${formatScalarPreview(node.define)}`,
+    `parents: ${formatRelationPreview(node.parents)}`,
+    `children: ${formatRelationPreview(node.children)}`,
+  ];
+
+  const customFieldNames = Object.keys(node).filter((fieldName) => !["key", "title", "type", "define", "parents", "children"].includes(fieldName));
+  if (customFieldNames.length) {
+    lines.push(`custom: ${customFieldNames.join(", ")}`);
+  }
+
+  return lines.join("\n");
+}
+
+function formatScalarPreview(value: unknown): string {
+  if (value === undefined || value === null || value === "") {
+    return "(empty)";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return JSON.stringify(value);
+}
+
+function formatRelationPreview(value: unknown): string {
+  const keys = getRelationKeys(value);
+  if (!keys.length) {
+    return "(none)";
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return keys.map((key) => `${key}:${formatScalarPreview((value as Record<string, unknown>)[key])}`).join(", ");
+  }
+  return keys.join(", ");
 }
