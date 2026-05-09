@@ -32,6 +32,21 @@ export const CONSOLE_COMMAND_REFERENCE: ConsoleCommandReference[] = [
 export function buildConsoleHelpText(): string {
   return [
     "Available commands:",
-    ...CONSOLE_COMMAND_REFERENCE.map((command) => `- ${command.label}: ${command.help}`),
+    '- help: Show this command reference.',
+    '- ls <node>: Print a compact node summary in the console output.',
+    '- use <node>: Set the current context node. Use . to refer to the current context in later commands.',
+    '- show <node>: Open the node viewer for a node.',
+    '- json <node>: Open the raw JSON editor for a node.',
+    '- mv <old-key> <new-key>: Rename a node key.',
+    '- rm [-r] <node>: Delete a single node, or delete the full subtree rooted at the node with -r.',
+    '- add <new-key> [-p <parent>]: Add a new node, and optionally link it as a child of the parent with -p.',
+    '- cp <source> <new-key> [-p <parent>]: Copy a node into a new node key, and optionally link the copy to a parent with -p.',
+    '- edge [--create-missing] <parent> <child> [weight]: Add or update a directed edge, optionally create missing endpoint nodes, and optionally set the edge relation value.',
+    '- rm-edge <parent> <child>: Remove a single directed edge.',
+    '- parents <node> = A,B,...: Replace the full parent relation set for a node. Use an empty assignment to clear it.',
+    '- children <node> = A,B,...: Replace the full child relation set for a node. Use an empty assignment to clear it.',
+    '- set <node> <field> <value>: Set a non-relation field value as string, number, boolean, null, or JSON.',
+    '- unset <node> <field>: Remove a non-relation field from a node.',
+    '- clear | cls: Clear the console output.',
   ].join("\n");
 }
