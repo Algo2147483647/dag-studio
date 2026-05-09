@@ -2,7 +2,14 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { buildStageData } from "./layout/stage-layout";
 import { applyGraphCommand, type GraphCommand } from "./graph/commands";
 import { createInitialCanvasDag, INITIAL_CANVAS_FILE_NAME } from "./graph/initialCanvas";
-import { getDefaultFieldMapping, getDisplayFieldName, remapGraphInputToSystemFields, remapGraphOutputFromSystemFields, type FieldMapping } from "./graph/fieldMapping";
+import {
+  canonicalizeGraphForFieldMappingChange,
+  getDefaultFieldMapping,
+  getDisplayFieldName,
+  remapGraphInputToSystemFields,
+  remapGraphOutputFromSystemFields,
+  type FieldMapping,
+} from "./graph/fieldMapping";
 import { normalizeDagInput } from "./graph/normalize";
 import { getFullGraphSelection, getInitialSelection, getParentLevelSelection, isSelectionValid, sanitizeNodeLabel } from "./graph/selectors";
 import { serializeDag } from "./graph/serialize";
@@ -665,8 +672,8 @@ export default function App() {
         mapping={fieldMapping}
         onSave={(nextMapping) => {
           if (state.dag) {
-            const externalGraph = remapGraphOutputFromSystemFields(serializeDag(state.dag), fieldMapping);
-            const nextDag = normalizeDagInput(remapGraphInputToSystemFields(externalGraph, nextMapping));
+            const canonicalGraph = canonicalizeGraphForFieldMappingChange(serializeDag(state.dag), fieldMapping, nextMapping);
+            const nextDag = normalizeDagInput(canonicalGraph);
             const nextSelection = isSelectionValid(state.selection, nextDag) ? state.selection : getInitialSelection(nextDag);
             const nextHistory = state.history.filter((item) => isSelectionValid(item, nextDag));
             dispatch({

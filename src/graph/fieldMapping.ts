@@ -102,6 +102,35 @@ export function remapGraphOutputFromSystemFields(input: unknown, mapping: FieldM
   );
 }
 
+export function canonicalizeGraphForFieldMappingChange(
+  input: unknown,
+  previousMapping: FieldMapping,
+  nextMapping: FieldMapping,
+): unknown {
+  if (Array.isArray(input)) {
+    return input.map((item) => canonicalizeNodeForFieldMappingChange(item, previousMapping, nextMapping));
+  }
+
+  if (!input || typeof input !== "object") {
+    return input;
+  }
+
+  const objectValue = input as Record<string, unknown>;
+  if (Array.isArray(objectValue.nodes)) {
+    return {
+      ...objectValue,
+      nodes: objectValue.nodes.map((item) => canonicalizeNodeForFieldMappingChange(item, previousMapping, nextMapping)),
+    };
+  }
+
+  return Object.fromEntries(
+    Object.entries(objectValue).map(([nodeKey, nodeValue]) => [
+      nodeKey,
+      canonicalizeNodeForFieldMappingChange(nodeValue, previousMapping, nextMapping),
+    ]),
+  );
+}
+
 export function remapNodeInput(input: unknown, mapping: FieldMapping): unknown {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return input;
@@ -143,6 +172,51 @@ function buildReverseFieldMapping(mapping: FieldMapping): Record<string, Mappabl
   });
 
   return reverseMapping as Record<string, MappableSystemFieldKey>;
+}
+
+function canonicalizeNodeForFieldMappingChange(
+  input: unknown,
+  previousMapping: FieldMapping,
+  nextMapping: FieldMapping,
+): unknown {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return input;
+  }
+
+  const source = input as Record<string, unknown>;
+  const output: Record<string, unknown> = { ...source };
+
+  MAPPABLE_SYSTEM_FIELD_KEYS.forEach((systemKey) => {
+    const aliases = uniqueFieldAliases(systemKey, previousMapping, nextMapping);
+    const canonicalValue = pickFirstDefinedValue(source, aliases);
+
+    aliases.forEach((alias) => {
+      delete output[alias];
+    });
+
+    if (canonicalValue !== undefined) {
+      output[systemKey] = canonicalValue;
+    }
+  });
+
+  return output;
+}
+
+function uniqueFieldAliases(
+  systemKey: MappableSystemFieldKey,
+  previousMapping: FieldMapping,
+  nextMapping: FieldMapping,
+): string[] {
+  return Array.from(new Set([systemKey, previousMapping[systemKey], nextMapping[systemKey]].filter(Boolean)));
+}
+
+function pickFirstDefinedValue(source: Record<string, unknown>, aliases: string[]): unknown {
+  for (const alias of aliases) {
+    if (Object.prototype.hasOwnProperty.call(source, alias)) {
+      return source[alias];
+    }
+  }
+  return undefined;
 }
 
 function resolveSystemFieldName(
