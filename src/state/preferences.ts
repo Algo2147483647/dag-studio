@@ -1,4 +1,5 @@
 import type { GraphLayoutMode, GraphMode } from "../graph/types";
+import { getDefaultFieldMapping, sanitizeFieldMapping, type FieldMapping } from "../graph/fieldMapping";
 
 const GRAPH_PAGE_PREFERENCES_KEY = "dag-studio:page-preferences";
 
@@ -7,6 +8,7 @@ export interface GraphPagePreferences {
   layoutMode: GraphLayoutMode;
   consoleSidebarOpen: boolean;
   consoleSidebarWidth: number;
+  fieldMapping: FieldMapping;
 }
 
 interface StorageLike {
@@ -20,6 +22,7 @@ export function getInitialGraphPagePreferences(): GraphPagePreferences {
     layoutMode: "bfs",
     consoleSidebarOpen: false,
     consoleSidebarWidth: 360,
+    fieldMapping: getDefaultFieldMapping(),
   };
 }
 
@@ -57,7 +60,13 @@ export function parseGraphPagePreferences(raw: string | null): Partial<GraphPage
     return null;
   }
 
-  let parsed: { mode?: unknown; layoutMode?: unknown; consoleSidebarOpen?: unknown; consoleSidebarWidth?: unknown } | null;
+  let parsed: {
+    mode?: unknown;
+    layoutMode?: unknown;
+    consoleSidebarOpen?: unknown;
+    consoleSidebarWidth?: unknown;
+    fieldMapping?: unknown;
+  } | null;
   try {
     parsed = JSON.parse(raw) as { mode?: unknown; layoutMode?: unknown } | null;
   } catch {
@@ -79,6 +88,9 @@ export function parseGraphPagePreferences(raw: string | null): Partial<GraphPage
   }
   if (typeof parsed.consoleSidebarWidth === "number" && Number.isFinite(parsed.consoleSidebarWidth)) {
     next.consoleSidebarWidth = clampConsoleSidebarWidth(parsed.consoleSidebarWidth);
+  }
+  if (parsed.fieldMapping && typeof parsed.fieldMapping === "object" && !Array.isArray(parsed.fieldMapping)) {
+    next.fieldMapping = sanitizeFieldMapping(parsed.fieldMapping);
   }
 
   return Object.keys(next).length ? next : null;

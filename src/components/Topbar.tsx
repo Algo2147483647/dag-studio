@@ -34,6 +34,7 @@ interface TopbarProps {
   onInitializeCanvas: () => void;
   onExport: () => void;
   onSaveJson: () => void;
+  onFieldMappingOpen: () => void;
 }
 
 export default function Topbar({
@@ -70,6 +71,7 @@ export default function Topbar({
   onInitializeCanvas,
   onExport,
   onSaveJson,
+  onFieldMappingOpen,
 }: TopbarProps) {
   return (
     <header ref={topbarRef} className="topbar">
@@ -143,6 +145,7 @@ export default function Topbar({
                 <button id="init-canvas-btn" className="ghost-btn settings-action-btn" type="button" onClick={onInitializeCanvas}>Initialize</button>
                 <button id="export-btn" className="ghost-btn settings-action-btn" type="button" disabled={!hasGraph} onClick={onExport}>Export SVG</button>
               </div>
+              <button id="field-mapping-btn" className="ghost-btn settings-action-btn" type="button" onClick={onFieldMappingOpen}>Field Mapping</button>
               <label htmlFor="fileInput" className="file-input-label">
                 <span className="file-input-text">{truncateFileName(fileName)}</span>
                 <input type="file" id="fileInput" accept=".json" onClick={onFileInputClick} onChange={onFileInputChange} />

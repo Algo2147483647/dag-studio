@@ -10,7 +10,7 @@ export function getNodeVisual(nodeKey: NodeKey, node: DagNode & { synthetic?: bo
     };
   }
 
-  const title = sanitizeNodeLabel(node.label || node.title || node.name || nodeKey);
+  const title = sanitizeNodeLabel(node.title || nodeKey);
   const detail = getNodeDetail(node, title);
   const longestLine = Math.max(title.length, detail.length * 0.76);
   const width = clamp(132 + longestLine * 6.1, minNodeWidth, maxNodeWidth);

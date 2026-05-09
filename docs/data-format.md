@@ -42,7 +42,7 @@ Each node is just a JSON object. DAG Studio treats only a small set of fields as
 - `children`: downstream node references
 - `parents`: upstream node references
 - `define`: main description shown in the node card and node viewer
-- `label`, `title`, `name`: optional display-text fallbacks for the node title
+- `title`: optional display text for the node title
 - `type`: optional category used for node color grouping
 
 All other fields are preserved as-is and remain visible in `View Node`.
@@ -52,7 +52,7 @@ Example:
 ```json
 {
   "Linear_Space": {
-    "label": "Linear Space",
+    "title": "Linear Space",
     "define": "A vector space over a field.",
     "parents": {},
     "children": {
@@ -168,7 +168,7 @@ You do not need to maintain both directions perfectly by hand, but keeping both 
 
 ## Rendering Notes
 
-- node title is chosen from `label`, `title`, `name`, or the node key
+- node title is chosen from `title` or the node key
 - node subtitle is derived from `define`
 - edge labels come from relation values in `children` or `parents`
 - card backgrounds stay neutral for readability, even when `type` color grouping is active

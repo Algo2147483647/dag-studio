@@ -63,12 +63,14 @@
 }
 
 .relation-editor-modal.is-visible,
-.save-json-modal.is-visible {
+.save-json-modal.is-visible,
+.field-mapping-modal.is-visible {
   display: flex;
 }
 
 .relation-editor-dialog,
-.save-json-dialog {
+.save-json-dialog,
+.field-mapping-dialog {
   width: min(540px, calc(100vw - 32px));
   padding: 18px;
   border: 1px solid rgba(66, 86, 119, 0.14);
@@ -81,14 +83,16 @@
 }
 
 .relation-editor-dialog h3,
-.save-json-dialog h3 {
+.save-json-dialog h3,
+.field-mapping-dialog h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
 }
 
 .relation-editor-description,
-.save-json-description {
+.save-json-description,
+.field-mapping-description {
   margin: 8px 0 0;
   color: var(--text-muted);
   font-size: 13px;
@@ -106,9 +110,25 @@
   background: rgba(18, 28, 43, 0.28);
 }
 
+.field-mapping-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 56;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(18, 28, 43, 0.32);
+}
+
 .save-json-dialog {
   width: min(460px, calc(100vw - 32px));
   border-radius: 8px;
+}
+
+.field-mapping-dialog {
+  width: min(760px, calc(100vw - 32px));
+  border-radius: 18px;
 }
 
 .save-json-actions {
@@ -131,6 +151,72 @@
 
 .save-json-actions button:disabled:hover {
   transform: none;
+}
+
+.field-mapping-table-wrap {
+  margin-top: 16px;
+  overflow: auto;
+  border: 1px solid rgba(96, 118, 151, 0.14);
+  border-radius: 14px;
+}
+
+.field-mapping-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.field-mapping-table th,
+.field-mapping-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(96, 118, 151, 0.1);
+  text-align: left;
+  font-size: 13px;
+}
+
+.field-mapping-table th {
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: rgba(246, 249, 253, 0.96);
+}
+
+.field-mapping-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.field-mapping-input {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid rgba(96, 118, 151, 0.22);
+  border-radius: 10px;
+  padding: 0 12px;
+  color: var(--text-strong);
+  background: #fff;
+  font: 13px/1.4 "IBM Plex Sans", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  outline: none;
+}
+
+.field-mapping-input:focus {
+  border-color: rgba(40, 95, 223, 0.42);
+  box-shadow: 0 0 0 3px rgba(40, 95, 223, 0.12);
+}
+
+.field-mapping-error {
+  margin: 12px 0 0;
+  color: #a23434;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.field-mapping-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
 }
 
 #relation-editor-input {

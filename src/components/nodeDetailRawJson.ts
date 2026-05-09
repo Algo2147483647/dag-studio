@@ -1,12 +1,14 @@
 import type { NodeKey } from "../graph/types";
+import { remapNodeInput, remapNodeOutput, type FieldMapping } from "../graph/fieldMapping";
 
-export function buildRawNodeEditorValue(nodeKey: NodeKey, node: Record<string, unknown>): string {
-  return JSON.stringify({ [nodeKey]: buildSerializableNode(nodeKey, node) }, null, 2);
+export function buildRawNodeEditorValue(nodeKey: NodeKey, node: Record<string, unknown>, fieldMapping: FieldMapping): string {
+  return JSON.stringify({ [nodeKey]: buildSerializableNode(nodeKey, node, fieldMapping) }, null, 2);
 }
 
 export function parseRawNodeEditorValue(
   rawValue: string,
   fallbackKey: NodeKey,
+  fieldMapping: FieldMapping,
 ): { ok: true; nextKey: NodeKey; fields: Record<string, unknown> } | { ok: false; message: string } {
   let parsed: unknown;
   try {
@@ -34,7 +36,7 @@ export function parseRawNodeEditorValue(
     return { ok: false, message: "Raw JSON must describe a single node object." };
   }
 
-  const fields = { ...(nodeValue as Record<string, unknown>) };
+  const fields = { ...(remapNodeInput(nodeValue as Record<string, unknown>, fieldMapping) as Record<string, unknown>) };
   if (fields.key === nextKey) {
     delete fields.key;
   }
@@ -53,10 +55,10 @@ function getWrappedNodeEntry(value: Record<string, unknown>): [NodeKey, Record<s
   return [nodeKey, nodeValue as Record<string, unknown>];
 }
 
-function buildSerializableNode(nodeKey: NodeKey, node: Record<string, unknown>): Record<string, unknown> {
+function buildSerializableNode(nodeKey: NodeKey, node: Record<string, unknown>, fieldMapping: FieldMapping): Record<string, unknown> {
   const clonedNode: Record<string, unknown> = { ...node };
   if (clonedNode.key === nodeKey) {
     delete clonedNode.key;
   }
-  return clonedNode;
+  return remapNodeOutput(clonedNode, fieldMapping) as Record<string, unknown>;
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { DagNode, GraphMode, NodeKey } from "../graph/types";
+import type { FieldMapping } from "../graph/fieldMapping";
 import { getRelationKeys } from "../graph/relations";
 import NodeFieldEditor, { buildEditableFields, formatEditorValue, parseNodeFieldValue, type EditableField } from "./NodeFieldEditor";
 import { buildRawNodeEditorValue, parseRawNodeEditorValue } from "./nodeDetailRawJson";
@@ -9,12 +10,13 @@ interface NodeDetailModalProps {
   nodeKey: NodeKey | null;
   node: DagNode | null;
   mode: GraphMode;
+  fieldMapping: FieldMapping;
   initialFocus?: "fields" | "raw";
   onSave: (nextKey: NodeKey, fields: Record<string, unknown>) => void;
   onClose: () => void;
 }
 
-export default function NodeDetailModal({ open, nodeKey, node, mode, initialFocus = "fields", onSave, onClose }: NodeDetailModalProps) {
+export default function NodeDetailModal({ open, nodeKey, node, mode, fieldMapping, initialFocus = "fields", onSave, onClose }: NodeDetailModalProps) {
   const [fields, setFields] = useState<EditableField[]>([]);
   const [values, setValues] = useState<Record<string, string>>({});
   const [rawJsonValue, setRawJsonValue] = useState("");
@@ -23,14 +25,14 @@ export default function NodeDetailModal({ open, nodeKey, node, mode, initialFocu
 
   useEffect(() => {
     if (open && node && nodeKey) {
-      const nextFields = buildEditableFields(nodeKey, node);
+      const nextFields = buildEditableFields(nodeKey, node, fieldMapping);
       setFields(nextFields);
       setValues(Object.fromEntries(nextFields.map((field) => [field.name, formatEditorValue(field)])));
-      setRawJsonValue(buildRawNodeEditorValue(nodeKey, node));
+      setRawJsonValue(buildRawNodeEditorValue(nodeKey, node, fieldMapping));
       setLastEdited("fields");
       setError("");
     }
-  }, [node, nodeKey, open]);
+  }, [fieldMapping, node, nodeKey, open]);
 
   useEffect(() => {
     if (!open || initialFocus !== "raw") {
@@ -75,7 +77,7 @@ export default function NodeDetailModal({ open, nodeKey, node, mode, initialFocu
             <div id="node-detail-fields" className="node-detail-fields">
               {fields.length ? fields.map((field) => (
                 <article key={field.name} className="node-detail-field">
-                  <p className="node-detail-field__label">{field.name}</p>
+                  <p className="node-detail-field__label">{field.displayName}</p>
                   <NodeFieldEditor
                     field={field}
                     mode={mode}
@@ -116,7 +118,7 @@ export default function NodeDetailModal({ open, nodeKey, node, mode, initialFocu
     setLastEdited("fields");
     setError("");
 
-    const nextRawJson = tryBuildRawJsonFromFieldValues(fields, nextValues, currentNodeKey);
+    const nextRawJson = tryBuildRawJsonFromFieldValues(fields, nextValues, currentNodeKey, fieldMapping);
     if (nextRawJson) {
       setRawJsonValue(nextRawJson);
     }
@@ -127,19 +129,19 @@ export default function NodeDetailModal({ open, nodeKey, node, mode, initialFocu
     setLastEdited("raw");
     setError("");
 
-    const parsed = parseRawNodeEditorValue(nextRawJson, currentNodeKey);
+    const parsed = parseRawNodeEditorValue(nextRawJson, currentNodeKey, fieldMapping);
     if (!parsed.ok) {
       return;
     }
 
-    const nextFields = buildEditableFields(parsed.nextKey, { ...parsed.fields, key: parsed.nextKey });
+    const nextFields = buildEditableFields(parsed.nextKey, { ...parsed.fields, key: parsed.nextKey }, fieldMapping);
     setFields(nextFields);
     setValues(Object.fromEntries(nextFields.map((field) => [field.name, formatEditorValue(field)])));
   }
 
   function handleSave() {
     if (lastEdited === "raw") {
-      const parsed = parseRawNodeEditorValue(rawJsonValue, currentNodeKey);
+      const parsed = parseRawNodeEditorValue(rawJsonValue, currentNodeKey, fieldMapping);
       if (!parsed.ok) {
         setError(parsed.message);
         return;
@@ -187,6 +189,7 @@ function tryBuildRawJsonFromFieldValues(
   fields: EditableField[],
   values: Record<string, string>,
   fallbackKey: NodeKey,
+  fieldMapping: FieldMapping,
 ): string | null {
   const nextKey = String(values.key ?? fallbackKey).trim();
   if (!nextKey || nextKey.includes("\n") || nextKey.includes(",")) {
@@ -209,7 +212,7 @@ function tryBuildRawJsonFromFieldValues(
     return null;
   }
 
-  return buildRawNodeEditorValue(nextKey, patch);
+  return buildRawNodeEditorValue(nextKey, patch, fieldMapping);
 }
 
 function validateNodeRelations(nextKey: NodeKey, fields: Record<string, unknown>): boolean {

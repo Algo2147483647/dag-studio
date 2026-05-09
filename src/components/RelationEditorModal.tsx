@@ -6,12 +6,13 @@ interface RelationEditorModalProps {
   open: boolean;
   nodeKey: NodeKey | null;
   field: "parents" | "children" | null;
+  fieldLabel?: string;
   node: DagNode | null;
   onSave: (keys: NodeKey[]) => void;
   onClose: () => void;
 }
 
-export default function RelationEditorModal({ open, nodeKey, field, node, onSave, onClose }: RelationEditorModalProps) {
+export default function RelationEditorModal({ open, nodeKey, field, fieldLabel, node, onSave, onClose }: RelationEditorModalProps) {
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
 
@@ -26,11 +27,13 @@ export default function RelationEditorModal({ open, nodeKey, field, node, onSave
     return null;
   }
 
+  const displayFieldName = fieldLabel || field;
+
   return (
     <div id="relation-editor-modal" className="relation-editor-modal is-visible" aria-hidden="false" onClick={(event) => event.target === event.currentTarget && onClose()}>
       <div className="relation-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="relation-editor-title">
-        <h3 id="relation-editor-title">{field === "parents" ? "Edit Parents" : "Edit Children"}</h3>
-        <p id="relation-editor-description" className="relation-editor-description">Editing {field} for node {nodeKey}.</p>
+        <h3 id="relation-editor-title">Edit {displayFieldName}</h3>
+        <p id="relation-editor-description" className="relation-editor-description">Editing {displayFieldName} for node {nodeKey}.</p>
         <textarea id="relation-editor-input" rows={10} spellCheck={false} value={value} onChange={(event) => setValue(event.target.value)} autoFocus />
         <p className="relation-editor-hint">Enter one key per line, or separate keys with commas.</p>
         {error ? <p className="relation-editor-error">{error}</p> : null}

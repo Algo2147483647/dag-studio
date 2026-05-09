@@ -1,4 +1,5 @@
 import type { NodeKey } from "../graph/types";
+import { getDisplayFieldName, type FieldMapping } from "../graph/fieldMapping";
 import { getRelationKeys, normalizeRelationField } from "../graph/relations";
 import { parseRelationInput } from "./RelationEditorModal";
 
@@ -6,6 +7,7 @@ export type FieldEditorKind = "plainText" | "multilineText" | "json" | "relation
 
 export interface EditableField {
   name: string;
+  displayName: string;
   value: unknown;
   editorKind: FieldEditorKind;
   locked?: boolean;
@@ -20,7 +22,7 @@ interface NodeFieldEditorProps {
 
 export default function NodeFieldEditor({ field, mode, value, onChange }: NodeFieldEditorProps) {
   if (mode === "preview") {
-    return <FieldPreview name={field.name} value={field.value} />;
+    return <FieldPreview name={field.name} displayName={field.displayName} value={field.value} />;
   }
 
   if (field.name === "key") {
@@ -41,11 +43,11 @@ export default function NodeFieldEditor({ field, mode, value, onChange }: NodeFi
   );
 }
 
-function FieldPreview({ name, value }: { name: string; value: unknown }) {
+function FieldPreview({ name, displayName, value }: { name: string; displayName: string; value: unknown }) {
   if (name === "parents" || name === "children") {
     const relationKeys = getRelationKeys(value);
     if (!relationKeys.length) {
-      return <p className="node-detail-empty">No {name} linked.</p>;
+      return <p className="node-detail-empty">No {displayName} linked.</p>;
     }
     return (
       <div className="node-detail-chip-list">
@@ -81,15 +83,16 @@ function FieldPreview({ name, value }: { name: string; value: unknown }) {
   return <pre className="node-detail-pre">{JSON.stringify(value, null, 2)}</pre>;
 }
 
-export function buildEditableFields(nodeKey: NodeKey, node: Record<string, unknown>): EditableField[] {
+export function buildEditableFields(nodeKey: NodeKey, node: Record<string, unknown>, fieldMapping: FieldMapping): EditableField[] {
   const clonedNode = { ...node };
   if (clonedNode.key === nodeKey) {
     delete clonedNode.key;
   }
   return [
-    { name: "key", value: nodeKey, editorKind: "plainText" },
+    { name: "key", displayName: "key", value: nodeKey, editorKind: "plainText" },
     ...Object.entries(clonedNode).map(([name, value]) => ({
       name,
+      displayName: getDisplayFieldName(name, fieldMapping),
       value,
       editorKind: inferEditorKind(name, value),
     })),
@@ -130,7 +133,7 @@ export function parseNodeFieldValue(field: EditableField, rawValue: string): { o
   if (typeof field.value === "number") {
     const nextNumber = Number(trimmed);
     if (!trimmed || !Number.isFinite(nextNumber)) {
-      return { ok: false, message: `Field "${field.name}" must be a valid number.` };
+      return { ok: false, message: `Field "${field.displayName}" must be a valid number.` };
     }
     return { ok: true, value: nextNumber };
   }
@@ -142,10 +145,10 @@ export function parseNodeFieldValue(field: EditableField, rawValue: string): { o
     if (/^false$/i.test(trimmed)) {
       return { ok: true, value: false };
     }
-    return { ok: false, message: `Field "${field.name}" must be true or false.` };
+    return { ok: false, message: `Field "${field.displayName}" must be true or false.` };
   }
 
-  return parseJsonEditorValue(field.name, trimmed || "null");
+  return parseJsonEditorValue(field.displayName, trimmed || "null");
 }
 
 function parseJsonEditorValue(fieldName: string, rawJson: string): { ok: true; value: unknown } | { ok: false; message: string } {

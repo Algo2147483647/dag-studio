@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { buildStageData } from "./layout/stage-layout";
 import { applyGraphCommand, type GraphCommand } from "./graph/commands";
 import { createInitialCanvasDag, INITIAL_CANVAS_FILE_NAME } from "./graph/initialCanvas";
+import { getDefaultFieldMapping, getDisplayFieldName, remapGraphInputToSystemFields, remapGraphOutputFromSystemFields, type FieldMapping } from "./graph/fieldMapping";
 import { normalizeDagInput } from "./graph/normalize";
 import { getFullGraphSelection, getInitialSelection, getParentLevelSelection, sanitizeNodeLabel } from "./graph/selectors";
 import { serializeDag } from "./graph/serialize";
@@ -18,9 +19,10 @@ import { useResizeObserver } from "./hooks/useResizeObserver";
 import { repairSelectionAfterCommand } from "./state/derived";
 import { graphReducer, repairHistoryAfterCommand } from "./state/graphReducer";
 import { initialGraphAppState } from "./state/initialState";
-import { saveGraphPagePreferences } from "./state/preferences";
+import { loadGraphPagePreferences, saveGraphPagePreferences } from "./state/preferences";
 import ConsoleSidebar from "./components/ConsoleSidebar";
 import ContextMenu, { type ContextMenuAction } from "./components/ContextMenu";
+import FieldMappingModal from "./components/FieldMappingModal";
 import NodeDetailModal from "./components/NodeDetailModal";
 import RelationEditorModal from "./components/RelationEditorModal";
 import SaveJsonModal from "./components/SaveJsonModal";
@@ -35,6 +37,8 @@ import { CONSOLE_COMMAND_REFERENCE } from "./console/reference";
 
 export default function App() {
   const [state, dispatch] = useReducer(graphReducer, initialGraphAppState);
+  const [fieldMapping, setFieldMapping] = useState<FieldMapping>(() => loadGraphPagePreferences().fieldMapping || getDefaultFieldMapping());
+  const [fieldMappingOpen, setFieldMappingOpen] = useState(false);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
   const [consoleInput, setConsoleInput] = useState("");
@@ -59,8 +63,9 @@ export default function App() {
       layoutMode: state.layout.mode,
       consoleSidebarOpen: state.ui.consoleSidebarOpen,
       consoleSidebarWidth: state.ui.consoleSidebarWidth,
+      fieldMapping,
     });
-  }, [state.layout.mode, state.mode, state.ui.consoleSidebarOpen, state.ui.consoleSidebarWidth]);
+  }, [fieldMapping, state.layout.mode, state.mode, state.ui.consoleSidebarOpen, state.ui.consoleSidebarWidth]);
 
   useEffect(() => {
     if (consoleContextNodeKey && state.dag && !state.dag[consoleContextNodeKey]) {
@@ -81,7 +86,7 @@ export default function App() {
       return state.ui.status;
     }
     const focusNode = stage.dag[stage.root];
-    const focusLabel = focusNode?.synthetic ? focusNode.label || "Selected roots" : sanitizeNodeLabel(focusNode?.label || focusNode?.title || focusNode?.name || stage.root);
+    const focusLabel = focusNode?.synthetic ? focusNode.label || "Selected roots" : sanitizeNodeLabel(focusNode?.title || stage.root);
     const modeLabel = state.mode === "edit" ? "Edit" : "Preview";
     const layoutLabel = getGraphLayoutLabel(state.layout.mode);
     const warningText = stage.warnings.length ? ` ${stage.warnings[0]}` : "";
@@ -115,6 +120,7 @@ export default function App() {
   useOutsideDismiss(Boolean(state.ui.contextMenu), () => dispatch({ type: "contextMenuClosed" }));
   useKeyboardShortcuts({
     onEscape: () => {
+      setFieldMappingOpen(false);
       dispatch({ type: "contextMenuClosed" });
       dispatch({ type: "modalClosed" });
     },
@@ -320,7 +326,7 @@ export default function App() {
     suppressDefaultGraphRef.current = true;
     try {
       const payload = await readJsonFile(file);
-      const dag = normalizeDagInput(payload);
+      const dag = normalizeDagInput(remapGraphInputToSystemFields(payload, fieldMapping));
       dispatch({
         type: "graphLoaded",
         dag,
@@ -459,7 +465,7 @@ export default function App() {
   }
 
   function getCurrentJsonContent(): string {
-    return JSON.stringify(serializeDag(state.dag || {}), null, 2);
+    return JSON.stringify(remapGraphOutputFromSystemFields(serializeDag(state.dag || {}), fieldMapping), null, 2);
   }
 
   async function handleOverwriteJson() {
@@ -531,6 +537,7 @@ export default function App() {
         onInitializeCanvas={initializeCanvas}
         onExport={handleExportSvg}
         onSaveJson={() => state.dag ? dispatch({ type: "saveDialogOpened" }) : dispatch({ type: "statusChanged", status: "Load or render a graph before saving JSON." })}
+        onFieldMappingOpen={() => setFieldMappingOpen(true)}
       />
 
       <Workspace
@@ -619,6 +626,7 @@ export default function App() {
         open={Boolean(relationEditor)}
         nodeKey={relationEditor?.nodeKey || null}
         field={relationEditor?.field || null}
+        fieldLabel={relationEditor?.field ? getDisplayFieldName(relationEditor.field, fieldMapping) : undefined}
         node={relationEditor && state.dag ? state.dag[relationEditor.nodeKey] || null : null}
         onSave={(keys) => {
           if (relationEditor) {
@@ -635,6 +643,7 @@ export default function App() {
         nodeKey={detailNodeKey}
         node={detailNodeKey && state.dag ? state.dag[detailNodeKey] || null : null}
         mode={state.mode}
+        fieldMapping={fieldMapping}
         initialFocus={nodeDetailInitialFocus}
         onSave={(nextKey, fields) => {
           if (detailNodeKey) {
@@ -650,6 +659,16 @@ export default function App() {
         onOverwrite={handleOverwriteJson}
         onSaveNew={handleSaveJsonAsNew}
         onClose={() => dispatch({ type: "saveDialogClosed" })}
+      />
+      <FieldMappingModal
+        open={fieldMappingOpen}
+        mapping={fieldMapping}
+        onSave={(nextMapping) => {
+          setFieldMapping(nextMapping);
+          setFieldMappingOpen(false);
+          dispatch({ type: "statusChanged", status: "Saved field mapping preferences." });
+        }}
+        onClose={() => setFieldMappingOpen(false)}
       />
     </div>
   );
