@@ -4,7 +4,7 @@ import { applyGraphCommand, type GraphCommand } from "./graph/commands";
 import { createInitialCanvasDag, INITIAL_CANVAS_FILE_NAME } from "./graph/initialCanvas";
 import { getDefaultFieldMapping, getDisplayFieldName, remapGraphInputToSystemFields, remapGraphOutputFromSystemFields, type FieldMapping } from "./graph/fieldMapping";
 import { normalizeDagInput } from "./graph/normalize";
-import { getFullGraphSelection, getInitialSelection, getParentLevelSelection, sanitizeNodeLabel } from "./graph/selectors";
+import { getFullGraphSelection, getInitialSelection, getParentLevelSelection, isSelectionValid, sanitizeNodeLabel } from "./graph/selectors";
 import { serializeDag } from "./graph/serialize";
 import { copyTextToClipboard } from "./adapters/clipboard";
 import { buildTimestampFileName, downloadJsonFile, ensureJsonExtension } from "./adapters/download";
@@ -664,9 +664,23 @@ export default function App() {
         open={fieldMappingOpen}
         mapping={fieldMapping}
         onSave={(nextMapping) => {
+          if (state.dag) {
+            const externalGraph = remapGraphOutputFromSystemFields(serializeDag(state.dag), fieldMapping);
+            const nextDag = normalizeDagInput(remapGraphInputToSystemFields(externalGraph, nextMapping));
+            const nextSelection = isSelectionValid(state.selection, nextDag) ? state.selection : getInitialSelection(nextDag);
+            const nextHistory = state.history.filter((item) => isSelectionValid(item, nextDag));
+            dispatch({
+              type: "graphReinterpreted",
+              dag: nextDag,
+              selection: nextSelection,
+              history: nextHistory,
+              status: "Saved field mapping preferences and refreshed the loaded graph.",
+            });
+          } else {
+            dispatch({ type: "statusChanged", status: "Saved field mapping preferences." });
+          }
           setFieldMapping(nextMapping);
           setFieldMappingOpen(false);
-          dispatch({ type: "statusChanged", status: "Saved field mapping preferences." });
         }}
         onClose={() => setFieldMappingOpen(false)}
       />

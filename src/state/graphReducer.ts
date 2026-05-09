@@ -34,6 +34,26 @@ export function graphReducer(state: GraphAppState, action: GraphAction): GraphAp
           status: action.status,
         },
       };
+    case "graphReinterpreted":
+      return {
+        ...state,
+        dag: action.dag,
+        selection: action.selection,
+        history: action.history,
+        editHistory: {
+          ...state.editHistory,
+          undoStack: [],
+          redoStack: [],
+        },
+        ui: {
+          ...state.ui,
+          contextMenu: null,
+          relationEditor: null,
+          nodeDetail: null,
+          saveDialogOpen: false,
+          status: action.status,
+        },
+      };
     case "canvasInitialized":
       return {
         ...initialGraphAppState,
