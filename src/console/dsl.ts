@@ -15,6 +15,8 @@ export type ConsoleInstruction =
   | { type: "delete"; key: ConsoleNodeOperand; recursive: boolean; line: number }
   | { type: "add"; key: string; parentKey?: ConsoleNodeOperand; line: number }
   | { type: "copy"; sourceKey: ConsoleNodeOperand; key: string; parentKey?: ConsoleNodeOperand; line: number }
+  | { type: "setEdge"; parentKey: ConsoleNodeOperand; childKey: ConsoleNodeOperand; weight?: string | number | boolean | null; line: number }
+  | { type: "removeEdge"; parentKey: ConsoleNodeOperand; childKey: ConsoleNodeOperand; line: number }
   | { type: "setParents"; key: ConsoleNodeOperand; keys: ConsoleNodeOperand[]; line: number }
   | { type: "setChildren"; key: ConsoleNodeOperand; keys: ConsoleNodeOperand[]; line: number }
   | { type: "setField"; key: ConsoleNodeOperand; field: string; value: string; line: number }
@@ -130,6 +132,10 @@ function parseInstruction(tokens: ConsoleToken[], line: number): { ok: true; ins
       return parseAddInstruction(tokens, line);
     case "cp":
       return parseCopyInstruction(tokens, line);
+    case "edge":
+      return parseEdgeInstruction(tokens, line);
+    case "rm-edge":
+      return parseRemoveEdgeInstruction(tokens, line);
     case "parents":
       return parseRelationInstruction(tokens, line, "setParents");
     case "children":
@@ -236,6 +242,43 @@ function parseCopyInstruction(tokens: ConsoleToken[], line: number) {
   return { ok: true, instruction: { type: "copy", sourceKey, key, parentKey, line } } as const;
 }
 
+function parseEdgeInstruction(tokens: ConsoleToken[], line: number) {
+  if (tokens.length !== 3 && tokens.length !== 4) {
+    return { ok: false, error: { line, message: "edge expects <parent> <child> or <parent> <child> <weight>." } } as const;
+  }
+
+  const parentKey = parseNodeOperand(tokens[1], true);
+  const childKey = parseNodeOperand(tokens[2], true);
+  if (!parentKey || !childKey) {
+    return { ok: false, error: { line, message: "edge expects <parent> <child> or <parent> <child> <weight>." } } as const;
+  }
+
+  if (tokens.length === 3) {
+    return { ok: true, instruction: { type: "setEdge", parentKey, childKey, line } } as const;
+  }
+
+  const weight = parseScalarLiteralToken(tokens[3]);
+  if (weight === undefined) {
+    return { ok: false, error: { line, message: "edge weight must be a scalar literal." } } as const;
+  }
+
+  return { ok: true, instruction: { type: "setEdge", parentKey, childKey, weight, line } } as const;
+}
+
+function parseRemoveEdgeInstruction(tokens: ConsoleToken[], line: number) {
+  if (tokens.length !== 3) {
+    return { ok: false, error: { line, message: "rm-edge expects <parent> <child>." } } as const;
+  }
+
+  const parentKey = parseNodeOperand(tokens[1], true);
+  const childKey = parseNodeOperand(tokens[2], true);
+  if (!parentKey || !childKey) {
+    return { ok: false, error: { line, message: "rm-edge expects <parent> <child>." } } as const;
+  }
+
+  return { ok: true, instruction: { type: "removeEdge", parentKey, childKey, line } } as const;
+}
+
 function parseRelationInstruction(
   tokens: ConsoleToken[],
   line: number,
@@ -314,6 +357,29 @@ function parseLiteralToken(token: ConsoleToken | undefined): string | null {
     return null;
   }
   return token.value;
+}
+
+function parseScalarLiteralToken(token: ConsoleToken | undefined): string | number | boolean | null | undefined {
+  const value = parseLiteralToken(token);
+  if (value === null) {
+    return undefined;
+  }
+  if (/^true$/i.test(value)) {
+    return true;
+  }
+  if (/^false$/i.test(value)) {
+    return false;
+  }
+  if (/^null$/i.test(value)) {
+    return null;
+  }
+  if (/^-?(?:\d+|\d*\.\d+)$/.test(value)) {
+    const nextNumber = Number(value);
+    if (Number.isFinite(nextNumber)) {
+      return nextNumber;
+    }
+  }
+  return value;
 }
 
 function expectWordToken(token: ConsoleToken | undefined): Extract<ConsoleToken, { type: "word" }> | null {

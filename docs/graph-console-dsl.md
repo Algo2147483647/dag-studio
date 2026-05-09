@@ -135,6 +135,8 @@ The console maintains one implicit **current-node context register**.
 | `rm` | Mutation | Delete a node |
 | `add` | Mutation | Create a node |
 | `cp` | Mutation | Copy a node |
+| `edge` | Mutation | Add or update one directed edge |
+| `rm-edge` | Mutation | Delete one directed edge |
 | `parents` | Mutation | Replace parent set |
 | `children` | Mutation | Replace child set |
 | `set` | Mutation | Replace one node field |
@@ -527,7 +529,81 @@ children Leaf =
 
 ---
 
-## 7.10 `set`
+## 7.10 `edge`
+
+### Synopsis
+
+```sh
+edge <parent> <child>
+edge <parent> <child> <weight>
+```
+
+### Description
+
+Adds a directed edge from the parent node to the child node. When `<weight>` is provided, the relation value is created or updated at the same time.
+
+### Operand Table
+
+| Operand | Required | Description |
+| --- | --- | --- |
+| `<parent>` | Yes | Parent node key or `.` |
+| `<child>` | Yes | Child node key or `.` |
+| `<weight>` | No | Scalar relation value such as `depends_on`, `"subtype of"`, `1`, `true`, or `null` |
+
+### Internal Mapping
+
+| Form | Internal Command |
+| --- | --- |
+| `edge A B` | `{ type: "setEdge", parentKey: "A", childKey: "B" }` |
+| `edge A B depends_on` | `{ type: "setEdge", parentKey: "A", childKey: "B", weight: "depends_on" }` |
+
+### Examples
+
+```sh
+edge Tree AVL
+edge Tree AVL subtype_of
+use Tree
+edge . RedBlack balanced_by
+```
+
+---
+
+## 7.11 `rm-edge`
+
+### Synopsis
+
+```sh
+rm-edge <parent> <child>
+```
+
+### Description
+
+Deletes one directed edge without deleting either node.
+
+### Operand Table
+
+| Operand | Required | Description |
+| --- | --- | --- |
+| `<parent>` | Yes | Parent node key or `.` |
+| `<child>` | Yes | Child node key or `.` |
+
+### Internal Mapping
+
+| Form | Internal Command |
+| --- | --- |
+| `rm-edge A B` | `{ type: "removeEdge", parentKey: "A", childKey: "B" }` |
+
+### Examples
+
+```sh
+rm-edge Tree AVL
+use Tree
+rm-edge . RedBlack
+```
+
+---
+
+## 7.12 `set`
 
 ### Synopsis
 
@@ -572,7 +648,7 @@ set . type "concept"
 
 ---
 
-## 7.11 `json`
+## 7.13 `json`
 
 ### Synopsis
 
@@ -700,6 +776,8 @@ type ConsoleInstruction =
   | { type: "delete"; key: string; recursive: boolean; line: number }
   | { type: "add"; key: string; parentKey?: string; line: number }
   | { type: "copy"; sourceKey: string; key: string; parentKey?: string; line: number }
+  | { type: "setEdge"; parentKey: string; childKey: string; weight?: string | number | boolean | null; line: number }
+  | { type: "removeEdge"; parentKey: string; childKey: string; line: number }
   | { type: "setParents"; key: string; keys: string[]; line: number }
   | { type: "setChildren"; key: string; keys: string[]; line: number }
   | { type: "setField"; key: string; field: string; value: string; line: number }
@@ -777,6 +855,8 @@ json .
 | P0 | `rm -r` |
 | P0 | `add` |
 | P0 | `cp` |
+| P0 | `edge` |
+| P0 | `rm-edge` |
 | P0 | `parents` |
 | P0 | `children` |
 | P0 | `set` |

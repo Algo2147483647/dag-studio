@@ -102,6 +102,26 @@ export function executeConsoleInstructions(
           results.push(result);
           break;
         }
+        case "setEdge": {
+          const parentKey = resolveExistingNodeKey(instruction.parentKey, contextNodeKey, workingDag, instruction.line);
+          const childKey = resolveExistingNodeKey(instruction.childKey, contextNodeKey, workingDag, instruction.line);
+          const result = applyGraphCommand(workingDag, { type: "setEdge", parentKey, childKey, weight: instruction.weight });
+          workingDag = result.dag;
+          contextNodeKey = remapContextKey(contextNodeKey, result);
+          syncUiEffects(uiEffects, result);
+          results.push(result);
+          break;
+        }
+        case "removeEdge": {
+          const parentKey = resolveExistingNodeKey(instruction.parentKey, contextNodeKey, workingDag, instruction.line);
+          const childKey = resolveExistingNodeKey(instruction.childKey, contextNodeKey, workingDag, instruction.line);
+          const result = applyGraphCommand(workingDag, { type: "removeEdge", parentKey, childKey });
+          workingDag = result.dag;
+          contextNodeKey = remapContextKey(contextNodeKey, result);
+          syncUiEffects(uiEffects, result);
+          results.push(result);
+          break;
+        }
         case "setParents": {
           const key = resolveExistingNodeKey(instruction.key, contextNodeKey, workingDag, instruction.line);
           const parents = instruction.keys.map((item) => resolveExistingNodeKey(item, contextNodeKey, workingDag, instruction.line));

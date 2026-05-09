@@ -1,4 +1,5 @@
 import type { DagNode, NodeKey, NormalizedDag, RelationValue } from "./types";
+import { DEFAULT_RELATION_VALUE } from "./types";
 import { ensureReferencedNodes, getRelationKeys, removeRelation, renameRelation, syncBidirectionalRelations } from "./relations";
 import { structuredCloneValue } from "./serialize";
 
@@ -8,6 +9,8 @@ export type GraphCommand =
   | { type: "deleteSubtree"; rootKey: NodeKey }
   | { type: "addNode"; key: NodeKey; parentKey?: NodeKey }
   | { type: "copyNode"; sourceKey: NodeKey; key: NodeKey; parentKey?: NodeKey }
+  | { type: "setEdge"; parentKey: NodeKey; childKey: NodeKey; weight?: RelationValue }
+  | { type: "removeEdge"; parentKey: NodeKey; childKey: NodeKey }
   | { type: "updateNodeFields"; key: NodeKey; nextKey?: NodeKey; fields: Record<string, unknown> }
   | { type: "setParents"; key: NodeKey; parents: NodeKey[] }
   | { type: "setChildren"; key: NodeKey; children: NodeKey[] };
@@ -34,6 +37,10 @@ export function applyGraphCommand(sourceDag: NormalizedDag, command: GraphComman
       return addNode(dag, command.key, command.parentKey);
     case "copyNode":
       return copyNode(dag, command.sourceKey, command.key, command.parentKey);
+    case "setEdge":
+      return setEdge(dag, command.parentKey, command.childKey, command.weight);
+    case "removeEdge":
+      return removeEdge(dag, command.parentKey, command.childKey);
     case "setParents":
       syncBidirectionalRelations(dag, command.key, "parents", command.parents);
       ensureReferencedNodes(dag);
@@ -152,6 +159,67 @@ function copyNode(dag: NormalizedDag, sourceKey: NodeKey, key: NodeKey, parentKe
   };
 }
 
+function setEdge(dag: NormalizedDag, parentKey: NodeKey, childKey: NodeKey, weight: RelationValue = DEFAULT_RELATION_VALUE): CommandResult {
+  const sourceKey = parentKey.trim();
+  const targetKey = childKey.trim();
+  const parentNode = dag[sourceKey];
+  const childNode = dag[targetKey];
+
+  if (!parentNode) {
+    throw new Error(`Node "${sourceKey}" does not exist.`);
+  }
+  if (!childNode) {
+    throw new Error(`Node "${targetKey}" does not exist.`);
+  }
+  if (sourceKey === targetKey) {
+    throw new Error("A node cannot reference itself.");
+  }
+
+  const nextChildren = toRelationMap(parentNode.children);
+  nextChildren[targetKey] = weight;
+  parentNode.children = nextChildren;
+
+  const nextParents = toRelationMap(childNode.parents);
+  nextParents[sourceKey] = weight;
+  childNode.parents = nextParents;
+
+  ensureReferencedNodes(dag);
+  return {
+    dag,
+    changedKeys: [sourceKey, targetKey],
+    message: weight === DEFAULT_RELATION_VALUE
+      ? `Linked ${sourceKey} -> ${targetKey}.`
+      : `Set edge ${sourceKey} -> ${targetKey} to ${String(weight)}.`,
+  };
+}
+
+function removeEdge(dag: NormalizedDag, parentKey: NodeKey, childKey: NodeKey): CommandResult {
+  const sourceKey = parentKey.trim();
+  const targetKey = childKey.trim();
+  const parentNode = dag[sourceKey];
+  const childNode = dag[targetKey];
+
+  if (!parentNode) {
+    throw new Error(`Node "${sourceKey}" does not exist.`);
+  }
+  if (!childNode) {
+    throw new Error(`Node "${targetKey}" does not exist.`);
+  }
+  if (!getRelationKeys(parentNode.children).includes(targetKey)) {
+    throw new Error(`Edge "${sourceKey}" -> "${targetKey}" does not exist.`);
+  }
+
+  removeRelation(parentNode, "children", targetKey);
+  removeRelation(childNode, "parents", sourceKey);
+  ensureReferencedNodes(dag);
+
+  return {
+    dag,
+    changedKeys: [sourceKey, targetKey],
+    message: `Removed edge ${sourceKey} -> ${targetKey}.`,
+  };
+}
+
 function updateNodeFields(dag: NormalizedDag, oldKey: NodeKey, nextKey: NodeKey, fields: Record<string, unknown>): CommandResult {
   const sourceKey = oldKey.trim();
   const targetKey = nextKey.trim();
@@ -239,4 +307,15 @@ function assertValidNewKey(dag: NormalizedDag, key: NodeKey, currentKey?: NodeKe
   if (key !== currentKey && Object.prototype.hasOwnProperty.call(dag, key)) {
     throw new Error(`Node key "${key}" already exists.`);
   }
+}
+
+function toRelationMap(value: unknown): Record<NodeKey, RelationValue> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return { ...(value as Record<NodeKey, RelationValue>) };
+  }
+  const relationMap: Record<NodeKey, RelationValue> = {};
+  getRelationKeys(value).forEach((key) => {
+    relationMap[key] = DEFAULT_RELATION_VALUE;
+  });
+  return relationMap;
 }
