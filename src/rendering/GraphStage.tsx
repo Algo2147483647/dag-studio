@@ -6,6 +6,9 @@ import GraphEdge from "./GraphEdge";
 import GraphNode from "./GraphNode";
 
 const EMPTY_CONNECTED_KEYS = new Set<string>();
+const DENSE_STAGE_NODE_THRESHOLD = 220;
+const DENSE_STAGE_EDGE_THRESHOLD = 440;
+const DENSE_STAGE_AREA_THRESHOLD = 20_000_000;
 
 interface GraphStageProps {
   stage: StageData;
@@ -25,6 +28,9 @@ export default function GraphStage({ stage, focusedKey, svgRef, onNodeClick, onN
   const connectedNodeElementsRef = useRef(new Set<SVGGElement>());
   const activeEdgeElementsRef = useRef(new Set<SVGPathElement>());
   const currentNodeElementRef = useRef<SVGGElement | null>(null);
+  const isDenseStage = stage.nodes.length >= DENSE_STAGE_NODE_THRESHOLD
+    || stage.edges.length >= DENSE_STAGE_EDGE_THRESHOLD
+    || stage.stageWidth * stage.stageHeight >= DENSE_STAGE_AREA_THRESHOLD;
 
   const clearInteractiveClasses = useCallback(() => {
     const svgElement = svgRef.current;
@@ -140,27 +146,46 @@ export default function GraphStage({ stage, focusedKey, svgRef, onNodeClick, onN
     nodeElementsByKeyRef.current = collectNodeElements(svgElement);
     edgeElementsByNodeKeyRef.current = collectEdgeElements(svgElement);
     syncInteractiveKey(hoveredKeyRef.current);
+    let frameHandle = 0;
+    let pendingKey: string | null = null;
 
-    const handlePointerMove = (event: PointerEvent) => {
-      const nextKey = resolveNodeKey(event.target);
-      if (hoveredKeyRef.current === nextKey) {
+    const scheduleInteractiveKey = (nextKey: string | null) => {
+      pendingKey = nextKey;
+      if (frameHandle) {
         return;
       }
-      syncInteractiveKey(nextKey);
+      frameHandle = window.requestAnimationFrame(() => {
+        frameHandle = 0;
+        if (hoveredKeyRef.current === pendingKey) {
+          return;
+        }
+        syncInteractiveKey(pendingKey);
+      });
+    };
+
+    const handlePointerOver = (event: PointerEvent) => {
+      scheduleInteractiveKey(resolveNodeKey(event.target));
     };
 
     const handlePointerLeave = () => {
+      if (frameHandle) {
+        window.cancelAnimationFrame(frameHandle);
+        frameHandle = 0;
+      }
       if (!hoveredKeyRef.current) {
         return;
       }
       syncInteractiveKey(null);
     };
 
-    svgElement.addEventListener("pointermove", handlePointerMove);
+    svgElement.addEventListener("pointerover", handlePointerOver);
     svgElement.addEventListener("pointerleave", handlePointerLeave);
 
     return () => {
-      svgElement.removeEventListener("pointermove", handlePointerMove);
+      if (frameHandle) {
+        window.cancelAnimationFrame(frameHandle);
+      }
+      svgElement.removeEventListener("pointerover", handlePointerOver);
       svgElement.removeEventListener("pointerleave", handlePointerLeave);
       hoveredKeyRef.current = null;
       appliedInteractiveKeyRef.current = null;
@@ -172,7 +197,7 @@ export default function GraphStage({ stage, focusedKey, svgRef, onNodeClick, onN
 
   return (
     <svg
-      className="graph-stage"
+      className={`graph-stage${isDenseStage ? " graph-stage--dense" : ""}`}
       ref={svgRef}
       viewBox={`0 0 ${stage.stageWidth} ${stage.stageHeight}`}
       width={stage.stageWidth}

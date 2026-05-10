@@ -2,14 +2,24 @@
   fill: none;
 }
 
+.graph-stage.graph-stage--dense .graph-edge,
+.graph-stage.graph-stage--dense .graph-node,
+.graph-stage.graph-stage--dense .graph-node__glow,
+.graph-stage.graph-stage--dense .graph-node__shape,
+.graph-stage.graph-stage--dense .graph-node__affordance {
+  transition: none;
+}
+
 .graph-stage__halo {
   fill: rgba(255, 255, 255, 0.8);
+  pointer-events: none;
 }
 
 .graph-stage__lane {
   stroke: rgba(89, 107, 139, 0.12);
   stroke-width: 1;
   stroke-dasharray: 2 12;
+  pointer-events: none;
 }
 
 .graph-stage__lane-label {
@@ -18,10 +28,12 @@
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  pointer-events: none;
 }
 
 .graph-stage__focus {
   fill: rgba(39, 79, 152, 0.04);
+  pointer-events: none;
 }
 
 .graph-edge-group {
@@ -174,4 +186,11 @@
 .graph-stage.has-interactive-node .graph-node:hover,
 .graph-stage.has-interactive-node .graph-node.is-current {
   opacity: 1;
+}
+
+.graph-stage.graph-stage--dense .graph-node__shape,
+.graph-stage.graph-stage--dense .graph-node:hover .graph-node__shape,
+.graph-stage.graph-stage--dense .graph-node.is-current .graph-node__shape,
+.graph-stage.graph-stage--dense .graph-node.is-active .graph-node__shape {
+  filter: none;
 }
