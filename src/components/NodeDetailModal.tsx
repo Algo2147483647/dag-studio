@@ -31,7 +31,7 @@ export default function NodeDetailModal({ open, nodeKey, node, mode, fieldMappin
       setValues(Object.fromEntries(nextFields.map((field) => [field.name, formatEditorValue(field)])));
       setRawJsonValue(buildRawNodeEditorValue(nodeKey, node, fieldMapping));
       setLastEdited("fields");
-      setMarkdownFields({});
+      setMarkdownFields(buildDefaultMarkdownFieldState(nextFields));
       setError("");
     }
   }, [fieldMapping, node, nodeKey, open]);
@@ -154,7 +154,10 @@ export default function NodeDetailModal({ open, nodeKey, node, mode, fieldMappin
     const nextFields = buildEditableFields(parsed.nextKey, { ...parsed.fields, key: parsed.nextKey }, fieldMapping);
     setFields(nextFields);
     setValues(Object.fromEntries(nextFields.map((field) => [field.name, formatEditorValue(field)])));
-    setMarkdownFields((current) => Object.fromEntries(nextFields.filter((field) => supportsMarkdown(field) && current[field.name]).map((field) => [field.name, true])));
+    setMarkdownFields((current) => {
+      const defaults = buildDefaultMarkdownFieldState(nextFields);
+      return Object.fromEntries(Object.keys(defaults).map((fieldName) => [fieldName, current[fieldName] ?? true]));
+    });
   }
 
   function handleSave() {
@@ -241,4 +244,8 @@ function validateNodeRelations(nextKey: NodeKey, fields: Record<string, unknown>
   const parentKeys = getRelationKeys(fields.parents);
   const childKeys = getRelationKeys(fields.children);
   return !parentKeys.includes(nextKey) && !childKeys.includes(nextKey);
+}
+
+function buildDefaultMarkdownFieldState(fields: EditableField[]): Record<string, boolean> {
+  return Object.fromEntries(fields.filter((field) => supportsMarkdown(field)).map((field) => [field.name, true]));
 }
