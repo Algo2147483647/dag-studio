@@ -60,6 +60,12 @@ export function truncate(text: string, maxLength: number): string {
   return `${text.slice(0, maxLength - 1)}...`;
 }
 
+export function truncateTitleToWidth(text: string, nodeWidth: number): string {
+  const availableWidth = Math.max(nodeWidth - 74, 72);
+  const estimatedMaxLength = Math.max(10, Math.floor(availableWidth / 7.1));
+  return truncate(text, estimatedMaxLength);
+}
+
 export function wrapDetailText(text: string, maxLineLength: number, maxLines: number): string[] {
   const normalized = String(text || "").replace(/\s+/g, " ").trim();
   if (!normalized) {

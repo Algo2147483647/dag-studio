@@ -3,7 +3,7 @@ import { DEFAULT_GRAPH_THEME } from "../graph/types";
 import { getRelationKeys } from "../graph/relations";
 import { structuredCloneValue } from "../graph/serialize";
 import { resolveStageEdgeGeometry } from "./edgeGeometry";
-import { getNodeVisual, truncate, wrapDetailText } from "./text";
+import { getNodeVisual, truncateTitleToWidth, wrapDetailText } from "./text";
 import { resolveStageSelection, withSyntheticSelectionRoot } from "./selection";
 import type { LayoutRoutePoint, StageData, StageNode, StageNodeColorTokens, StageRoutePoint } from "./types";
 import { buildLevelLayout } from "./algorithms/level";
@@ -13,7 +13,6 @@ import { buildSugiyamaStageRoutes, buildSugiyamaVerticalPlanner } from "./sugiya
 
 const DETAIL_MAX_LINE_LENGTH = 48;
 const DETAIL_MAX_LINES = 2;
-const DISPLAY_TITLE_MAX_LENGTH = 24;
 
 export function buildStageData(input: {
   dag: NormalizedDag;
@@ -60,7 +59,7 @@ export function buildStageData(input: {
       layer,
       order,
       title: visual.title,
-      displayTitle: truncate(visual.title, DISPLAY_TITLE_MAX_LENGTH),
+      displayTitle: truncateTitleToWidth(visual.title, visual.width),
       detail: visual.detail,
       detailLines: visual.detail ? wrapDetailText(visual.detail, DETAIL_MAX_LINE_LENGTH, DETAIL_MAX_LINES) : [],
       typeLabel,
