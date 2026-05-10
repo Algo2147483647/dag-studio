@@ -14,6 +14,9 @@ const DETAIL_MAX_LINE_LENGTH = 48;
 const DETAIL_MAX_LINES = 2;
 const DISPLAY_TITLE_MAX_LENGTH = 24;
 const SUGIYAMA_CHANNEL_INSET = 12;
+const SUGIYAMA_CHANNEL_SPACING = 10;
+const SUGIYAMA_CHANNEL_MAX_SPREAD = 44;
+const SUGIYAMA_CHANNEL_INTERVAL_GAP = 6;
 
 interface SugiyamaLogicalRouteVertex {
   layer: number;
@@ -24,6 +27,15 @@ interface SugiyamaBoundarySegment {
   edgeId: string;
   upper: SugiyamaLogicalRouteVertex;
   lower: SugiyamaLogicalRouteVertex;
+  startY: number;
+  endY: number;
+}
+
+interface SugiyamaBoundaryBundle {
+  bundleKey: string;
+  segments: SugiyamaBoundarySegment[];
+  startY: number;
+  endY: number;
 }
 
 export function buildStageData(input: {
@@ -489,33 +501,22 @@ function buildSugiyamaStageRoutes(input: {
       if (!boundarySegments.has(upper.layer)) {
         boundarySegments.set(upper.layer, []);
       }
-      boundarySegments.get(upper.layer)!.push({ edgeId, upper, lower });
+      boundarySegments.get(upper.layer)!.push({
+        edgeId,
+        upper,
+        lower,
+        startY: getLayerOrderCenterY(upper.layer, upper.order, slotCountsByLayer, stageInnerHeight, theme),
+        endY: getLayerOrderCenterY(lower.layer, lower.order, slotCountsByLayer, stageInnerHeight, theme),
+      });
     }
   });
 
   const channelXByBoundary = new Map<number, Map<string, number>>();
   boundarySegments.forEach((segments, boundaryLayer) => {
-    const leftLayer = layerBounds.get(boundaryLayer);
-    const rightLayer = layerBounds.get(boundaryLayer + 1);
-    const corridorStart = (leftLayer?.right ?? leftLayer?.center ?? 0) + SUGIYAMA_CHANNEL_INSET;
-    const corridorEnd = (rightLayer?.left ?? rightLayer?.center ?? corridorStart) - SUGIYAMA_CHANNEL_INSET;
-    const sortedSegments = segments
-      .slice()
-      .sort((left, right) => compareSugiyamaBoundarySegments(left, right));
-    const xByEdge = new Map<string, number>();
-    const center = corridorStart <= corridorEnd ? (corridorStart + corridorEnd) / 2 : corridorStart;
-
-    sortedSegments.forEach((segment, index) => {
-      let x = center;
-      if (corridorStart < corridorEnd) {
-        x = sortedSegments.length === 1
-          ? center
-          : corridorStart + ((corridorEnd - corridorStart) * index) / (sortedSegments.length - 1);
-      }
-      xByEdge.set(segment.edgeId, x);
-    });
-
-    channelXByBoundary.set(boundaryLayer, xByEdge);
+    channelXByBoundary.set(
+      boundaryLayer,
+      assignSugiyamaBoundaryChannels(segments, boundaryLayer, layerBounds),
+    );
   });
 
   const stageRoutes = new Map<string, StageRoutePoint[]>();
@@ -612,6 +613,90 @@ function compareSugiyamaBoundarySegments(left: SugiyamaBoundarySegment, right: S
   return left.edgeId.localeCompare(right.edgeId);
 }
 
+function assignSugiyamaBoundaryChannels(
+  segments: SugiyamaBoundarySegment[],
+  boundaryLayer: number,
+  layerBounds: Map<number, { left: number; right: number; center: number }>,
+): Map<string, number> {
+  const leftLayer = layerBounds.get(boundaryLayer);
+  const rightLayer = layerBounds.get(boundaryLayer + 1);
+  const corridorStart = (leftLayer?.right ?? leftLayer?.center ?? 0) + SUGIYAMA_CHANNEL_INSET;
+  const corridorEnd = (rightLayer?.left ?? rightLayer?.center ?? corridorStart) - SUGIYAMA_CHANNEL_INSET;
+  const corridorWidth = Math.max(corridorEnd - corridorStart, 0);
+  const center = corridorStart <= corridorEnd ? (corridorStart + corridorEnd) / 2 : corridorStart;
+
+  const bundles = buildSugiyamaBoundaryBundles(segments);
+  const sortedBundles = bundles.slice().sort((left, right) => {
+    if (left.startY !== right.startY) {
+      return left.startY - right.startY;
+    }
+    if (left.endY !== right.endY) {
+      return left.endY - right.endY;
+    }
+    return left.bundleKey.localeCompare(right.bundleKey);
+  });
+
+  const channelTailY: number[] = [];
+  const channelIndexByBundle = new Map<string, number>();
+  sortedBundles.forEach((bundle) => {
+    let channelIndex = channelTailY.findIndex((tailY) => bundle.startY >= tailY + SUGIYAMA_CHANNEL_INTERVAL_GAP);
+    if (channelIndex === -1) {
+      channelIndex = channelTailY.length;
+      channelTailY.push(bundle.endY);
+    } else {
+      channelTailY[channelIndex] = bundle.endY;
+    }
+    channelIndexByBundle.set(bundle.bundleKey, channelIndex);
+  });
+
+  const channelCount = Math.max(channelTailY.length, 1);
+  const preferredSpread = Math.min(
+    (channelCount - 1) * SUGIYAMA_CHANNEL_SPACING,
+    SUGIYAMA_CHANNEL_MAX_SPREAD,
+    corridorWidth,
+  );
+  const step = channelCount > 1 ? preferredSpread / (channelCount - 1) : 0;
+  const bandStart = center - preferredSpread / 2;
+  const xByEdge = new Map<string, number>();
+
+  bundles.forEach((bundle) => {
+    const channelIndex = channelIndexByBundle.get(bundle.bundleKey) || 0;
+    const x = channelCount === 1 ? center : bandStart + channelIndex * step;
+    const snappedX = snapSvgCoordinate(clamp(x, corridorStart, corridorEnd));
+    bundle.segments.forEach((segment) => {
+      xByEdge.set(segment.edgeId, snappedX);
+    });
+  });
+
+  return xByEdge;
+}
+
+function buildSugiyamaBoundaryBundles(segments: SugiyamaBoundarySegment[]): SugiyamaBoundaryBundle[] {
+  const bundlesByKey = new Map<string, SugiyamaBoundaryBundle>();
+
+  segments.forEach((segment) => {
+    const bundleKey = `${segment.upper.layer}:${segment.upper.order}`;
+    const intervalStart = Math.min(segment.startY, segment.endY);
+    const intervalEnd = Math.max(segment.startY, segment.endY);
+    const existing = bundlesByKey.get(bundleKey);
+    if (existing) {
+      existing.segments.push(segment);
+      existing.startY = Math.min(existing.startY, intervalStart);
+      existing.endY = Math.max(existing.endY, intervalEnd);
+      return;
+    }
+
+    bundlesByKey.set(bundleKey, {
+      bundleKey,
+      segments: [segment],
+      startY: intervalStart,
+      endY: intervalEnd,
+    });
+  });
+
+  return Array.from(bundlesByKey.values());
+}
+
 function getLayerOrderCenterY(
   layer: number,
   order: number,
@@ -675,6 +760,14 @@ function isCollinearOrthogonal(
 
 function nearlyEqual(left: number, right: number): boolean {
   return Math.abs(left - right) < 0.001;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function snapSvgCoordinate(value: number): number {
+  return Math.round(value) + 0.5;
 }
 
 function getEdgeLabel(weight: unknown): string {
