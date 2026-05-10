@@ -9,7 +9,7 @@ import type { LayoutRoutePoint, StageData, StageNode, StageNodeColorTokens, Stag
 import { buildLevelLayout } from "./algorithms/level";
 import { buildDagreLayout } from "./algorithms/dagre";
 import { buildSugiyamaLayout } from "./algorithms/sugiyama";
-import { buildSugiyamaStageRoutes } from "./sugiyama-edge-routing";
+import { buildSugiyamaStageRoutes, buildSugiyamaVerticalPlanner } from "./sugiyama-edge-routing";
 
 const DETAIL_MAX_LINE_LENGTH = 48;
 const DETAIL_MAX_LINES = 2;
@@ -91,6 +91,7 @@ export function buildStageData(input: {
   let stageWidth = 0;
   let stageHeight = 0;
   let absoluteOffset: { x: number; y: number } | undefined;
+  let sugiyamaVerticalPlanner: ReturnType<typeof buildSugiyamaVerticalPlanner> | undefined;
 
   if (layoutResult.nodePositions?.size) {
     const absoluteGeometry = applyAbsoluteLayoutGeometry({
@@ -110,6 +111,16 @@ export function buildStageData(input: {
     stageHeight = absoluteGeometry.stageHeight;
     absoluteOffset = absoluteGeometry.absoluteOffset;
   } else {
+    if (layoutMode === "sugiyama") {
+      sugiyamaVerticalPlanner = buildSugiyamaVerticalPlanner({
+        nodesByLayer,
+        logicalSlotCountsByLayer: slotCountsByLayer,
+        sortedLayers,
+        theme,
+      });
+      stageInnerHeight = sugiyamaVerticalPlanner.stageInnerHeight;
+    }
+
     sortedLayers.forEach((layer) => {
       const layerNodes = (nodesByLayer.get(layer) || []).sort((a, b) => a.order - b.order);
       if (layoutMode === "level" && layer > 0) {
@@ -124,6 +135,20 @@ export function buildStageData(input: {
         layerNodes.forEach((nodeData, index) => {
           nodeData.order = index;
         });
+      }
+
+       if (layoutMode === "sugiyama" && sugiyamaVerticalPlanner) {
+        layerNodes.forEach((nodeData) => {
+          const displayOrder = sugiyamaVerticalPlanner?.nodeDisplayOrderByKey.get(nodeData.key);
+          const centerY = sugiyamaVerticalPlanner?.nodeCenterYByKey.get(nodeData.key);
+          if (displayOrder !== undefined) {
+            nodeData.order = displayOrder;
+          }
+          if (centerY !== undefined) {
+            nodeData.y = centerY;
+          }
+        });
+        return;
       }
 
       const slotCount = slotCountsByLayer.get(layer) || layerNodes.length || 1;
@@ -166,11 +191,13 @@ export function buildStageData(input: {
           edgeRoutes: layoutResult.edgeRoutes,
           nodeMap,
           nodesByLayer,
-          slotCountsByLayer,
-          stageInnerHeight,
-          theme,
           laneCenters,
-          absoluteOffset,
+          planner: sugiyamaVerticalPlanner || buildSugiyamaVerticalPlanner({
+            nodesByLayer,
+            logicalSlotCountsByLayer: slotCountsByLayer,
+            sortedLayers,
+            theme,
+          }),
         })
     : undefined;
 
