@@ -5,7 +5,7 @@ import { structuredCloneValue } from "../graph/serialize";
 import { resolveStageEdgeGeometry } from "./edgeGeometry";
 import { getNodeVisual, truncate, wrapDetailText } from "./text";
 import { resolveStageSelection, withSyntheticSelectionRoot } from "./selection";
-import type { LayoutRoutePoint, StageData, StageNode, StageNodeColorTokens, StageRoutePoint } from "./types";
+import type { LayoutEdgeRoute, LayoutRoutePoint, StageData, StageNode, StageNodeColorTokens, StageRoutePoint } from "./types";
 import { buildBfsLayout } from "./algorithms/bfs";
 import { buildDagreLayout } from "./algorithms/dagre";
 import { buildSugiyamaLayout } from "./algorithms/sugiyama";
@@ -13,6 +13,18 @@ import { buildSugiyamaLayout } from "./algorithms/sugiyama";
 const DETAIL_MAX_LINE_LENGTH = 48;
 const DETAIL_MAX_LINES = 2;
 const DISPLAY_TITLE_MAX_LENGTH = 24;
+const SUGIYAMA_CHANNEL_INSET = 12;
+
+interface SugiyamaLogicalRouteVertex {
+  layer: number;
+  order: number;
+}
+
+interface SugiyamaBoundarySegment {
+  edgeId: string;
+  upper: SugiyamaLogicalRouteVertex;
+  lower: SugiyamaLogicalRouteVertex;
+}
 
 export function buildStageData(input: {
   dag: NormalizedDag;
@@ -160,6 +172,19 @@ export function buildStageData(input: {
     stageHeight = stageInnerHeight + theme.stagePaddingY * 2;
   }
 
+  const sugiyamaStageRoutes = layoutMode === "sugiyama"
+      ? buildSugiyamaStageRoutes({
+          edgeRoutes: layoutResult.edgeRoutes,
+          nodeMap,
+          nodesByLayer,
+          slotCountsByLayer,
+          stageInnerHeight,
+          theme,
+          laneCenters,
+          absoluteOffset,
+        })
+    : undefined;
+
   nodeKeys.forEach((sourceKey) => {
     const sourceNode = layoutDag[sourceKey];
     const children = sourceNode.children || [];
@@ -170,9 +195,11 @@ export function buildStageData(input: {
       }
       const weight = Array.isArray(children) ? 1 : (children as Record<NodeKey, RelationValue>)[targetKey];
       const route = layoutResult.edgeRoutes?.get(`${sourceKey}-->${targetKey}`);
-      const points = route?.points.map((point) => (
-        getRoutePointPosition(point, laneCenters, slotCountsByLayer, stageInnerHeight, theme, absoluteOffset)
-      ));
+      const points = layoutMode === "sugiyama"
+        ? sugiyamaStageRoutes?.get(`${sourceKey}-->${targetKey}`)
+        : route?.points.map((point) => (
+            getRoutePointPosition(point, laneCenters, slotCountsByLayer, stageInnerHeight, theme, absoluteOffset)
+          ));
       edges.push({
         id: `${sourceKey}-->${targetKey}`,
         source: sourceKey,
@@ -423,6 +450,231 @@ function getRoutePointPosition(
     x: laneCenters.get(point.layer) || theme.stagePaddingX,
     y: startY + point.order * (theme.nodeHeight + theme.rowGap) + theme.nodeHeight / 2,
   };
+}
+
+function buildSugiyamaStageRoutes(input: {
+  edgeRoutes: Map<string, LayoutEdgeRoute> | undefined;
+  nodeMap: Record<NodeKey, StageNode>;
+  nodesByLayer: Map<number, StageNode[]>;
+  slotCountsByLayer: Map<number, number>;
+  stageInnerHeight: number;
+  theme: GraphTheme;
+  laneCenters: Map<number, number>;
+  absoluteOffset?: { x: number; y: number };
+}): Map<string, StageRoutePoint[]> {
+  const { edgeRoutes, nodeMap, nodesByLayer, slotCountsByLayer, stageInnerHeight, theme, laneCenters, absoluteOffset } = input;
+  if (!edgeRoutes?.size) {
+    return new Map();
+  }
+
+  const layerBounds = buildSugiyamaLayerBounds(nodesByLayer);
+  const boundarySegments = new Map<number, SugiyamaBoundarySegment[]>();
+  const logicalRoutes = new Map<string, SugiyamaLogicalRouteVertex[]>();
+
+  edgeRoutes.forEach((route, edgeId) => {
+    const sourceNode = nodeMap[route.source];
+    const targetNode = nodeMap[route.target];
+    if (!sourceNode || !targetNode) {
+      return;
+    }
+
+    const logicalRoute = buildSugiyamaLogicalRoute(route, sourceNode, targetNode);
+    logicalRoutes.set(edgeId, logicalRoute);
+    for (let index = 0; index < logicalRoute.length - 1; index += 1) {
+      const upper = logicalRoute[index];
+      const lower = logicalRoute[index + 1];
+      if (lower.layer !== upper.layer + 1) {
+        continue;
+      }
+      if (!boundarySegments.has(upper.layer)) {
+        boundarySegments.set(upper.layer, []);
+      }
+      boundarySegments.get(upper.layer)!.push({ edgeId, upper, lower });
+    }
+  });
+
+  const channelXByBoundary = new Map<number, Map<string, number>>();
+  boundarySegments.forEach((segments, boundaryLayer) => {
+    const leftLayer = layerBounds.get(boundaryLayer);
+    const rightLayer = layerBounds.get(boundaryLayer + 1);
+    const corridorStart = (leftLayer?.right ?? leftLayer?.center ?? 0) + SUGIYAMA_CHANNEL_INSET;
+    const corridorEnd = (rightLayer?.left ?? rightLayer?.center ?? corridorStart) - SUGIYAMA_CHANNEL_INSET;
+    const sortedSegments = segments
+      .slice()
+      .sort((left, right) => compareSugiyamaBoundarySegments(left, right));
+    const xByEdge = new Map<string, number>();
+    const center = corridorStart <= corridorEnd ? (corridorStart + corridorEnd) / 2 : corridorStart;
+
+    sortedSegments.forEach((segment, index) => {
+      let x = center;
+      if (corridorStart < corridorEnd) {
+        x = sortedSegments.length === 1
+          ? center
+          : corridorStart + ((corridorEnd - corridorStart) * index) / (sortedSegments.length - 1);
+      }
+      xByEdge.set(segment.edgeId, x);
+    });
+
+    channelXByBoundary.set(boundaryLayer, xByEdge);
+  });
+
+  const stageRoutes = new Map<string, StageRoutePoint[]>();
+  logicalRoutes.forEach((logicalRoute, edgeId) => {
+    const sourceNode = nodeMap[edgeRoutes.get(edgeId)?.source || ""];
+    const targetNode = nodeMap[edgeRoutes.get(edgeId)?.target || ""];
+    if (!sourceNode || !targetNode) {
+      return;
+    }
+
+    if (logicalRoute.length < 2 || logicalRoute[0].layer >= logicalRoute[logicalRoute.length - 1].layer) {
+      stageRoutes.set(
+        edgeId,
+        (edgeRoutes.get(edgeId)?.points || []).map((point) =>
+          getRoutePointPosition(point, laneCenters, slotCountsByLayer, stageInnerHeight, theme, absoluteOffset),
+        ),
+      );
+      return;
+    }
+
+    const points: StageRoutePoint[] = [];
+    let currentY = sourceNode.y;
+
+    for (let index = 0; index < logicalRoute.length - 1; index += 1) {
+      const upper = logicalRoute[index];
+      const lower = logicalRoute[index + 1];
+      if (lower.layer !== upper.layer + 1) {
+        continue;
+      }
+
+      const channelX = channelXByBoundary.get(upper.layer)?.get(edgeId);
+      if (channelX === undefined) {
+        continue;
+      }
+
+      points.push({ layer: upper.layer, order: upper.order, x: channelX, y: currentY });
+      currentY = getLayerOrderCenterY(lower.layer, lower.order, slotCountsByLayer, stageInnerHeight, theme);
+      points.push({ layer: lower.layer, order: lower.order, x: channelX, y: currentY });
+
+      const next = logicalRoute[index + 2];
+      if (next && next.layer === lower.layer + 1) {
+        const nextChannelX = channelXByBoundary.get(lower.layer)?.get(edgeId);
+        if (nextChannelX !== undefined) {
+          points.push({ layer: lower.layer, order: lower.order, x: nextChannelX, y: currentY });
+        }
+      }
+    }
+
+    stageRoutes.set(edgeId, simplifyStageRoutePoints(points, sourceNode, targetNode));
+  });
+
+  return stageRoutes;
+}
+
+function buildSugiyamaLayerBounds(nodesByLayer: Map<number, StageNode[]>): Map<number, { left: number; right: number; center: number }> {
+  const bounds = new Map<number, { left: number; right: number; center: number }>();
+  nodesByLayer.forEach((nodes, layer) => {
+    if (!nodes.length) {
+      return;
+    }
+    const left = Math.min(...nodes.map((node) => node.x - node.width / 2));
+    const right = Math.max(...nodes.map((node) => node.x + node.width / 2));
+    const center = nodes.reduce((sum, node) => sum + node.x, 0) / nodes.length;
+    bounds.set(layer, { left, right, center });
+  });
+  return bounds;
+}
+
+function buildSugiyamaLogicalRoute(
+  route: LayoutEdgeRoute,
+  sourceNode: StageNode,
+  targetNode: StageNode,
+): SugiyamaLogicalRouteVertex[] {
+  const intermediate = sourceNode.layer <= targetNode.layer ? route.points : route.points.slice().reverse();
+  return [
+    { layer: sourceNode.layer, order: sourceNode.order },
+    ...intermediate.map((point) => ({ layer: point.layer, order: point.order })),
+    { layer: targetNode.layer, order: targetNode.order },
+  ];
+}
+
+function compareSugiyamaBoundarySegments(left: SugiyamaBoundarySegment, right: SugiyamaBoundarySegment): number {
+  const leftAverage = (left.upper.order + left.lower.order) / 2;
+  const rightAverage = (right.upper.order + right.lower.order) / 2;
+  if (leftAverage !== rightAverage) {
+    return leftAverage - rightAverage;
+  }
+  if (left.upper.order !== right.upper.order) {
+    return left.upper.order - right.upper.order;
+  }
+  if (left.lower.order !== right.lower.order) {
+    return left.lower.order - right.lower.order;
+  }
+  return left.edgeId.localeCompare(right.edgeId);
+}
+
+function getLayerOrderCenterY(
+  layer: number,
+  order: number,
+  slotCountsByLayer: Map<number, number>,
+  stageInnerHeight: number,
+  theme: GraphTheme,
+): number {
+  const slotCount = slotCountsByLayer.get(layer) || 1;
+  const layerHeight = slotCount * theme.nodeHeight + Math.max(slotCount - 1, 0) * theme.rowGap;
+  const startY = theme.stagePaddingY + (stageInnerHeight - layerHeight) / 2;
+  return startY + order * (theme.nodeHeight + theme.rowGap) + theme.nodeHeight / 2;
+}
+
+function simplifyStageRoutePoints(points: StageRoutePoint[], sourceNode: StageNode, targetNode: StageNode): StageRoutePoint[] {
+  const simplified: StageRoutePoint[] = [];
+  const start = { x: sourceNode.x + sourceNode.width / 2 + 4, y: sourceNode.y };
+  const end = { x: targetNode.x - targetNode.width / 2, y: targetNode.y };
+
+  points.forEach((point) => {
+    const previous = simplified[simplified.length - 1];
+    if (previous && nearlyEqual(previous.x, point.x) && nearlyEqual(previous.y, point.y)) {
+      return;
+    }
+    simplified.push(point);
+    while (simplified.length >= 3) {
+      const current = simplified[simplified.length - 1];
+      const middle = simplified[simplified.length - 2];
+      const before = simplified[simplified.length - 3];
+      const first = simplified.length === 3 ? start : simplified[simplified.length - 4];
+      const next = current;
+      if (isCollinearOrthogonal(first, before, middle) || isCollinearOrthogonal(before, middle, next)) {
+        simplified.splice(simplified.length - 2, 1);
+        continue;
+      }
+      break;
+    }
+  });
+
+  while (simplified.length && nearlyEqual(simplified[0].x, start.x) && nearlyEqual(simplified[0].y, start.y)) {
+    simplified.shift();
+  }
+  while (simplified.length && nearlyEqual(simplified[simplified.length - 1].x, end.x) && nearlyEqual(simplified[simplified.length - 1].y, end.y)) {
+    simplified.pop();
+  }
+
+  return simplified.filter((point, index) => {
+    const previous = index === 0 ? start : simplified[index - 1];
+    const next = index === simplified.length - 1 ? end : simplified[index + 1];
+    return !isCollinearOrthogonal(previous, point, next);
+  });
+}
+
+function isCollinearOrthogonal(
+  first: { x: number; y: number },
+  middle: { x: number; y: number },
+  last: { x: number; y: number },
+): boolean {
+  return (nearlyEqual(first.x, middle.x) && nearlyEqual(middle.x, last.x))
+    || (nearlyEqual(first.y, middle.y) && nearlyEqual(middle.y, last.y));
+}
+
+function nearlyEqual(left: number, right: number): boolean {
+  return Math.abs(left - right) < 0.001;
 }
 
 function getEdgeLabel(weight: unknown): string {
