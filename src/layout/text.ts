@@ -1,17 +1,23 @@
 import type { DagNode, NodeKey } from "../graph/types";
 import { sanitizeNodeLabel } from "../graph/selectors";
 
-export function getNodeVisual(nodeKey: NodeKey, node: DagNode & { synthetic?: boolean }, minNodeWidth: number, maxNodeWidth: number): { title: string; detail: string; width: number } {
+export function getNodeVisual(
+  nodeKey: NodeKey,
+  node: DagNode & { synthetic?: boolean },
+  minNodeWidth: number,
+  maxNodeWidth: number,
+  showDetail: boolean,
+): { title: string; detail: string; width: number } {
   if (node.synthetic) {
     return {
       title: node.title || "Selected roots",
-      detail: "Combined entry point for every detected root branch.",
-      width: 232,
+      detail: showDetail ? "Combined entry point for every detected root branch." : "",
+      width: clamp(232, minNodeWidth, maxNodeWidth),
     };
   }
 
   const title = sanitizeNodeLabel(node.title || nodeKey);
-  const detail = getNodeDetail(node, title);
+  const detail = showDetail ? getNodeDetail(node, title) : "";
   const longestLine = Math.max(title.length, detail.length * 0.76);
   const width = clamp(132 + longestLine * 6.1, minNodeWidth, maxNodeWidth);
   return { title: title || nodeKey, detail, width };

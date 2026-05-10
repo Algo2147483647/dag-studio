@@ -20,8 +20,9 @@ export function buildStageData(input: {
   selection: GraphSelection | null;
   layoutMode?: GraphLayoutMode;
   theme?: GraphTheme;
+  showNodeDetail?: boolean;
 }): StageData | null {
-  const { dag: sourceDag, selection: requestedSelection, layoutMode = "sugiyama", theme = DEFAULT_GRAPH_THEME } = input;
+  const { dag: sourceDag, selection: requestedSelection, layoutMode = "sugiyama", theme = DEFAULT_GRAPH_THEME, showNodeDetail = true } = input;
   if (!sourceDag || Object.keys(sourceDag).length === 0) {
     return null;
   }
@@ -35,7 +36,7 @@ export function buildStageData(input: {
     ? collectReachableFromRoots(layoutDag, selection.topLevelKeys)
     : collectReachableNodes(layoutDag, selection.rootKey);
   const typeColorMap = buildTypeColorMap(sourceDag);
-  const visualByKey = buildNodeVisualMap(layoutDag, reachable, theme);
+  const visualByKey = buildNodeVisualMap(layoutDag, reachable, theme, showNodeDetail);
   const layoutResult = resolveLayout(layoutMode, layoutDag, layoutRoots, visualByKey, theme);
   const coordinates = layoutResult.coordinates;
   const nodeKeys = Array.from(reachable).filter((key) => layoutDag[key] && coordinates.has(key));
@@ -61,7 +62,7 @@ export function buildStageData(input: {
       title: visual.title,
       displayTitle: truncate(visual.title, DISPLAY_TITLE_MAX_LENGTH),
       detail: visual.detail,
-      detailLines: wrapDetailText(visual.detail, DETAIL_MAX_LINE_LENGTH, DETAIL_MAX_LINES),
+      detailLines: visual.detail ? wrapDetailText(visual.detail, DETAIL_MAX_LINE_LENGTH, DETAIL_MAX_LINES) : [],
       typeLabel,
       colorTokens: typeLabel ? typeColorMap.get(typeLabel) : undefined,
       width: visual.width,
@@ -283,6 +284,7 @@ function buildNodeVisualMap(
   dag: Record<NodeKey, NormalizedDag[NodeKey] | undefined>,
   nodeKeys: Set<NodeKey>,
   theme: GraphTheme,
+  showNodeDetail: boolean,
 ): Map<NodeKey, ReturnType<typeof getNodeVisual>> {
   const visuals = new Map<NodeKey, ReturnType<typeof getNodeVisual>>();
   nodeKeys.forEach((nodeKey) => {
@@ -290,7 +292,7 @@ function buildNodeVisualMap(
     if (!node) {
       return;
     }
-    visuals.set(nodeKey, getNodeVisual(nodeKey, node, theme.minNodeWidth, theme.maxNodeWidth));
+    visuals.set(nodeKey, getNodeVisual(nodeKey, node, theme.minNodeWidth, theme.maxNodeWidth, showNodeDetail));
   });
   return visuals;
 }

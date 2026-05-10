@@ -6,7 +6,6 @@ const SUGIYAMA_CHANNEL_MIN_SPACING = 10;
 const SUGIYAMA_CHANNEL_WIDTH_UTILIZATION = 0.8;
 const SUGIYAMA_CHANNEL_INTERVAL_GAP = 6;
 const EDGE_STROKE_WIDTH = 1.65;
-const EDGE_LANE_GAP = 28;
 const EDGE_NODE_CLEARANCE_Y = 10;
 const EMPTY_CORRIDOR_HEIGHT = 16;
 
@@ -207,7 +206,7 @@ function buildLayerVerticalPlan(nodes: StageNode[], logicalSlotCount: number, th
   let cursorY = 0;
 
   if (corridors[0]) {
-    assignCorridorYs(corridors[0], cursorY);
+    assignCorridorYs(corridors[0], cursorY, theme);
     cursorY += corridors[0].height;
   }
 
@@ -226,7 +225,7 @@ function buildLayerVerticalPlan(nodes: StageNode[], logicalSlotCount: number, th
     if (!corridor) {
       return;
     }
-    assignCorridorYs(corridor, cursorY);
+    assignCorridorYs(corridor, cursorY, theme);
     cursorY += corridor.height;
   });
 
@@ -279,19 +278,19 @@ function computeCorridorHeight(laneCount: number, theme: GraphTheme): number {
   if (laneCount <= 0) {
     return EMPTY_CORRIDOR_HEIGHT;
   }
-  const edgeDemand = laneCount * EDGE_STROKE_WIDTH + Math.max(laneCount - 1, 0) * EDGE_LANE_GAP + EDGE_NODE_CLEARANCE_Y * 2;
+  const edgeDemand = laneCount * EDGE_STROKE_WIDTH + Math.max(laneCount - 1, 0) * theme.edgeLaneGap + EDGE_NODE_CLEARANCE_Y * 2;
   return Math.max(edgeDemand, EMPTY_CORRIDOR_HEIGHT, theme.rowGap);
 }
 
-function assignCorridorYs(corridor: LayerEdgeCorridor, topY: number): void {
+function assignCorridorYs(corridor: LayerEdgeCorridor, topY: number, theme: GraphTheme): void {
   if (!corridor.logicalOrders.length) {
     corridor.laneYs = [];
     return;
   }
 
-  const laneBandHeight = corridor.logicalOrders.length * EDGE_STROKE_WIDTH + Math.max(corridor.logicalOrders.length - 1, 0) * EDGE_LANE_GAP;
+  const laneBandHeight = corridor.logicalOrders.length * EDGE_STROKE_WIDTH + Math.max(corridor.logicalOrders.length - 1, 0) * theme.edgeLaneGap;
   const laneStartY = topY + (corridor.height - laneBandHeight) / 2 + EDGE_STROKE_WIDTH / 2;
-  corridor.laneYs = corridor.logicalOrders.map((_, index) => laneStartY + index * (EDGE_STROKE_WIDTH + EDGE_LANE_GAP));
+  corridor.laneYs = corridor.logicalOrders.map((_, index) => laneStartY + index * (EDGE_STROKE_WIDTH + theme.edgeLaneGap));
 }
 
 function buildLogicalOrderRange(start: number, end: number): number[] {

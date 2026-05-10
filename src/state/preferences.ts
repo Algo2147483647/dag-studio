@@ -1,4 +1,5 @@
-import type { GraphLayoutMode, GraphMode } from "../graph/types";
+import type { GraphLayoutMode, GraphMode, GraphTheme } from "../graph/types";
+import { DEFAULT_GRAPH_THEME } from "../graph/types";
 import { getDefaultFieldMapping, sanitizeFieldMapping, type FieldMapping } from "../graph/fieldMapping";
 
 const GRAPH_PAGE_PREFERENCES_KEY = "dag-studio:page-preferences";
@@ -6,6 +7,8 @@ const GRAPH_PAGE_PREFERENCES_KEY = "dag-studio:page-preferences";
 export interface GraphPagePreferences {
   mode: GraphMode;
   layoutMode: GraphLayoutMode;
+  theme: GraphTheme;
+  showNodeDetail: boolean;
   consoleSidebarOpen: boolean;
   consoleSidebarWidth: number;
   fieldMapping: FieldMapping;
@@ -20,6 +23,8 @@ export function getInitialGraphPagePreferences(): GraphPagePreferences {
   return {
     mode: "preview",
     layoutMode: "sugiyama",
+    theme: DEFAULT_GRAPH_THEME,
+    showNodeDetail: true,
     consoleSidebarOpen: false,
     consoleSidebarWidth: 360,
     fieldMapping: getDefaultFieldMapping(),
@@ -65,6 +70,8 @@ export function parseGraphPagePreferences(raw: string | null): Partial<GraphPage
     layoutMode?: unknown;
     consoleSidebarOpen?: unknown;
     consoleSidebarWidth?: unknown;
+    theme?: unknown;
+    showNodeDetail?: unknown;
     fieldMapping?: unknown;
   } | null;
   try {
@@ -82,6 +89,12 @@ export function parseGraphPagePreferences(raw: string | null): Partial<GraphPage
   }
   if (parsed.layoutMode === "level" || parsed.layoutMode === "sugiyama" || parsed.layoutMode === "dagre") {
     next.layoutMode = parsed.layoutMode;
+  }
+  if (parsed.theme && typeof parsed.theme === "object" && !Array.isArray(parsed.theme)) {
+    next.theme = sanitizeGraphTheme(parsed.theme);
+  }
+  if (typeof parsed.showNodeDetail === "boolean") {
+    next.showNodeDetail = parsed.showNodeDetail;
   }
   if (typeof parsed.consoleSidebarOpen === "boolean") {
     next.consoleSidebarOpen = parsed.consoleSidebarOpen;
@@ -105,4 +118,27 @@ function getBrowserStorage(): StorageLike | null {
     return null;
   }
   return window.localStorage;
+}
+
+function sanitizeGraphTheme(input: object): GraphTheme {
+  const record = input as Record<string, unknown>;
+  const minNodeWidth = clampNumericPreference(record.minNodeWidth, DEFAULT_GRAPH_THEME.minNodeWidth, 140, 260);
+  const maxNodeWidth = clampNumericPreference(record.maxNodeWidth, DEFAULT_GRAPH_THEME.maxNodeWidth, minNodeWidth, 480);
+  return {
+    stagePaddingX: DEFAULT_GRAPH_THEME.stagePaddingX,
+    stagePaddingY: DEFAULT_GRAPH_THEME.stagePaddingY,
+    columnGap: clampNumericPreference(record.columnGap, DEFAULT_GRAPH_THEME.columnGap, 48, 260),
+    rowGap: clampNumericPreference(record.rowGap, DEFAULT_GRAPH_THEME.rowGap, 4, 140),
+    edgeLaneGap: clampNumericPreference(record.edgeLaneGap, DEFAULT_GRAPH_THEME.edgeLaneGap, 4, 96),
+    nodeHeight: clampNumericPreference(record.nodeHeight, DEFAULT_GRAPH_THEME.nodeHeight, 44, 160),
+    minNodeWidth,
+    maxNodeWidth,
+  };
+}
+
+function clampNumericPreference(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, Math.round(value)));
 }

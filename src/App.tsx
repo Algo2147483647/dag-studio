@@ -35,7 +35,8 @@ import RelationEditorModal from "./components/RelationEditorModal";
 import SaveJsonModal from "./components/SaveJsonModal";
 import Topbar from "./components/Topbar";
 import Workspace from "./components/Workspace";
-import type { GraphLayoutMode, GraphMode, NodeKey } from "./graph/types";
+import { DEFAULT_GRAPH_THEME } from "./graph/types";
+import type { GraphLayoutMode, GraphMode, GraphTheme, NodeKey } from "./graph/types";
 import { getGraphLayoutLabel } from "./graph/types";
 import type { EditTransaction } from "./state/initialState";
 import { collectBatchEffects, buildConsoleMutationLabel, executeConsoleInstructions } from "./console/executor";
@@ -45,6 +46,8 @@ import { CONSOLE_COMMAND_REFERENCE } from "./console/reference";
 export default function App() {
   const [state, dispatch] = useReducer(graphReducer, initialGraphAppState);
   const [fieldMapping, setFieldMapping] = useState<FieldMapping>(() => loadGraphPagePreferences().fieldMapping || getDefaultFieldMapping());
+  const [theme, setTheme] = useState<GraphTheme>(() => loadGraphPagePreferences().theme || DEFAULT_GRAPH_THEME);
+  const [showNodeDetail, setShowNodeDetail] = useState<boolean>(() => loadGraphPagePreferences().showNodeDetail ?? true);
   const [fieldMappingOpen, setFieldMappingOpen] = useState(false);
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
   const [consoleInput, setConsoleInput] = useState("");
@@ -67,11 +70,13 @@ export default function App() {
     saveGraphPagePreferences({
       mode: state.mode,
       layoutMode: state.layout.mode,
+      theme,
+      showNodeDetail,
       consoleSidebarOpen: state.ui.consoleSidebarOpen,
       consoleSidebarWidth: state.ui.consoleSidebarWidth,
       fieldMapping,
     });
-  }, [fieldMapping, state.layout.mode, state.mode, state.ui.consoleSidebarOpen, state.ui.consoleSidebarWidth]);
+  }, [fieldMapping, showNodeDetail, state.layout.mode, state.mode, state.ui.consoleSidebarOpen, state.ui.consoleSidebarWidth, theme]);
 
   useEffect(() => {
     if (consoleContextNodeKey && state.dag && !state.dag[consoleContextNodeKey]) {
@@ -83,7 +88,7 @@ export default function App() {
     setActiveSuggestionIndex(0);
   }, [consoleInput]);
 
-  const stage = useMemo(() => state.dag ? buildStageData({ dag: state.dag, selection: state.selection, layoutMode: state.layout.mode }) : null, [state.dag, state.layout.mode, state.selection]);
+  const stage = useMemo(() => state.dag ? buildStageData({ dag: state.dag, selection: state.selection, layoutMode: state.layout.mode, theme, showNodeDetail }) : null, [showNodeDetail, state.dag, state.layout.mode, state.selection, theme]);
   const parentSelection = useMemo(() => state.dag && stage ? getParentLevelSelection(state.dag, stage.topLevelKeys) : null, [stage, state.dag]);
   const consoleSidebarVisible = state.mode === "edit" && state.ui.consoleSidebarOpen;
   const consoleSuggestions = useMemo(() => getConsoleSuggestions(consoleInput), [consoleInput]);
@@ -461,6 +466,18 @@ export default function App() {
     dispatch({ type: "layoutModeChanged", mode });
   }
 
+  function handleThemeChange<K extends keyof GraphTheme>(key: K, value: GraphTheme[K]) {
+    setTheme((current) => ({ ...current, [key]: value }));
+  }
+
+  function handleThemeReset() {
+    setTheme(DEFAULT_GRAPH_THEME);
+  }
+
+  function handleNodeDetailToggle() {
+    setShowNodeDetail((current) => !current);
+  }
+
   function handleExportSvg() {
     if (!svgRef.current) {
       dispatch({ type: "statusChanged", status: "Render a DAG first, then export the SVG." });
@@ -513,6 +530,8 @@ export default function App() {
         topbarRef={topbarRef}
         mode={state.mode}
         layoutMode={state.layout.mode}
+        theme={theme}
+        showNodeDetail={showNodeDetail}
         status={status}
         fileName={state.source.fileName}
         hasGraph={Boolean(stage)}
@@ -538,6 +557,9 @@ export default function App() {
         onConsoleSidebarToggle={() => dispatch({ type: "consoleSidebarToggled" })}
         onModeChange={handleModeChange}
         onLayoutModeChange={handleLayoutModeChange}
+        onThemeChange={handleThemeChange}
+        onThemeReset={handleThemeReset}
+        onNodeDetailToggle={handleNodeDetailToggle}
         onFileInputClick={handleFileInputClick}
         onFileInputChange={handleFileInputChange}
         onInitializeCanvas={initializeCanvas}

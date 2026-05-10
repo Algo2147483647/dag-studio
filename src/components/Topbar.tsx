@@ -1,9 +1,11 @@
-import type { GraphLayoutMode, GraphMode } from "../graph/types";
+import type { GraphLayoutMode, GraphMode, GraphTheme } from "../graph/types";
 
 interface TopbarProps {
   topbarRef: React.RefObject<HTMLElement>;
   mode: GraphMode;
   layoutMode: GraphLayoutMode;
+  theme: GraphTheme;
+  showNodeDetail: boolean;
   status: string;
   fileName: string;
   hasGraph: boolean;
@@ -29,6 +31,9 @@ interface TopbarProps {
   onConsoleSidebarToggle: () => void;
   onModeChange: (mode: GraphMode) => void;
   onLayoutModeChange: (mode: GraphLayoutMode) => void;
+  onThemeChange: <K extends keyof GraphTheme>(key: K, value: GraphTheme[K]) => void;
+  onThemeReset: () => void;
+  onNodeDetailToggle: () => void;
   onFileInputClick: (event: React.MouseEvent<HTMLInputElement>) => void;
   onFileInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onInitializeCanvas: () => void;
@@ -41,6 +46,8 @@ export default function Topbar({
   topbarRef,
   mode,
   layoutMode,
+  theme,
+  showNodeDetail,
   status,
   fileName,
   hasGraph,
@@ -66,6 +73,9 @@ export default function Topbar({
   onConsoleSidebarToggle,
   onModeChange,
   onLayoutModeChange,
+  onThemeChange,
+  onThemeReset,
+  onNodeDetailToggle,
   onFileInputClick,
   onFileInputChange,
   onInitializeCanvas,
@@ -129,23 +139,54 @@ export default function Topbar({
                 </select>
               </label>
 
-              <p className="control-label">Workspace</p>
-              <div className="workspace-action-row">
-                {mode === "edit" ? (
+              <section className="settings-section settings-section-emphasis" aria-labelledby="layout-tuning-title">
+                <div className="settings-section-header">
+                  <div>
+                    <p id="layout-tuning-title" className="control-label">Layout Tuning</p>
+                  </div>
+                  <button type="button" className="settings-link-btn" onClick={onThemeReset}>Reset</button>
+                </div>
+                <div className="settings-slider-grid">
+                  {LAYOUT_CONTROLS.map((control) => (
+                    <LayoutSliderControl
+                      key={control.key}
+                      control={control}
+                      value={theme[control.key]}
+                      onChange={(value) => onThemeChange(control.key, value)}
+                    />
+                  ))}
+                </div>
+              </section>
+
+              <section className="settings-section" aria-labelledby="workspace-options-title">
+                <p id="workspace-options-title" className="control-label">Workspace</p>
+                <div className="workspace-action-row">
+                  {mode === "edit" ? (
+                    <button
+                      id="console-sidebar-toggle-btn"
+                      className={`ghost-btn settings-action-btn${consoleSidebarOpen ? " settings-action-btn-active" : ""}`}
+                      type="button"
+                      aria-pressed={consoleSidebarOpen}
+                      onClick={onConsoleSidebarToggle}
+                    >
+                      {consoleSidebarOpen ? "Hide Console" : "Show Console"}
+                    </button>
+                  ) : null}
+                  <button id="field-mapping-btn" className="ghost-btn settings-action-btn" type="button" onClick={onFieldMappingOpen}>Field Mapping</button>
                   <button
-                    id="console-sidebar-toggle-btn"
-                    className={`ghost-btn settings-action-btn${consoleSidebarOpen ? " settings-action-btn-active" : ""}`}
                     type="button"
-                    aria-pressed={consoleSidebarOpen}
-                    onClick={onConsoleSidebarToggle}
+                    className={`ghost-btn settings-action-btn${showNodeDetail ? " settings-action-btn-active" : ""}`}
+                    aria-pressed={showNodeDetail}
+                    onClick={onNodeDetailToggle}
                   >
-                    {consoleSidebarOpen ? "Hide Console" : "Show Console"}
+                    {showNodeDetail ? "Hide Details" : "Show Details"}
                   </button>
-                ) : null}
-                <button id="init-canvas-btn" className="ghost-btn settings-action-btn" type="button" onClick={onInitializeCanvas}>Initialize</button>
-                <button id="export-btn" className="ghost-btn settings-action-btn" type="button" disabled={!hasGraph} onClick={onExport}>Export SVG</button>
-              </div>
-              <button id="field-mapping-btn" className="ghost-btn settings-action-btn" type="button" onClick={onFieldMappingOpen}>Field Mapping</button>
+                </div>
+                <div className="workspace-action-row">
+                  <button id="init-canvas-btn" className="ghost-btn settings-action-btn" type="button" onClick={onInitializeCanvas}>Initialize</button>
+                  <button id="export-btn" className="ghost-btn settings-action-btn" type="button" disabled={!hasGraph} onClick={onExport}>Export SVG</button>
+                </div>
+              </section>
               <label htmlFor="fileInput" className="file-input-label">
                 <span className="file-input-text">{truncateFileName(fileName)}</span>
                 <input type="file" id="fileInput" accept=".json" onClick={onFileInputClick} onChange={onFileInputChange} />
@@ -332,4 +373,76 @@ function SlidersIcon() {
 
 function truncateFileName(fileName: string): string {
   return fileName.length > 26 ? `${fileName.slice(0, 23)}...` : fileName;
+}
+
+type LayoutControlKey = "columnGap" | "rowGap" | "edgeLaneGap" | "nodeHeight" | "maxNodeWidth";
+
+interface LayoutControlDefinition {
+  key: LayoutControlKey;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  unit?: string;
+}
+
+const LAYOUT_CONTROLS: LayoutControlDefinition[] = [
+  { key: "columnGap", label: "Layer spacing", min: 48, max: 260, step: 2, unit: "px" },
+  { key: "rowGap", label: "Node spacing", min: 4, max: 140, step: 2, unit: "px" },
+  { key: "edgeLaneGap", label: "Line spacing", min: 4, max: 96, step: 2, unit: "px" },
+  { key: "nodeHeight", label: "Node height", min: 44, max: 160, step: 2, unit: "px" },
+  { key: "maxNodeWidth", label: "Node max width", min: 188, max: 480, step: 4, unit: "px" },
+];
+
+function LayoutSliderControl({
+  control,
+  value,
+  onChange,
+}: {
+  control: LayoutControlDefinition;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const inputId = `layout-control-${control.key}`;
+
+  const commitValue = (nextValue: number) => {
+    if (!Number.isFinite(nextValue)) {
+      return;
+    }
+    const bounded = Math.max(control.min, Math.min(control.max, Math.round(nextValue)));
+    onChange(bounded);
+  };
+
+  return (
+    <div className="layout-slider-control">
+      <label htmlFor={inputId} className="layout-slider-label">{control.label}</label>
+      <div className="layout-slider-inputs">
+        <input
+          id={inputId}
+          className="layout-slider"
+          type="range"
+          min={control.min}
+          max={control.max}
+          step={control.step}
+          value={value}
+          onChange={(event) => commitValue(Number(event.currentTarget.value))}
+        />
+        <label className="layout-value-pill" htmlFor={`${inputId}-number`}>
+          <input
+            id={`${inputId}-number`}
+            className="layout-value-input"
+            type="number"
+            min={control.min}
+            max={control.max}
+            step={control.step}
+            value={value}
+            aria-label={`${control.label} value`}
+            onChange={(event) => commitValue(Number(event.currentTarget.value))}
+            onBlur={(event) => commitValue(Number(event.currentTarget.value))}
+          />
+          <span className="layout-value-unit">{control.unit || ""}</span>
+        </label>
+      </div>
+    </div>
+  );
 }

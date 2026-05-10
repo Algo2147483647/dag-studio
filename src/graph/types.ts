@@ -52,6 +52,7 @@ export interface GraphTheme {
   stagePaddingY: number;
   columnGap: number;
   rowGap: number;
+  edgeLaneGap: number;
   nodeHeight: number;
   minNodeWidth: number;
   maxNodeWidth: number;
@@ -62,6 +63,7 @@ export const DEFAULT_GRAPH_THEME: GraphTheme = {
   stagePaddingY: 88,
   columnGap: 116,
   rowGap: 22,
+  edgeLaneGap: 28,
   nodeHeight: 74,
   minNodeWidth: 188,
   maxNodeWidth: 280,

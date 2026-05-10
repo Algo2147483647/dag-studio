@@ -18,6 +18,7 @@ const GraphNode = memo(function GraphNode({
   onContextMenu,
   onFocusChange,
 }: GraphNodeProps) {
+  const hasDetail = node.detailLines.length > 0;
   const style = node.colorTokens ? ({
     "--graph-node-glow": node.colorTokens.glow,
     "--graph-node-fill": node.colorTokens.fill,
@@ -45,6 +46,12 @@ const GraphNode = memo(function GraphNode({
     }
   }
 
+  const nodeAriaDescription = [
+    node.title,
+    node.detail ? `${node.detail}.` : "",
+    node.isRoot ? "Current focus." : "Activate to focus this branch.",
+  ].filter(Boolean).join(" ");
+
   return (
     <g
       className={className}
@@ -54,7 +61,7 @@ const GraphNode = memo(function GraphNode({
       transform={`translate(${node.x - node.width / 2}, ${node.y - node.height / 2})`}
       tabIndex={0}
       role="button"
-      aria-label={`${node.title}. ${node.detail}. ${node.isRoot ? "Current focus." : "Activate to focus this branch."}`}
+      aria-label={nodeAriaDescription}
       onClick={() => onClick(node.key)}
       onContextMenu={(event) => onContextMenu(event, node.key)}
       onFocus={() => onFocusChange(node.key)}
@@ -65,16 +72,23 @@ const GraphNode = memo(function GraphNode({
       <rect className="graph-node__shape" width={node.width} height={node.height} rx={24} ry={24} />
       <circle className="graph-node__pin" cx={26} cy={node.height / 2} r={11} />
       <circle className="graph-node__pin-core" cx={26} cy={node.height / 2} r={4} />
-      <text className="graph-node__title" x={48} y={29}>
+      <text
+        className="graph-node__title"
+        x={48}
+        y={hasDetail ? 29 : node.height / 2}
+        dominantBaseline={hasDetail ? undefined : "middle"}
+      >
         {node.displayTitle}
       </text>
-      <text className="graph-node__detail" x={48} y={45}>
-        {node.detailLines.map((line, index) => (
-          <tspan key={`${line}-${index}`} x={48} dy={index === 0 ? 0 : DETAIL_LINE_HEIGHT}>
-            {line}
-          </tspan>
-        ))}
-      </text>
+      {hasDetail ? (
+        <text className="graph-node__detail" x={48} y={45}>
+          {node.detailLines.map((line, index) => (
+            <tspan key={`${line}-${index}`} x={48} dy={index === 0 ? 0 : DETAIL_LINE_HEIGHT}>
+              {line}
+            </tspan>
+          ))}
+        </text>
+      ) : null}
       <g className="graph-node__affordance">
         <rect className="graph-node__affordance-bg" x={node.width - 90} y={node.height - 21} width={74} height={14} rx={7} ry={7} />
         <text className="graph-node__affordance-text" x={node.width - 53} y={node.height - 10} textAnchor="middle">
