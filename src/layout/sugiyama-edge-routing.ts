@@ -2,8 +2,8 @@ import type { GraphTheme, NodeKey } from "../graph/types";
 import type { LayoutEdgeRoute, StageNode, StageRoutePoint } from "./types";
 
 const SUGIYAMA_CHANNEL_INSET = 12;
-const SUGIYAMA_CHANNEL_SPACING = 10;
-const SUGIYAMA_CHANNEL_MAX_SPREAD = 44;
+const SUGIYAMA_CHANNEL_MIN_SPACING = 10;
+const SUGIYAMA_CHANNEL_WIDTH_UTILIZATION = 0.8;
 const SUGIYAMA_CHANNEL_INTERVAL_GAP = 6;
 const EDGE_STROKE_WIDTH = 1.65;
 const EDGE_LANE_GAP = 14;
@@ -372,11 +372,11 @@ function assignSugiyamaBoundaryChannels(
   });
 
   const channelCount = Math.max(channelTailY.length, 1);
-  const preferredSpread = Math.min(
-    (channelCount - 1) * SUGIYAMA_CHANNEL_SPACING,
-    SUGIYAMA_CHANNEL_MAX_SPREAD,
-    corridorWidth,
-  );
+  const minimumSpread = Math.max(channelCount - 1, 0) * SUGIYAMA_CHANNEL_MIN_SPACING;
+  const desiredSpread = corridorWidth * SUGIYAMA_CHANNEL_WIDTH_UTILIZATION;
+  const preferredSpread = channelCount <= 1
+    ? 0
+    : Math.max(0, Math.min(corridorWidth, Math.max(minimumSpread, desiredSpread)));
   const step = channelCount > 1 ? preferredSpread / (channelCount - 1) : 0;
   const bandStart = center - preferredSpread / 2;
   const xByEdge = new Map<string, number>();
