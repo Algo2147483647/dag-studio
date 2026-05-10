@@ -20,7 +20,9 @@ export interface StageNode {
   layer: number;
   order: number;
   title: string;
+  displayTitle: string;
   detail: string;
+  detailLines: string[];
   typeLabel?: string;
   colorTokens?: StageNodeColorTokens;
   width: number;
@@ -37,6 +39,8 @@ export interface StageEdge {
   weight: RelationValue | 1 | undefined;
   label: string;
   points?: StageRoutePoint[];
+  path: string;
+  labelPosition: { x: number; y: number };
 }
 
 export interface StageLane {
@@ -95,6 +99,7 @@ export interface StageData {
   nodeMap: Record<NodeKey, StageNode>;
   nodes: StageNode[];
   edges: StageEdge[];
+  connectedKeysByNode: Map<NodeKey, ReadonlySet<NodeKey>>;
   lanes: StageLane[];
   stageWidth: number;
   stageHeight: number;

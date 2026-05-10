@@ -1,25 +1,29 @@
-import type { CSSProperties, KeyboardEvent } from "react";
+import { memo, type CSSProperties, type KeyboardEvent } from "react";
 import type { StageNode } from "../layout/types";
-import { truncate, wrapDetailText } from "../layout/text";
 
-const DETAIL_MAX_LINE_LENGTH = 48;
-const DETAIL_MAX_LINES = 2;
 const DETAIL_LINE_HEIGHT = 10;
 
 interface GraphNodeProps {
   node: StageNode;
-  rootKey: string;
-  interactiveKey: string | null;
-  connectedKeys: Set<string>;
+  isActive: boolean;
+  isCurrent: boolean;
+  isDimmed: boolean;
   onClick: (key: string) => void;
   onContextMenu: (event: React.MouseEvent<SVGGElement>, key: string) => void;
   onHoverChange: (key: string | null) => void;
   onFocusChange: (key: string | null) => void;
 }
 
-export default function GraphNode({ node, rootKey, interactiveKey, connectedKeys, onClick, onContextMenu, onHoverChange, onFocusChange }: GraphNodeProps) {
-  const isCurrent = interactiveKey === node.key;
-  const isConnected = !interactiveKey || connectedKeys.has(node.key);
+const GraphNode = memo(function GraphNode({
+  node,
+  isActive,
+  isCurrent,
+  isDimmed,
+  onClick,
+  onContextMenu,
+  onHoverChange,
+  onFocusChange,
+}: GraphNodeProps) {
   const style = node.colorTokens ? ({
     "--graph-node-glow": node.colorTokens.glow,
     "--graph-node-fill": node.colorTokens.fill,
@@ -37,11 +41,10 @@ export default function GraphNode({ node, rootKey, interactiveKey, connectedKeys
   const className = [
     "graph-node",
     node.isRoot ? "is-root" : "",
-    node.key === rootKey || isCurrent ? "is-active" : "",
+    isActive ? "is-active" : "",
     isCurrent ? "is-hovered" : "",
-    !isConnected ? "is-dimmed" : "",
+    isDimmed ? "is-dimmed" : "",
   ].filter(Boolean).join(" ");
-  const detailLines = wrapDetailText(node.detail, DETAIL_MAX_LINE_LENGTH, DETAIL_MAX_LINES);
 
   function handleKeyDown(event: KeyboardEvent<SVGGElement>) {
     if (event.key === "Enter" || event.key === " ") {
@@ -73,10 +76,10 @@ export default function GraphNode({ node, rootKey, interactiveKey, connectedKeys
       <circle className="graph-node__pin" cx={26} cy={node.height / 2} r={11} />
       <circle className="graph-node__pin-core" cx={26} cy={node.height / 2} r={4} />
       <text className="graph-node__title" x={48} y={29}>
-        {truncate(node.title, 24)}
+        {node.displayTitle}
       </text>
       <text className="graph-node__detail" x={48} y={45}>
-        {detailLines.map((line, index) => (
+        {node.detailLines.map((line, index) => (
           <tspan key={`${line}-${index}`} x={48} dy={index === 0 ? 0 : DETAIL_LINE_HEIGHT}>
             {line}
           </tspan>
@@ -90,4 +93,17 @@ export default function GraphNode({ node, rootKey, interactiveKey, connectedKeys
       </g>
     </g>
   );
+}, areEqualGraphNodeProps);
+
+export default GraphNode;
+
+function areEqualGraphNodeProps(previous: GraphNodeProps, next: GraphNodeProps): boolean {
+  return previous.node === next.node
+    && previous.isActive === next.isActive
+    && previous.isCurrent === next.isCurrent
+    && previous.isDimmed === next.isDimmed
+    && previous.onClick === next.onClick
+    && previous.onContextMenu === next.onContextMenu
+    && previous.onHoverChange === next.onHoverChange
+    && previous.onFocusChange === next.onFocusChange;
 }

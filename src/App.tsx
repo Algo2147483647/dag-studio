@@ -46,7 +46,6 @@ export default function App() {
   const [state, dispatch] = useReducer(graphReducer, initialGraphAppState);
   const [fieldMapping, setFieldMapping] = useState<FieldMapping>(() => loadGraphPagePreferences().fieldMapping || getDefaultFieldMapping());
   const [fieldMappingOpen, setFieldMappingOpen] = useState(false);
-  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
   const [consoleInput, setConsoleInput] = useState("");
   const [consoleContextNodeKey, setConsoleContextNodeKey] = useState<NodeKey | null>(null);
@@ -618,11 +617,9 @@ export default function App() {
         sidebarOpen={consoleSidebarVisible}
         sidebarWidth={state.ui.consoleSidebarWidth}
         onInitializeCanvas={initializeCanvas}
-        hoveredKey={hoveredKey}
         focusedKey={focusedKey}
         onNodeClick={handleNodeClick}
         onNodeContextMenu={handleNodeContextMenu}
-        onHoverChange={setHoveredKey}
         onFocusChange={setFocusedKey}
         onScroll={() => dispatch({ type: "contextMenuClosed" })}
         onSidebarResizeStart={handleConsoleSidebarResizeStart}

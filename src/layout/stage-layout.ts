@@ -2,12 +2,17 @@ import type { GraphLayoutMode, GraphSelection, GraphTheme, NodeKey, NormalizedDa
 import { DEFAULT_GRAPH_THEME } from "../graph/types";
 import { getRelationKeys } from "../graph/relations";
 import { structuredCloneValue } from "../graph/serialize";
-import { getNodeVisual } from "./text";
+import { resolveStageEdgeGeometry } from "./edgeGeometry";
+import { getNodeVisual, truncate, wrapDetailText } from "./text";
 import { resolveStageSelection, withSyntheticSelectionRoot } from "./selection";
 import type { LayoutRoutePoint, StageData, StageNode, StageNodeColorTokens, StageRoutePoint } from "./types";
 import { buildBfsLayout } from "./algorithms/bfs";
 import { buildDagreLayout } from "./algorithms/dagre";
 import { buildSugiyamaLayout } from "./algorithms/sugiyama";
+
+const DETAIL_MAX_LINE_LENGTH = 48;
+const DETAIL_MAX_LINES = 2;
+const DISPLAY_TITLE_MAX_LENGTH = 24;
 
 export function buildStageData(input: {
   dag: NormalizedDag;
@@ -53,7 +58,9 @@ export function buildStageData(input: {
       layer,
       order,
       title: visual.title,
+      displayTitle: truncate(visual.title, DISPLAY_TITLE_MAX_LENGTH),
       detail: visual.detail,
+      detailLines: wrapDetailText(visual.detail, DETAIL_MAX_LINE_LENGTH, DETAIL_MAX_LINES),
       typeLabel,
       colorTokens: typeLabel ? typeColorMap.get(typeLabel) : undefined,
       width: visual.width,
@@ -173,8 +180,22 @@ export function buildStageData(input: {
         weight,
         label: getEdgeLabel(weight),
         points: points && points.length ? points : undefined,
+        path: "",
+        labelPosition: { x: 0, y: 0 },
       });
     });
+  });
+
+  const connectedKeysByNode = buildConnectedKeysByNode(nodeKeys, edges);
+  edges.forEach((edge) => {
+    const sourceNode = nodeMap[edge.source];
+    const targetNode = nodeMap[edge.target];
+    if (!sourceNode || !targetNode) {
+      return;
+    }
+    const geometry = resolveStageEdgeGeometry(layoutMode, sourceNode, targetNode, edge.points);
+    edge.path = geometry.path;
+    edge.labelPosition = geometry.labelPosition;
   });
 
   return {
@@ -187,6 +208,7 @@ export function buildStageData(input: {
     nodeMap,
     nodes: Object.values(nodeMap),
     edges,
+    connectedKeysByNode,
     lanes,
     stageWidth: Math.max(stageWidth, 980),
     stageHeight: Math.max(stageHeight, 600),
@@ -408,6 +430,22 @@ function getEdgeLabel(weight: unknown): string {
     return "";
   }
   return String(weight);
+}
+
+function buildConnectedKeysByNode(nodeKeys: NodeKey[], edges: StageData["edges"]): Map<NodeKey, ReadonlySet<NodeKey>> {
+  const connectedKeysByNode = new Map<NodeKey, Set<NodeKey>>();
+  nodeKeys.forEach((nodeKey) => {
+    connectedKeysByNode.set(nodeKey, new Set([nodeKey]));
+  });
+
+  edges.forEach((edge) => {
+    const sourceKeys = connectedKeysByNode.get(edge.source);
+    const targetKeys = connectedKeysByNode.get(edge.target);
+    sourceKeys?.add(edge.target);
+    targetKeys?.add(edge.source);
+  });
+
+  return new Map(Array.from(connectedKeysByNode.entries(), ([nodeKey, connectedKeys]) => [nodeKey, connectedKeys as ReadonlySet<NodeKey>]));
 }
 
 function buildTypeColorMap(dag: NormalizedDag): Map<string, StageNodeColorTokens> {
