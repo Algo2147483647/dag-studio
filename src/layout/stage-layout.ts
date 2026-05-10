@@ -6,7 +6,7 @@ import { resolveStageEdgeGeometry } from "./edgeGeometry";
 import { getNodeVisual, truncate, wrapDetailText } from "./text";
 import { resolveStageSelection, withSyntheticSelectionRoot } from "./selection";
 import type { LayoutEdgeRoute, LayoutRoutePoint, StageData, StageNode, StageNodeColorTokens, StageRoutePoint } from "./types";
-import { buildBfsLayout } from "./algorithms/bfs";
+import { buildLevelLayout } from "./algorithms/level";
 import { buildDagreLayout } from "./algorithms/dagre";
 import { buildSugiyamaLayout } from "./algorithms/sugiyama";
 
@@ -44,7 +44,7 @@ export function buildStageData(input: {
   layoutMode?: GraphLayoutMode;
   theme?: GraphTheme;
 }): StageData | null {
-  const { dag: sourceDag, selection: requestedSelection, layoutMode = "bfs", theme = DEFAULT_GRAPH_THEME } = input;
+  const { dag: sourceDag, selection: requestedSelection, layoutMode = "sugiyama", theme = DEFAULT_GRAPH_THEME } = input;
   if (!sourceDag || Object.keys(sourceDag).length === 0) {
     return null;
   }
@@ -135,7 +135,7 @@ export function buildStageData(input: {
   } else {
     sortedLayers.forEach((layer) => {
       const layerNodes = (nodesByLayer.get(layer) || []).sort((a, b) => a.order - b.order);
-      if (layoutMode === "bfs" && layer > 0) {
+      if (layoutMode === "level" && layer > 0) {
         layerNodes.sort((a, b) => {
           const aScore = getBarycentricScore(a.key, incomingMap, nodeMap);
           const bScore = getBarycentricScore(b.key, incomingMap, nodeMap);
@@ -143,7 +143,7 @@ export function buildStageData(input: {
         });
       }
 
-      if (layoutMode === "bfs") {
+      if (layoutMode === "level") {
         layerNodes.forEach((nodeData, index) => {
           nodeData.order = index;
         });
@@ -272,7 +272,7 @@ function resolveLayout(
     });
     return buildDagreLayout(layoutDag, layoutRoots, nodeSizes);
   }
-  return buildBfsLayout(layoutDag, layoutRoots);
+  return buildLevelLayout(layoutDag, layoutRoots);
 }
 
 function buildNodeVisualMap(

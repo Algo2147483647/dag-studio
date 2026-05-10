@@ -19,7 +19,7 @@ interface StorageLike {
 export function getInitialGraphPagePreferences(): GraphPagePreferences {
   return {
     mode: "preview",
-    layoutMode: "bfs",
+    layoutMode: "sugiyama",
     consoleSidebarOpen: false,
     consoleSidebarWidth: 360,
     fieldMapping: getDefaultFieldMapping(),
@@ -80,7 +80,7 @@ export function parseGraphPagePreferences(raw: string | null): Partial<GraphPage
   if (parsed.mode === "preview" || parsed.mode === "edit") {
     next.mode = parsed.mode;
   }
-  if (parsed.layoutMode === "bfs" || parsed.layoutMode === "sugiyama" || parsed.layoutMode === "dagre") {
+  if (parsed.layoutMode === "level" || parsed.layoutMode === "sugiyama" || parsed.layoutMode === "dagre") {
     next.layoutMode = parsed.layoutMode;
   }
   if (typeof parsed.consoleSidebarOpen === "boolean") {

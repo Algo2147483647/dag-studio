@@ -18,10 +18,10 @@ export function getExistingRoots(dag: Record<NodeKey, unknown>, roots: NodeKey[]
 }
 
 export function collectReachableFromRoots(dag: Record<NodeKey, LayoutGraphNode | undefined>, roots: NodeKey[]): Set<NodeKey> {
-  return new Set(collectReachableInBfsOrder(dag, roots));
+  return new Set(collectReachableInLevelOrder(dag, roots));
 }
 
-export function collectReachableInBfsOrder(dag: Record<NodeKey, LayoutGraphNode | undefined>, roots: NodeKey[]): NodeKey[] {
+export function collectReachableInLevelOrder(dag: Record<NodeKey, LayoutGraphNode | undefined>, roots: NodeKey[]): NodeKey[] {
   const queue = getExistingRoots(dag, roots);
   const visited = new Set(queue);
   const nodeKeys: NodeKey[] = [];
@@ -45,7 +45,7 @@ export function collectReachableInBfsOrder(dag: Record<NodeKey, LayoutGraphNode 
 }
 
 export function buildVisibleGraph(dag: Record<NodeKey, LayoutGraphNode | undefined>, roots: NodeKey[]): VisibleGraph {
-  const nodeKeys = collectReachableInBfsOrder(dag, roots);
+  const nodeKeys = collectReachableInLevelOrder(dag, roots);
   const visibleSet = new Set(nodeKeys);
   const incoming: Record<NodeKey, NodeKey[]> = {};
   const outgoing: Record<NodeKey, NodeKey[]> = {};

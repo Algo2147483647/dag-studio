@@ -123,8 +123,8 @@ export default function Topbar({
                   value={layoutMode}
                   onChange={(event) => onLayoutModeChange(event.currentTarget.value as GraphLayoutMode)}
                 >
-                  <option value="bfs">BFS</option>
                   <option value="sugiyama">Sugiyama layered</option>
+                  <option value="level">Level layout</option>
                   <option value="dagre">Dagre layered</option>
                 </select>
               </label>

@@ -3,7 +3,7 @@ import { getRelationKeys } from "../../graph/relations";
 import type { LayoutResult } from "../types";
 import { getExistingRoots, type LayoutGraphNode } from "./shared";
 
-export function buildBfsLayout(dag: Record<NodeKey, LayoutGraphNode | undefined>, roots: NodeKey[]): LayoutResult {
+export function buildLevelLayout(dag: Record<NodeKey, LayoutGraphNode | undefined>, roots: NodeKey[]): LayoutResult {
   const coordinates: LayoutResult["coordinates"] = new Map();
   const queue = getExistingRoots(dag, roots);
   const visited = new Set(queue);

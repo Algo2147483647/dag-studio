@@ -36,7 +36,7 @@ export type GraphSelection =
 
 export type GraphMode = "preview" | "edit";
 
-export type GraphLayoutMode = "bfs" | "sugiyama" | "dagre";
+export type GraphLayoutMode = "level" | "sugiyama" | "dagre";
 
 export function getGraphLayoutLabel(mode: GraphLayoutMode): string {
   switch (mode) {
@@ -45,7 +45,7 @@ export function getGraphLayoutLabel(mode: GraphLayoutMode): string {
     case "dagre":
       return "Dagre layered";
     default:
-      return "BFS";
+      return "Level layout";
   }
 }
 
