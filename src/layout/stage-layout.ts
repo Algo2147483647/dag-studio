@@ -598,21 +598,6 @@ function buildSugiyamaLogicalRoute(
   ];
 }
 
-function compareSugiyamaBoundarySegments(left: SugiyamaBoundarySegment, right: SugiyamaBoundarySegment): number {
-  const leftAverage = (left.upper.order + left.lower.order) / 2;
-  const rightAverage = (right.upper.order + right.lower.order) / 2;
-  if (leftAverage !== rightAverage) {
-    return leftAverage - rightAverage;
-  }
-  if (left.upper.order !== right.upper.order) {
-    return left.upper.order - right.upper.order;
-  }
-  if (left.lower.order !== right.lower.order) {
-    return left.lower.order - right.lower.order;
-  }
-  return left.edgeId.localeCompare(right.edgeId);
-}
-
 function assignSugiyamaBoundaryChannels(
   segments: SugiyamaBoundarySegment[],
   boundaryLayer: number,

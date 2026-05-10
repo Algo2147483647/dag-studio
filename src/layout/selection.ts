@@ -56,7 +56,7 @@ export function withSyntheticSelectionRoot(dag: NormalizedDag, selection: Resolv
   if (selection.isForest) {
     nextDag[selection.rootKey] = {
       key: selection.rootKey,
-      label: selection.label,
+      title: selection.label,
       children: selection.topLevelKeys,
       parents: {},
       synthetic: true,

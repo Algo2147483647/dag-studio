@@ -1,4 +1,4 @@
-import { applyGraphCommand, type CommandResult, type GraphCommand } from "../graph/commands";
+import { applyGraphCommand, type CommandResult } from "../graph/commands";
 import { getRelationKeys } from "../graph/relations";
 import { structuredCloneValue } from "../graph/serialize";
 import type { NodeKey, NormalizedDag } from "../graph/types";

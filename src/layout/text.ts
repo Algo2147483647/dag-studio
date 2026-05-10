@@ -4,7 +4,7 @@ import { sanitizeNodeLabel } from "../graph/selectors";
 export function getNodeVisual(nodeKey: NodeKey, node: DagNode & { synthetic?: boolean }, minNodeWidth: number, maxNodeWidth: number): { title: string; detail: string; width: number } {
   if (node.synthetic) {
     return {
-      title: node.label || "Selected roots",
+      title: node.title || "Selected roots",
       detail: "Combined entry point for every detected root branch.",
       width: 232,
     };

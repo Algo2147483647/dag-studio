@@ -92,7 +92,7 @@ export default function App() {
       return state.ui.status;
     }
     const focusNode = stage.dag[stage.root];
-    const focusLabel = focusNode?.synthetic ? focusNode.label || "Selected roots" : sanitizeNodeLabel(focusNode?.title || stage.root);
+    const focusLabel = focusNode?.synthetic ? focusNode.title || "Selected roots" : sanitizeNodeLabel(focusNode?.title || stage.root);
     const modeLabel = state.mode === "edit" ? "Edit" : "Preview";
     const layoutLabel = getGraphLayoutLabel(state.layout.mode);
     const warningText = stage.warnings.length ? ` ${stage.warnings[0]}` : "";

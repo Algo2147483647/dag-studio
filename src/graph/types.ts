@@ -6,9 +6,7 @@ export type RelationField = NodeKey[] | Record<NodeKey, RelationValue>;
 
 export interface RawGraphNode {
   key?: NodeKey;
-  label?: string;
   title?: string;
-  name?: string;
   type?: string;
   define?: string;
   parents?: RelationField;

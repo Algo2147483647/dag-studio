@@ -48,17 +48,6 @@ export function getRelationKeys(relationValue: unknown): NodeKey[] {
   return [];
 }
 
-export function hasRelationKey(relationValue: unknown, key: NodeKey): boolean {
-  const targetKey = key.trim();
-  if (!targetKey) {
-    return false;
-  }
-  if (Array.isArray(relationValue)) {
-    return relationValue.includes(targetKey);
-  }
-  return Boolean(relationValue && typeof relationValue === "object" && Object.prototype.hasOwnProperty.call(relationValue, targetKey));
-}
-
 export function addRelation(node: DagNode, fieldName: "parents" | "children", relationKey: NodeKey, relationValue: RelationValue = DEFAULT_RELATION_VALUE): void {
   const targetKey = relationKey.trim();
   if (!targetKey) {
