@@ -6,22 +6,16 @@ const DETAIL_LINE_HEIGHT = 10;
 interface GraphNodeProps {
   node: StageNode;
   isActive: boolean;
-  isCurrent: boolean;
-  isDimmed: boolean;
   onClick: (key: string) => void;
   onContextMenu: (event: React.MouseEvent<SVGGElement>, key: string) => void;
-  onHoverChange: (key: string | null) => void;
   onFocusChange: (key: string | null) => void;
 }
 
 const GraphNode = memo(function GraphNode({
   node,
   isActive,
-  isCurrent,
-  isDimmed,
   onClick,
   onContextMenu,
-  onHoverChange,
   onFocusChange,
 }: GraphNodeProps) {
   const style = node.colorTokens ? ({
@@ -42,8 +36,6 @@ const GraphNode = memo(function GraphNode({
     "graph-node",
     node.isRoot ? "is-root" : "",
     isActive ? "is-active" : "",
-    isCurrent ? "is-hovered" : "",
-    isDimmed ? "is-dimmed" : "",
   ].filter(Boolean).join(" ");
 
   function handleKeyDown(event: KeyboardEvent<SVGGElement>) {
@@ -65,8 +57,6 @@ const GraphNode = memo(function GraphNode({
       aria-label={`${node.title}. ${node.detail}. ${node.isRoot ? "Current focus." : "Activate to focus this branch."}`}
       onClick={() => onClick(node.key)}
       onContextMenu={(event) => onContextMenu(event, node.key)}
-      onMouseEnter={() => onHoverChange(node.key)}
-      onMouseLeave={() => onHoverChange(null)}
       onFocus={() => onFocusChange(node.key)}
       onBlur={() => onFocusChange(null)}
       onKeyDown={handleKeyDown}
@@ -100,10 +90,7 @@ export default GraphNode;
 function areEqualGraphNodeProps(previous: GraphNodeProps, next: GraphNodeProps): boolean {
   return previous.node === next.node
     && previous.isActive === next.isActive
-    && previous.isCurrent === next.isCurrent
-    && previous.isDimmed === next.isDimmed
     && previous.onClick === next.onClick
     && previous.onContextMenu === next.onContextMenu
-    && previous.onHoverChange === next.onHoverChange
     && previous.onFocusChange === next.onFocusChange;
 }

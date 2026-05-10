@@ -3,16 +3,12 @@ import type { StageEdge } from "../layout/types";
 
 interface GraphEdgeProps {
   edge: StageEdge;
-  isActive: boolean;
-  isDimmed: boolean;
 }
 
-const GraphEdge = memo(function GraphEdge({ edge, isActive, isDimmed }: GraphEdgeProps) {
-  const className = ["graph-edge", isDimmed ? "is-dimmed" : "", isActive ? "is-active" : ""].filter(Boolean).join(" ");
-
+const GraphEdge = memo(function GraphEdge({ edge }: GraphEdgeProps) {
   return (
     <g className="graph-edge-group">
-      <path className={className} d={edge.path} data-source={edge.source} data-target={edge.target} markerEnd="url(#arrowhead)" />
+      <path className="graph-edge" d={edge.path} data-source={edge.source} data-target={edge.target} markerEnd="url(#arrowhead)" />
       {edge.label ? <EdgeLabel label={edge.label} x={edge.labelPosition.x} y={edge.labelPosition.y} /> : null}
     </g>
   );
@@ -21,7 +17,7 @@ const GraphEdge = memo(function GraphEdge({ edge, isActive, isDimmed }: GraphEdg
 export default GraphEdge;
 
 function areEqualGraphEdgeProps(previous: GraphEdgeProps, next: GraphEdgeProps): boolean {
-  return previous.edge === next.edge && previous.isActive === next.isActive && previous.isDimmed === next.isDimmed;
+  return previous.edge === next.edge;
 }
 
 function EdgeLabel({ label, x, y }: { label: string; x: number; y: number }) {
