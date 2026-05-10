@@ -2,6 +2,10 @@ import type { NodeKey } from "../graph/types";
 import { getDisplayFieldName, type FieldMapping } from "../graph/fieldMapping";
 import { getRelationKeys, normalizeRelationField } from "../graph/relations";
 import { parseRelationInput } from "./RelationEditorModal";
+import ReactMarkdown from "react-markdown";
+import rehypeKatex from "rehype-katex";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 
 export type FieldEditorKind = "plainText" | "multilineText" | "json" | "relation";
 
@@ -17,12 +21,13 @@ interface NodeFieldEditorProps {
   field: EditableField;
   mode: "preview" | "edit";
   value: string;
+  showMarkdown: boolean;
   onChange: (value: string) => void;
 }
 
-export default function NodeFieldEditor({ field, mode, value, onChange }: NodeFieldEditorProps) {
+export default function NodeFieldEditor({ field, mode, value, showMarkdown, onChange }: NodeFieldEditorProps) {
   if (mode === "preview") {
-    return <FieldPreview name={field.name} displayName={field.displayName} value={field.value} />;
+    return <FieldPreview name={field.name} displayName={field.displayName} value={field.value} showMarkdown={showMarkdown} />;
   }
 
   if (field.name === "key") {
@@ -38,12 +43,13 @@ export default function NodeFieldEditor({ field, mode, value, onChange }: NodeFi
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
+      {showMarkdown && supportsMarkdown(field) ? <MarkdownValue value={value} previewSurface /> : null}
       {getEditorHint(field) ? <p className="node-detail-editor-hint">{getEditorHint(field)}</p> : null}
     </div>
   );
 }
 
-function FieldPreview({ name, displayName, value }: { name: string; displayName: string; value: unknown }) {
+function FieldPreview({ name, displayName, value, showMarkdown }: { name: string; displayName: string; value: unknown; showMarkdown: boolean }) {
   if (name === "parents" || name === "children") {
     const relationKeys = getRelationKeys(value);
     if (!relationKeys.length) {
@@ -54,6 +60,10 @@ function FieldPreview({ name, displayName, value }: { name: string; displayName:
         {relationKeys.map((relationKey) => <span key={relationKey} className="node-detail-chip">{relationKey}</span>)}
       </div>
     );
+  }
+
+  if (showMarkdown && typeof value === "string") {
+    return <MarkdownValue value={value} emphasize={name === "define"} />;
   }
 
   if (name === "define") {
@@ -83,6 +93,26 @@ function FieldPreview({ name, displayName, value }: { name: string; displayName:
   return <pre className="node-detail-pre">{JSON.stringify(value, null, 2)}</pre>;
 }
 
+function MarkdownValue({ value, emphasize = false, previewSurface = false }: { value: string; emphasize?: boolean; previewSurface?: boolean }) {
+  if (!value.trim()) {
+    return <p className="node-detail-empty">(empty string)</p>;
+  }
+
+  return (
+    <div
+      className={[
+        "node-detail-markdown",
+        emphasize ? "node-detail-markdown--define" : "",
+        previewSurface ? "node-detail-markdown--preview" : "",
+      ].filter(Boolean).join(" ")}
+    >
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+        {value}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
 export function buildEditableFields(nodeKey: NodeKey, node: Record<string, unknown>, fieldMapping: FieldMapping): EditableField[] {
   const clonedNode = { ...node };
   if (clonedNode.key === nodeKey) {
@@ -110,6 +140,12 @@ export function formatEditorValue(field: EditableField): string {
     return String(field.value);
   }
   return JSON.stringify(field.value, null, 2);
+}
+
+export function supportsMarkdown(field: EditableField): boolean {
+  return field.name !== "key"
+    && typeof field.value === "string"
+    && (field.editorKind === "plainText" || field.editorKind === "multilineText");
 }
 
 export function parseNodeFieldValue(field: EditableField, rawValue: string): { ok: true; value: unknown } | { ok: false; message: string } {

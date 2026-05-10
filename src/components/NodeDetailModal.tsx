@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { DagNode, GraphMode, NodeKey } from "../graph/types";
 import type { FieldMapping } from "../graph/fieldMapping";
 import { getRelationKeys } from "../graph/relations";
-import NodeFieldEditor, { buildEditableFields, formatEditorValue, parseNodeFieldValue, type EditableField } from "./NodeFieldEditor";
+import NodeFieldEditor, { buildEditableFields, formatEditorValue, parseNodeFieldValue, supportsMarkdown, type EditableField } from "./NodeFieldEditor";
 import { buildRawNodeEditorValue, parseRawNodeEditorValue } from "./nodeDetailRawJson";
 
 interface NodeDetailModalProps {
@@ -21,6 +21,7 @@ export default function NodeDetailModal({ open, nodeKey, node, mode, fieldMappin
   const [values, setValues] = useState<Record<string, string>>({});
   const [rawJsonValue, setRawJsonValue] = useState("");
   const [lastEdited, setLastEdited] = useState<"fields" | "raw">("fields");
+  const [markdownFields, setMarkdownFields] = useState<Record<string, boolean>>({});
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -30,6 +31,7 @@ export default function NodeDetailModal({ open, nodeKey, node, mode, fieldMappin
       setValues(Object.fromEntries(nextFields.map((field) => [field.name, formatEditorValue(field)])));
       setRawJsonValue(buildRawNodeEditorValue(nodeKey, node, fieldMapping));
       setLastEdited("fields");
+      setMarkdownFields({});
       setError("");
     }
   }, [fieldMapping, node, nodeKey, open]);
@@ -77,11 +79,26 @@ export default function NodeDetailModal({ open, nodeKey, node, mode, fieldMappin
             <div id="node-detail-fields" className="node-detail-fields">
               {fields.length ? fields.map((field) => (
                 <article key={field.name} className="node-detail-field">
-                  <p className="node-detail-field__label">{field.displayName}</p>
+                  <div className="node-detail-field__header">
+                    <p className="node-detail-field__label">{field.displayName}</p>
+                    {supportsMarkdown(field) ? (
+                      <button
+                        className={`node-detail-markdown-toggle${markdownFields[field.name] ? " is-active" : ""}`}
+                        type="button"
+                        aria-pressed={markdownFields[field.name] ? "true" : "false"}
+                        onClick={() => toggleMarkdownField(field.name)}
+                      >
+                        {mode === "edit"
+                          ? (markdownFields[field.name] ? "Hide Preview" : "Markdown Preview")
+                          : (markdownFields[field.name] ? "Plain Text" : "Markdown")}
+                      </button>
+                    ) : null}
+                  </div>
                   <NodeFieldEditor
                     field={field}
                     mode={mode}
                     value={values[field.name] ?? ""}
+                    showMarkdown={Boolean(markdownFields[field.name])}
                     onChange={(value) => handleFieldChange(field.name, value)}
                   />
                 </article>
@@ -137,6 +154,7 @@ export default function NodeDetailModal({ open, nodeKey, node, mode, fieldMappin
     const nextFields = buildEditableFields(parsed.nextKey, { ...parsed.fields, key: parsed.nextKey }, fieldMapping);
     setFields(nextFields);
     setValues(Object.fromEntries(nextFields.map((field) => [field.name, formatEditorValue(field)])));
+    setMarkdownFields((current) => Object.fromEntries(nextFields.filter((field) => supportsMarkdown(field) && current[field.name]).map((field) => [field.name, true])));
   }
 
   function handleSave() {
@@ -182,6 +200,10 @@ export default function NodeDetailModal({ open, nodeKey, node, mode, fieldMappin
       return;
     }
     onSave(nextKey, patch);
+  }
+
+  function toggleMarkdownField(fieldName: string) {
+    setMarkdownFields((current) => ({ ...current, [fieldName]: !current[fieldName] }));
   }
 }
 
