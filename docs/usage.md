@@ -43,6 +43,25 @@ After loading JSON, the renderer first looks for nodes with no parents.
 - `Sugiyama layered` ranks nodes by dependency depth and applies crossing reduction before rendering.
 - `Dagre layered` uses Dagre's layered engine for a library-backed dependency layout.
 
+## Dense Graph Hover Mode
+
+When the visible stage gets large, DAG Studio automatically uses a lower-cost hover rendering path so linked highlighting stays usable.
+
+The dense-stage threshold is triggered when any one of these is true:
+
+- `220` or more visible nodes
+- `440` or more visible edges
+- `stageWidth * stageHeight >= 20,000,000`
+
+Dense hover mode keeps the same interaction semantics:
+
+- the hovered node still highlights
+- adjacent nodes still highlight
+- related edges still highlight
+- unrelated nodes and edges are still deemphasized
+
+To reduce repaint cost, the app disables the most expensive hover-only visual effects in this mode, especially shadow filters and transition animations.
+
 ## Editing in the UI
 
 Switch to `Edit` mode to enable graph editing.
