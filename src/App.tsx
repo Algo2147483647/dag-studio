@@ -654,11 +654,11 @@ export default function App() {
         field={relationEditor?.field || null}
         fieldLabel={relationEditor?.field ? getDisplayFieldName(relationEditor.field, fieldMapping) : undefined}
         node={relationEditor && state.dag ? state.dag[relationEditor.nodeKey] || null : null}
-        onSave={(keys) => {
+        onSave={(relations) => {
           if (relationEditor) {
             commitCommand(relationEditor.field === "parents"
-              ? { type: "setParents", key: relationEditor.nodeKey, parents: keys }
-              : { type: "setChildren", key: relationEditor.nodeKey, children: keys });
+              ? { type: "setParentRelations", key: relationEditor.nodeKey, parents: relations }
+              : { type: "setChildRelations", key: relationEditor.nodeKey, children: relations });
             dispatch({ type: "modalClosed" });
           }
         }}

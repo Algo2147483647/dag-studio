@@ -1,6 +1,6 @@
 import type { DagNode, NodeKey, NormalizedDag, RelationValue } from "./types";
 import { DEFAULT_RELATION_VALUE } from "./types";
-import { ensureReferencedNodes, getRelationKeys, removeRelation, renameRelation, syncBidirectionalRelations } from "./relations";
+import { ensureReferencedNodes, getRelationKeys, removeRelation, renameRelation, syncBidirectionalRelationMap, syncBidirectionalRelations, toRelationMap } from "./relations";
 import { structuredCloneValue } from "./serialize";
 
 export type GraphCommand =
@@ -13,7 +13,9 @@ export type GraphCommand =
   | { type: "removeEdge"; parentKey: NodeKey; childKey: NodeKey }
   | { type: "updateNodeFields"; key: NodeKey; nextKey?: NodeKey; fields: Record<string, unknown> }
   | { type: "setParents"; key: NodeKey; parents: NodeKey[] }
-  | { type: "setChildren"; key: NodeKey; children: NodeKey[] };
+  | { type: "setChildren"; key: NodeKey; children: NodeKey[] }
+  | { type: "setParentRelations"; key: NodeKey; parents: Record<NodeKey, RelationValue> }
+  | { type: "setChildRelations"; key: NodeKey; children: Record<NodeKey, RelationValue> };
 
 export interface CommandResult {
   dag: NormalizedDag;
@@ -49,6 +51,14 @@ export function applyGraphCommand(sourceDag: NormalizedDag, command: GraphComman
       syncBidirectionalRelations(dag, command.key, "children", command.children);
       ensureReferencedNodes(dag);
       return { dag, changedKeys: [command.key, ...command.children], message: `Updated children for ${command.key}.` };
+    case "setParentRelations":
+      syncBidirectionalRelationMap(dag, command.key, "parents", command.parents);
+      ensureReferencedNodes(dag);
+      return { dag, changedKeys: [command.key, ...Object.keys(command.parents)], message: `Updated parents for ${command.key}.` };
+    case "setChildRelations":
+      syncBidirectionalRelationMap(dag, command.key, "children", command.children);
+      ensureReferencedNodes(dag);
+      return { dag, changedKeys: [command.key, ...Object.keys(command.children)], message: `Updated children for ${command.key}.` };
     case "updateNodeFields":
       return updateNodeFields(dag, command.key, command.nextKey || command.key, command.fields);
   }
@@ -307,15 +317,4 @@ function assertValidNewKey(dag: NormalizedDag, key: NodeKey, currentKey?: NodeKe
   if (key !== currentKey && Object.prototype.hasOwnProperty.call(dag, key)) {
     throw new Error(`Node key "${key}" already exists.`);
   }
-}
-
-function toRelationMap(value: unknown): Record<NodeKey, RelationValue> {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return { ...(value as Record<NodeKey, RelationValue>) };
-  }
-  const relationMap: Record<NodeKey, RelationValue> = {};
-  getRelationKeys(value).forEach((key) => {
-    relationMap[key] = DEFAULT_RELATION_VALUE;
-  });
-  return relationMap;
 }

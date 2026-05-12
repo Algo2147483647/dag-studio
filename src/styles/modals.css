@@ -80,6 +80,7 @@
 
 .relation-editor-dialog {
   border-radius: 18px;
+  width: min(760px, calc(100vw - 32px));
 }
 
 .relation-editor-dialog h3,
@@ -238,9 +239,68 @@
 }
 
 .relation-editor-hint {
-  margin: 8px 0 0;
+  margin: 0;
   color: var(--text-soft);
   font-size: 12px;
+  line-height: 1.5;
+}
+
+.relation-editor-table-wrap {
+  margin-top: 14px;
+  overflow: auto;
+  border: 1px solid rgba(96, 118, 151, 0.14);
+  border-radius: 14px;
+}
+
+.relation-editor-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.relation-editor-table th,
+.relation-editor-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(96, 118, 151, 0.1);
+  text-align: left;
+  font-size: 13px;
+}
+
+.relation-editor-table th {
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: rgba(246, 249, 253, 0.96);
+}
+
+.relation-editor-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.relation-editor-cell-input {
+  min-width: 160px;
+}
+
+.relation-editor-actions-cell {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.relation-editor-remove-btn {
+  min-height: 36px;
+}
+
+.relation-editor-empty {
+  color: var(--text-soft);
+  text-align: center;
+}
+
+.relation-editor-secondary-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-start;
 }
 
 .relation-editor-actions {

@@ -48,6 +48,25 @@ export function getRelationKeys(relationValue: unknown): NodeKey[] {
   return [];
 }
 
+export function toRelationMap(value: unknown, defaultRelationValue: RelationValue = DEFAULT_RELATION_VALUE): Record<NodeKey, RelationValue> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const relationMap: Record<NodeKey, RelationValue> = {};
+    Object.entries(value as Record<string, unknown>).forEach(([rawKey, rawValue]) => {
+      const key = String(rawKey ?? "").trim();
+      if (key) {
+        relationMap[key] = coerceRelationValue(rawValue);
+      }
+    });
+    return relationMap;
+  }
+
+  const relationMap: Record<NodeKey, RelationValue> = {};
+  getRelationKeys(value).forEach((key) => {
+    relationMap[key] = defaultRelationValue;
+  });
+  return relationMap;
+}
+
 export function addRelation(node: DagNode, fieldName: "parents" | "children", relationKey: NodeKey, relationValue: RelationValue = DEFAULT_RELATION_VALUE): void {
   const targetKey = relationKey.trim();
   if (!targetKey) {
@@ -177,5 +196,40 @@ export function syncBidirectionalRelations(dag: NormalizedDag, nodeKey: NodeKey,
   normalizedNextKeys.forEach((relatedKey) => {
     const relatedNode = ensureNodeExists(dag, relatedKey);
     addRelation(relatedNode, oppositeField, nodeKey);
+  });
+}
+
+export function syncBidirectionalRelationMap(
+  dag: NormalizedDag,
+  nodeKey: NodeKey,
+  fieldName: "parents" | "children",
+  nextRelations: Record<NodeKey, RelationValue>,
+  defaultRelationValue: RelationValue = DEFAULT_RELATION_VALUE,
+): void {
+  const node = ensureNodeExists(dag, nodeKey);
+  const oppositeField = fieldName === "parents" ? "children" : "parents";
+  const previousKeys = getRelationKeys(node[fieldName]);
+  const normalizedNextRelations: Record<NodeKey, RelationValue> = {};
+
+  Object.entries(nextRelations).forEach(([rawKey, rawValue]) => {
+    const key = String(rawKey ?? "").trim();
+    if (key && key !== nodeKey) {
+      normalizedNextRelations[key] = coerceRelationValue(rawValue);
+    }
+  });
+
+  node[fieldName] = normalizedNextRelations;
+
+  previousKeys.forEach((relatedKey) => {
+    if (!Object.prototype.hasOwnProperty.call(normalizedNextRelations, relatedKey) && dag[relatedKey]) {
+      removeRelation(dag[relatedKey], oppositeField, nodeKey);
+    }
+  });
+
+  Object.entries(normalizedNextRelations).forEach(([relatedKey, relationValue]) => {
+    const relatedNode = ensureNodeExists(dag, relatedKey);
+    const oppositeMap = toRelationMap(relatedNode[oppositeField], defaultRelationValue);
+    oppositeMap[nodeKey] = relationValue;
+    relatedNode[oppositeField] = oppositeMap;
   });
 }
