@@ -60,7 +60,7 @@ export default function RelationEditorModal({ open, nodeKey, field, fieldLabel, 
   }
 
   return (
-    <div id="relation-editor-modal" className="relation-editor-modal is-visible" aria-hidden="false" onClick={(event) => event.target === event.currentTarget && onClose()}>
+    <div id="relation-editor-modal" className="relation-editor-modal is-visible" aria-hidden="false">
       <div className="relation-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="relation-editor-title">
         <h3 id="relation-editor-title">Edit {displayFieldName}</h3>
         <p id="relation-editor-description" className="relation-editor-description">Editing {displayFieldName} for node {activeNodeKey}.</p>

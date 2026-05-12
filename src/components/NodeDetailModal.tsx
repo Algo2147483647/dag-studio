@@ -54,7 +54,7 @@ export default function NodeDetailModal({ open, nodeKey, node, mode, fieldMappin
   const draftKey = String(values.key || currentNodeKey).trim() || currentNodeKey;
 
   return (
-    <div id="node-detail-modal" className="node-detail-modal is-visible" aria-hidden="false" onClick={(event) => event.target === event.currentTarget && onClose()}>
+    <div id="node-detail-modal" className="node-detail-modal is-visible" aria-hidden="false">
       <div className="node-detail-page" role="dialog" aria-modal="true" aria-labelledby="node-detail-title">
         <div className="node-detail-header">
           <div className="node-detail-header-main">

@@ -18,7 +18,7 @@ export default function SaveJsonModal({ open, sourceFileName, canOverwrite, onOv
   const newFileName = buildTimestampFileName(normalizedFileName);
 
   return (
-    <div id="save-json-modal" className="save-json-modal is-visible" aria-hidden="false" onClick={(event) => event.target === event.currentTarget && onClose()}>
+    <div id="save-json-modal" className="save-json-modal is-visible" aria-hidden="false">
       <div className="save-json-dialog" role="dialog" aria-modal="true" aria-labelledby="save-json-title">
         <h3 id="save-json-title">Save Graph JSON</h3>
         <p id="save-json-description" className="save-json-description">

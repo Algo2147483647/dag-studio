@@ -30,7 +30,7 @@ export default function FieldMappingModal({ open, mapping, onSave, onClose }: Fi
   }
 
   return (
-    <div id="field-mapping-modal" className="field-mapping-modal is-visible" aria-hidden="false" onClick={(event) => event.target === event.currentTarget && onClose()}>
+    <div id="field-mapping-modal" className="field-mapping-modal is-visible" aria-hidden="false">
       <div className="field-mapping-dialog" role="dialog" aria-modal="true" aria-labelledby="field-mapping-title">
         <h3 id="field-mapping-title">Field Mapping</h3>
         <p className="field-mapping-description">Customize how system keywords are read from and written to JSON files.</p>
