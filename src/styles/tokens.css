@@ -20,6 +20,10 @@
   --node-border-strong: rgba(50, 79, 132, 0.35);
   --node-shadow: 0 16px 34px rgba(28, 40, 63, 0.08);
   --node-shadow-active: 0 18px 40px rgba(39, 78, 156, 0.12);
+  --scrollbar-thumb: rgba(96, 118, 151, 0.42);
+  --scrollbar-thumb-hover: rgba(66, 97, 147, 0.58);
+  --scrollbar-track: rgba(233, 239, 247, 0.86);
+  --scrollbar-track-border: rgba(96, 118, 151, 0.1);
   --radius-xl: 24px;
   --radius-lg: 18px;
   --radius-md: 14px;
