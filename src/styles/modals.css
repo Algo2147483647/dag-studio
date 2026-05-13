@@ -41,8 +41,8 @@
 .node-detail-json::-webkit-scrollbar,
 .node-detail-markdown pre::-webkit-scrollbar,
 .node-detail-markdown .katex-display::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 .relation-editor-modal::-webkit-scrollbar-track,
@@ -58,8 +58,6 @@
 .node-detail-json::-webkit-scrollbar-track,
 .node-detail-markdown pre::-webkit-scrollbar-track,
 .node-detail-markdown .katex-display::-webkit-scrollbar-track {
-  border: 1px solid var(--scrollbar-track-border);
-  border-radius: 999px;
   background: var(--scrollbar-track);
 }
 
@@ -78,7 +76,7 @@
 .node-detail-markdown .katex-display::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(120, 140, 173, 0.74), var(--scrollbar-thumb));
+  background: var(--scrollbar-thumb);
   background-clip: padding-box;
 }
 
@@ -95,7 +93,7 @@
 .node-detail-json::-webkit-scrollbar-thumb:hover,
 .node-detail-markdown pre::-webkit-scrollbar-thumb:hover,
 .node-detail-markdown .katex-display::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(101, 126, 170, 0.82), var(--scrollbar-thumb-hover));
+  background: var(--scrollbar-thumb-hover);
   background-clip: padding-box;
 }
 
