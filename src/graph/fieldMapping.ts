@@ -113,10 +113,9 @@ export function formatMappedFieldLabel(fieldName: string, mapping: FieldMapping)
   if (!semanticFieldName) {
     return fieldName;
   }
-  const mappedFieldName = mapping[semanticFieldName];
-  return mappedFieldName === semanticFieldName
-    ? mappedFieldName
-    : `${mappedFieldName} (${semanticFieldName})`;
+  return fieldName === semanticFieldName
+    ? fieldName
+    : `${fieldName} (${semanticFieldName})`;
 }
 
 export function isMappableSystemFieldKey(fieldName: string): fieldName is MappableSystemFieldKey {

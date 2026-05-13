@@ -36,11 +36,14 @@ export const fieldMappingSuite = defineSuite("field-mapping", [
 
     assert.equal(getDisplayFieldName("title", mapping), "label");
     assert.equal(getDisplayFieldName("meta", mapping), "meta");
+    assert.equal(getDisplayFieldName("define", mapping), "description");
     assert.equal(getSemanticFieldName("label", mapping), "title");
     assert.equal(getSemanticFieldName("description", mapping), "define");
     assert.equal(getSemanticFieldName("next", mapping), "children");
     assert.equal(getSemanticFieldName("meta", mapping), null);
     assert.equal(formatMappedFieldLabel("label", mapping), "label (title)");
+    assert.equal(formatMappedFieldLabel("define", mapping), "define");
+    assert.equal(formatMappedFieldLabel("description", mapping), "description (define)");
     assert.equal(formatMappedFieldLabel("meta", mapping), "meta");
   }),
 
