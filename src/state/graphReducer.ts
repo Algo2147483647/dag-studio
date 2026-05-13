@@ -282,6 +282,11 @@ export function graphReducer(state: GraphAppState, action: GraphAction): GraphAp
         editHistory: { ...state.editHistory, savedRevision: state.editHistory.revision },
         ui: { ...state.ui, saveDialogOpen: false, status: action.status },
       };
+    case "savedAsCopy":
+      return {
+        ...state,
+        ui: { ...state.ui, saveDialogOpen: false, status: action.status },
+      };
     case "statusChanged":
       return { ...state, ui: { ...state.ui, status: action.status } };
   }

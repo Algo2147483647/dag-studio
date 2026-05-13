@@ -518,7 +518,7 @@ export default function App() {
   function handleSaveJsonAsNew() {
     const outputFileName = buildTimestampFileName(state.source.fileName || "graph.json");
     downloadJsonFile(getCurrentJsonContent(), outputFileName);
-    dispatch({ type: "saved", status: `Saved JSON as ${outputFileName}.` });
+    dispatch({ type: "savedAsCopy", status: `Saved JSON as ${outputFileName}. Original file still has unsaved changes.` });
   }
 
   const relationEditor = state.ui.relationEditor;

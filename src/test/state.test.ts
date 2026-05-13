@@ -85,6 +85,37 @@ export const stateSuite = defineSuite("state", [
     assert.match(nextState.ui.status, /Added node E/);
   }),
 
+  defineTest("savedAsCopy keeps the current document dirty because the source file was not overwritten", () => {
+    const state: GraphAppState = {
+      ...initialGraphAppState,
+      source: {
+        fileName: "sample.json",
+        fileHandle: null,
+        dirty: true,
+      },
+      editHistory: {
+        undoStack: [],
+        redoStack: [],
+        revision: 3,
+        savedRevision: 1,
+      },
+      ui: {
+        ...initialGraphAppState.ui,
+        saveDialogOpen: true,
+      },
+    };
+
+    const nextState = graphReducer(state, {
+      type: "savedAsCopy",
+      status: "Saved JSON as sample-2026-05-13.json. Original file still has unsaved changes.",
+    });
+
+    assert.equal(nextState.source.dirty, true);
+    assert.equal(nextState.editHistory.savedRevision, 1);
+    assert.equal(nextState.ui.saveDialogOpen, false);
+    assert.match(nextState.ui.status, /Original file still has unsaved changes/);
+  }),
+
   defineTest("repairHistoryAfterCommand remaps renamed selections and removes deleted ones", () => {
     const dag = createSampleDag();
     const state: GraphAppState = {

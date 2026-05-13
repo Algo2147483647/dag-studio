@@ -27,4 +27,5 @@ export type GraphAction =
   | { type: "saveDialogOpened" }
   | { type: "saveDialogClosed" }
   | { type: "saved"; status: string }
+  | { type: "savedAsCopy"; status: string }
   | { type: "statusChanged"; status: string };
