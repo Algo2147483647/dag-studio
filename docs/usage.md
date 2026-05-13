@@ -26,9 +26,20 @@ You can work from sample data or start from scratch.
 - `Initialize Canvas` creates a new blank graph with a single centered root node named `Initial_Node`.
 - A newly initialized graph is treated as unsaved until you export or save it as JSON.
 
+## Field Mapping
+
+Each opened JSON file is interpreted using a field mapping.
+
+- DAG Studio first tries to infer the document's own schema from its field names
+- if a file uses default fields such as `children`, `define`, and `type`, the default mapping is used
+- if a file uses custom fields such as `next`, `description`, or `kind`, the app can map those roles automatically
+- different files may therefore show different active mappings
+
+The `Field Mapping` dialog changes how the current document is interpreted in the UI. It does not rename fields in the source JSON just by saving the mapping.
+
 ## Navigation
 
-After loading JSON, the renderer first looks for nodes with no parents.
+After loading JSON, the renderer finds roots by looking at both parent links and incoming edges inferred from child links.
 
 - If there is one root node, that node becomes the focused root.
 - If there are multiple root nodes, DAG Studio renders them as a forest.
@@ -95,11 +106,11 @@ In `Preview` mode, edit-only actions stay disabled while non-destructive actions
 `View Node` opens a generic node detail view. It shows:
 
 - every key-value pair in the node
-- `define` as readable text
-- `parents` and `children` as relation sets
+- the mapped description field as readable text
+- the mapped parent and child relation fields as relation sets
 - the node's raw JSON
 
-The viewer is schema-agnostic, so custom node fields are preserved and still inspectable.
+The viewer is schema-agnostic, so custom node fields are preserved and still inspectable. Field labels prefer the real JSON field name. When a custom field is acting as a graph-aware role, the UI may show it like `description (define)`.
 
 ## Graph Console
 
@@ -165,5 +176,11 @@ original-name-YYYYMMDD-HHMMSS.json
 ```
 
 Direct overwrite uses the browser File System Access API. When file access is unavailable, saving a new copy remains available.
+
+Saving behavior notes:
+
+- `Save New Copy` does not mark the original source file as clean
+- saving preserves the document's active field names instead of rewriting them back to system names
+- changing field mapping affects interpretation, not the literal JSON keys written to disk
 
 The app also supports exporting the current view as SVG.

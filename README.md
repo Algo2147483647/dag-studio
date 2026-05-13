@@ -5,6 +5,7 @@ DAG Studio is a browser-based graph viewer and lightweight JSON editor for direc
 It is built for fast graph inspection and editing in the browser:
 
 - load a JSON graph and render it immediately
+- infer a document-specific field mapping when JSON uses custom field names
 - navigate by root, subtree, or parent level
 - edit nodes and relationships directly in the UI
 - batch graph edits from a text console in `Edit` mode
@@ -30,6 +31,8 @@ npm test
 ```
 
 When the page loads, the app automatically reads [`public/example.json`](public/example.json).
+
+Each opened document can use its own field mapping. If one file uses `children / define / type` and another uses `next / description / kind`, DAG Studio will interpret each file using its detected schema while preserving the original JSON field names on save.
 
 ## What You Can Do
 

@@ -1,6 +1,6 @@
 # Data Format Guide
 
-DAG Studio accepts JSON graph data and preserves custom fields. This guide describes the recommended shape and the normalization rules used by the app.
+DAG Studio accepts JSON graph data, preserves custom fields, and can interpret a small set of graph-aware fields through per-document field mapping. This guide describes the recommended shape and the current load, mapping, and save behavior.
 
 ## Recommended Top-Level Shape
 
@@ -35,7 +35,7 @@ The recommended and simplest format is an object keyed by node key:
 
 If you are creating data from scratch, prefer this keyed-object form.
 
-## Field Rules
+## Graph-Aware Fields
 
 Each node is just a JSON object. DAG Studio treats only a small set of fields as graph-aware:
 
@@ -46,6 +46,8 @@ Each node is just a JSON object. DAG Studio treats only a small set of fields as
 - `type`: optional category used for node color grouping
 
 All other fields are preserved as-is and remain visible in `View Node`.
+
+If you are creating data from scratch, these default field names are still the recommended schema.
 
 Example:
 
@@ -153,24 +155,78 @@ The keyed-object format is recommended, but two additional input shapes are acce
 }
 ```
 
-## Relationship Normalization
+## Field Mapping
 
-The app normalizes and synchronizes graph relationships after loading and editing.
+DAG Studio can interpret alternate field names for the graph-aware roles above.
 
-That means:
+For example, this document can be read without renaming its JSON keys:
 
-- missing referenced nodes are created automatically
-- if `children` points to another node, that node receives the matching `parents` link
-- if `parents` points to another node, that node receives the matching `children` link
-- duplicate relation keys are removed
+```json
+{
+  "A": {
+    "label": "Alpha",
+    "description": "Root node",
+    "next": {
+      "B": "related_to"
+    },
+    "kind": "service"
+  },
+  "B": {
+    "prev": {
+      "A": "related_to"
+    }
+  }
+}
+```
 
-You do not need to maintain both directions perfectly by hand, but keeping both sides explicit is still recommended for clarity.
+In that case, DAG Studio may infer a mapping like:
+
+- `title -> label`
+- `define -> description`
+- `children -> next`
+- `parents -> prev`
+- `type -> kind`
+
+Important behavior notes:
+
+- mapping is interpreted per opened document, not as one global schema for every file
+- changing mapping changes how the current document is interpreted in the UI
+- saving does not rename your JSON fields to system names
+- node viewer labels prefer the real JSON field name and only append the semantic role when helpful, such as `description (define)`
+
+## Load and Save Behavior
+
+Loading performs only light structural normalization:
+
+- top-level keyed objects, arrays of nodes, and `{ "nodes": [...] }` wrappers are accepted
+- array entries use their `key` field as the node key
+- keyed-object entries are copied as node records and receive an internal `key` value matching the outer key
+- custom fields are preserved
+
+Saving preserves the document's active field names:
+
+- if the document uses `children`, it saves `children`
+- if the document uses `next`, it saves `next`
+- if a node never had a relation field, saving does not add an empty one just because the mapping defines that role
+
+## Relationship Interpretation
+
+The app interprets graph relationships from whichever fields are mapped to `children` and `parents`.
+
+Behavior notes:
+
+- `children` and `parents` both accept array form and object form
+- root detection uses both explicit parent links and incoming edges inferred from child links
+- a file that only defines `children` can still render correctly
+- UI edits keep parent and child links synchronized once you mutate the graph in `Edit` mode
+
+For clarity and portability, explicitly storing both directions is still recommended, but it is no longer required just to get correct rendering.
 
 ## Rendering Notes
 
 - node title is chosen from `title` or the node key
 - node subtitle is derived from `define`
-- edge labels come from relation values in `children` or `parents`
+- edge labels come from relation values in the fields mapped to `children` or `parents`
 - card backgrounds stay neutral for readability, even when `type` color grouping is active
 
 ## Node Color Grouping
@@ -221,7 +277,8 @@ Example:
 
 - use stable, unique keys
 - prefer the keyed-object top-level format
-- prefer object-form `children` if edge labels matter
-- use `define` for the main readable description
+- prefer object-form child relations if edge labels matter
+- use a single consistent schema within one document
+- if you use custom field names, keep the mapping stable across the dataset
+- use the mapped `define` role for the main readable description
 - keep additional metadata in custom fields instead of overloading relation fields
-- use consistent field naming across shared datasets

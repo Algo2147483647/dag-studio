@@ -50,6 +50,7 @@ Script behavior:
 The codebase is organized around a few clear responsibilities:
 
 - graph loading and normalization happen in the graph layer
+- field mapping is interpreted per document and inferred during load before the UI chooses selections or layouts
 - edits flow through graph commands and reducer-managed history
 - layout selection is separated from rendering so multiple layout engines can coexist
 - browser integrations such as file access and clipboard support live in adapters instead of core graph logic
