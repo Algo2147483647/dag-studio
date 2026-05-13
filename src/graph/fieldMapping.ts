@@ -5,6 +5,13 @@ export type MappableSystemFieldKey = typeof MAPPABLE_SYSTEM_FIELD_KEYS[number];
 export type FieldMapping = Record<MappableSystemFieldKey, string>;
 
 const MAPPABLE_FIELD_SET = new Set<string>(MAPPABLE_SYSTEM_FIELD_KEYS);
+const FIELD_ALIAS_CANDIDATES: Record<MappableSystemFieldKey, string[]> = {
+  children: ["children", "child", "next", "nexts", "downstream", "outputs", "targets"],
+  parents: ["parents", "parent", "prev", "previous", "upstream", "inputs", "sources"],
+  define: ["define", "description", "desc", "summary", "details", "detail", "content"],
+  title: ["title", "label", "name"],
+  type: ["type", "kind", "category", "nodeType", "node_type"],
+};
 
 export function getDefaultFieldMapping(): FieldMapping {
   return {
@@ -52,6 +59,36 @@ export function validateFieldMapping(mapping: FieldMapping): { ok: true } | { ok
   }
 
   return { ok: true };
+}
+
+export function inferFieldMapping(input: unknown, fallback: FieldMapping = getDefaultFieldMapping()): FieldMapping {
+  const samples = collectNodeLikeSamples(input);
+  if (!samples.length) {
+    return fallback;
+  }
+
+  const resolved = new Set<string>();
+  const next: Partial<FieldMapping> = {};
+
+  MAPPABLE_SYSTEM_FIELD_KEYS.forEach((systemKey) => {
+    const explicitFieldName = findBestExplicitFieldName(samples, systemKey);
+    if (explicitFieldName && !resolved.has(explicitFieldName)) {
+      next[systemKey] = explicitFieldName;
+      resolved.add(explicitFieldName);
+      return;
+    }
+
+    const fallbackFieldName = fallback[systemKey];
+    if (samples.some((sample) => Object.prototype.hasOwnProperty.call(sample, fallbackFieldName)) && !resolved.has(fallbackFieldName)) {
+      next[systemKey] = fallbackFieldName;
+      resolved.add(fallbackFieldName);
+    }
+  });
+
+  return sanitizeFieldMapping({
+    ...fallback,
+    ...next,
+  });
 }
 
 export function getDisplayFieldName(fieldName: string, mapping: FieldMapping): string {
@@ -108,4 +145,67 @@ export function remapNodeInput(input: unknown, _mapping: FieldMapping): unknown 
 
 export function remapNodeOutput(input: unknown, _mapping: FieldMapping): unknown {
   return input;
+}
+
+function collectNodeLikeSamples(input: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(input)) {
+    return input.filter(isNodeLikeRecord);
+  }
+
+  if (input && typeof input === "object") {
+    const record = input as Record<string, unknown>;
+    if (Array.isArray(record.nodes)) {
+      return record.nodes.filter(isNodeLikeRecord);
+    }
+    return Object.values(record).filter(isNodeLikeRecord);
+  }
+
+  return [];
+}
+
+function isNodeLikeRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function findBestExplicitFieldName(samples: Array<Record<string, unknown>>, systemKey: MappableSystemFieldKey): string | null {
+  const candidates = FIELD_ALIAS_CANDIDATES[systemKey];
+  let bestFieldName: string | null = null;
+  let bestScore = 0;
+
+  candidates.forEach((fieldName, index) => {
+    const score = samples.reduce((total, sample) => {
+      if (!Object.prototype.hasOwnProperty.call(sample, fieldName)) {
+        return total;
+      }
+      const value = sample[fieldName];
+      return total + 10 + getValueShapeScore(systemKey, value);
+    }, 0) + (candidates.length - index) * 0.01;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestFieldName = fieldName;
+    }
+  });
+
+  return bestFieldName;
+}
+
+function getValueShapeScore(systemKey: MappableSystemFieldKey, value: unknown): number {
+  if (systemKey === "children" || systemKey === "parents") {
+    return isRelationLikeValue(value) ? 4 : 0;
+  }
+  if (systemKey === "title" || systemKey === "define" || systemKey === "type") {
+    return typeof value === "string" ? 3 : 0;
+  }
+  return 0;
+}
+
+function isRelationLikeValue(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.every((item) => typeof item === "string");
+  }
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  return Object.keys(value as Record<string, unknown>).length >= 0;
 }

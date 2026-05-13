@@ -3,7 +3,7 @@ import { applyGraphCommand, collectSubtreeNodeKeys } from "../graph/commands";
 import { getParentLevelSelection, getInitialSelection, remapSelectionKeys, removeSelectionKeys } from "../graph/selectors";
 import { serializeDag } from "../graph/serialize";
 import { defineSuite, defineTest } from "./harness";
-import { createCustomFieldMapping, createForestDag, createMappedSampleDag, createSampleDag } from "./fixtures";
+import { createChildOnlyDag, createCustomFieldMapping, createForestDag, createMappedSampleDag, createSampleDag } from "./fixtures";
 
 export const graphSuite = defineSuite("graph", [
   defineTest("renameNode updates reciprocal relations without mutating the source dag", () => {
@@ -53,6 +53,7 @@ export const graphSuite = defineSuite("graph", [
   defineTest("selectors derive initial and parent-level selections correctly", () => {
     assert.deepEqual(getInitialSelection(createForestDag()), { type: "full" });
     assert.deepEqual(getInitialSelection(createSampleDag()), { type: "node", key: "A" });
+    assert.deepEqual(getInitialSelection(createChildOnlyDag()), { type: "node", key: "Root" });
     assert.deepEqual(getParentLevelSelection(createSampleDag(), ["D"]), { type: "node", key: "B" });
   }),
 

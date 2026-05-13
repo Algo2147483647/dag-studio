@@ -4,17 +4,24 @@ import type { GraphSelection, NodeKey, NormalizedDag } from "./types";
 
 export function findRootsFromDag(dag: NormalizedDag, mapping: FieldMapping = getDefaultFieldMapping()): NodeKey[] {
   const nodeKeys = Object.keys(dag);
-  const rootsByParents = nodeKeys.filter((nodeKey) => getNodeParentKeys(dag[nodeKey], mapping).length === 0);
-  if (rootsByParents.length) {
-    return rootsByParents;
-  }
-
-  const allNodes = new Set(nodeKeys);
+  const nodesWithIncoming = new Set<NodeKey>();
   nodeKeys.forEach((nodeKey) => {
-    getNodeChildKeys(dag[nodeKey], mapping).forEach((childKey) => allNodes.delete(childKey));
+    getNodeParentKeys(dag[nodeKey], mapping).forEach((parentKey) => {
+      if (parentKey && parentKey !== nodeKey) {
+        nodesWithIncoming.add(nodeKey);
+      }
+    });
   });
 
-  const inferredRoots = Array.from(allNodes);
+  nodeKeys.forEach((nodeKey) => {
+    getNodeChildKeys(dag[nodeKey], mapping).forEach((childKey) => {
+      if (childKey && childKey !== nodeKey) {
+        nodesWithIncoming.add(childKey);
+      }
+    });
+  });
+
+  const inferredRoots = nodeKeys.filter((nodeKey) => !nodesWithIncoming.has(nodeKey));
   return inferredRoots.length ? inferredRoots : nodeKeys;
 }
 

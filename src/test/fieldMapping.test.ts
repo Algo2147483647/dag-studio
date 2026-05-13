@@ -4,6 +4,7 @@ import {
   getDisplayFieldName,
   getDefaultFieldMapping,
   getSemanticFieldName,
+  inferFieldMapping,
   sanitizeFieldMapping,
   validateFieldMapping,
 } from "../graph/fieldMapping";
@@ -56,6 +57,31 @@ export const fieldMappingSuite = defineSuite("field-mapping", [
         C: "edge_ac",
       },
     });
+  }),
+
+  defineTest("inferFieldMapping prefers a document's own field names over saved page preferences", () => {
+    const fallback = createCustomFieldMapping();
+
+    assert.deepEqual(inferFieldMapping({
+      A: {
+        title: "Alpha",
+        define: "Root",
+        type: "service",
+        children: { B: "edge_ab" },
+      },
+    }, fallback), getDefaultFieldMapping());
+
+    assert.deepEqual(inferFieldMapping({
+      A: {
+        label: "Alpha",
+        description: "Root",
+        kind: "service",
+        next: { B: "edge_ab" },
+      },
+      B: {
+        prev: { A: "edge_ab" },
+      },
+    }, getDefaultFieldMapping()), createCustomFieldMapping());
   }),
 
   defineTest("validateFieldMapping accepts unique names and rejects duplicates", () => {

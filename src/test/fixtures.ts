@@ -47,6 +47,24 @@ export function createForestDag(): NormalizedDag {
   });
 }
 
+export function createChildOnlyDag(): NormalizedDag {
+  return normalizeDagInput({
+    Root: {
+      children: {
+        Mid: "edge_rm",
+      },
+    },
+    Mid: {
+      children: {
+        Leaf: "edge_ml",
+      },
+    },
+    Leaf: {
+      define: "terminal",
+    },
+  });
+}
+
 export function createCustomFieldMapping(): FieldMapping {
   return {
     ...getDefaultFieldMapping(),

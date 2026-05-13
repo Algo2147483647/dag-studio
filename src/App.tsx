@@ -6,6 +6,7 @@ import { createInitialCanvasDag, INITIAL_CANVAS_FILE_NAME } from "./graph/initia
 import {
   getDefaultFieldMapping,
   getDisplayFieldName,
+  inferFieldMapping,
   type FieldMapping,
 } from "./graph/fieldMapping";
 import { normalizeDagInput } from "./graph/normalize";
@@ -62,7 +63,7 @@ export default function App() {
   const svgRef = useRef<SVGSVGElement>(null);
   const topbarRef = useRef<HTMLElement>(null);
 
-  useDefaultGraph(dispatch, suppressDefaultGraphRef, fieldMapping);
+  useDefaultGraph(dispatch, suppressDefaultGraphRef, setFieldMapping);
 
   useEffect(() => {
     saveGraphPagePreferences({
@@ -336,13 +337,15 @@ export default function App() {
     suppressDefaultGraphRef.current = true;
     try {
       const payload = await readJsonFile(file);
+      const inferredMapping = inferFieldMapping(payload, fieldMapping);
       const dag = normalizeDagInput(payload);
+      setFieldMapping(inferredMapping);
       dispatch({
         type: "graphLoaded",
         dag,
         fileName: file.name,
         fileHandle,
-        selection: getInitialSelection(dag, fieldMapping),
+        selection: getInitialSelection(dag, inferredMapping),
         status: `${Object.keys(dag).length} nodes loaded from ${file.name}.`,
       });
     } catch (error) {
@@ -693,8 +696,8 @@ export default function App() {
           dispatch({
             type: "statusChanged",
             status: state.dag
-              ? "Saved field mapping preferences. The graph is now being interpreted with the updated field names."
-              : "Saved field mapping preferences.",
+        ? "Saved field mapping preferences. The graph is now being interpreted with the updated field names."
+        : "Saved field mapping preferences.",
           });
           setFieldMappingOpen(false);
         }}
