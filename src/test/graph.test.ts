@@ -1,0 +1,73 @@
+import assert from "node:assert/strict";
+import { applyGraphCommand, collectSubtreeNodeKeys } from "../graph/commands";
+import { getParentLevelSelection, getInitialSelection, remapSelectionKeys, removeSelectionKeys } from "../graph/selectors";
+import { serializeDag } from "../graph/serialize";
+import { defineSuite, defineTest } from "./harness";
+import { createForestDag, createSampleDag } from "./fixtures";
+
+export const graphSuite = defineSuite("graph", [
+  defineTest("renameNode updates reciprocal relations without mutating the source dag", () => {
+    const sourceDag = createSampleDag();
+    const beforeSnapshot = serializeDag(sourceDag);
+
+    const result = applyGraphCommand(sourceDag, { type: "renameNode", oldKey: "B", newKey: "B_Renamed" });
+
+    assert.equal(sourceDag.B.key, "B");
+    assert.deepEqual(serializeDag(sourceDag), beforeSnapshot);
+    assert.equal(result.dag.B_Renamed.key, "B_Renamed");
+    assert.ok(!("B" in result.dag));
+    assert.deepEqual(result.dag.A.children, { B_Renamed: "edge_ab", C: "edge_ac" });
+    assert.deepEqual(result.dag.D.parents, { B_Renamed: "related_to" });
+  }),
+
+  defineTest("deleteSubtree removes descendants and cleans dangling relations", () => {
+    const sourceDag = createSampleDag();
+    const result = applyGraphCommand(sourceDag, { type: "deleteSubtree", rootKey: "B" });
+
+    assert.deepEqual(collectSubtreeNodeKeys(sourceDag, "B").sort(), ["B", "D"]);
+    assert.ok(!("B" in result.dag));
+    assert.ok(!("D" in result.dag));
+    assert.deepEqual(result.dag.A.children, { C: "edge_ac" });
+    assert.deepEqual(result.deletedKeys?.sort(), ["B", "D"]);
+  }),
+
+  defineTest("updateNodeFields resynchronizes bidirectional parent and child relations", () => {
+    const sourceDag = createSampleDag();
+    const result = applyGraphCommand(sourceDag, {
+      type: "updateNodeFields",
+      key: "C",
+      fields: {
+        title: "Gamma 2",
+        define: "Moved",
+        parents: { B: "linked_from_b" },
+        children: { D: "edge_cd" },
+      },
+    });
+
+    assert.deepEqual(result.dag.C.parents, { B: "linked_from_b" });
+    assert.deepEqual(result.dag.B.children, { D: "edge_bd", C: "related_to" });
+    assert.deepEqual(result.dag.A.children, { B: "edge_ab" });
+    assert.deepEqual(result.dag.D.parents, { B: "related_to", C: "related_to" });
+  }),
+
+  defineTest("selectors derive initial and parent-level selections correctly", () => {
+    assert.deepEqual(getInitialSelection(createForestDag()), { type: "full" });
+    assert.deepEqual(getInitialSelection(createSampleDag()), { type: "node", key: "A" });
+    assert.deepEqual(getParentLevelSelection(createSampleDag(), ["D"]), { type: "node", key: "B" });
+  }),
+
+  defineTest("selection remapping helpers preserve only valid keys", () => {
+    const forestSelection = { type: "forest" as const, keys: ["A", "B", "C"], label: "Focus" };
+
+    assert.deepEqual(remapSelectionKeys(forestSelection, (key) => (key === "B" ? "B2" : key)), {
+      type: "forest",
+      keys: ["A", "B2", "C"],
+      label: "Focus",
+    });
+    assert.deepEqual(removeSelectionKeys(forestSelection, new Set(["A", "C"])), {
+      type: "forest",
+      keys: ["B"],
+      label: "Focus",
+    });
+  }),
+]);
