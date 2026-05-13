@@ -201,6 +201,9 @@ export default function Topbar({
 }
 
 function ZoomInput({ value, disabled, onCommit }: { value: number; disabled: boolean; onCommit: (percent: number) => void }) {
+  const digits = String(Math.max(0, Math.trunc(Math.abs(value || 0)))).length;
+  const inputWidth = `${Math.max(2, digits) + 0.35}ch`;
+
   const handleCommit = (event: React.FocusEvent<HTMLInputElement> | React.ChangeEvent<HTMLInputElement>) => {
     onCommit(Number(event.currentTarget.value));
   };
@@ -211,11 +214,11 @@ function ZoomInput({ value, disabled, onCommit }: { value: number; disabled: boo
         id="zoom-value-input"
         className="zoom-value-input"
         type="number"
-        min={5}
-        max={200}
+        min={0.0001}
         step={1}
         value={value}
         disabled={disabled}
+        style={{ width: inputWidth, minWidth: inputWidth }}
         aria-label="Zoom percentage"
         onChange={handleCommit}
         onBlur={handleCommit}

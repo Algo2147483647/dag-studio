@@ -73,7 +73,7 @@ export const initialGraphAppState: GraphAppState = {
   zoom: {
     scale: 1,
     minScale: 1,
-    maxScale: 2,
+    maxScale: Number.POSITIVE_INFINITY,
   },
   ui: {
     status: "Loading example.json...",
