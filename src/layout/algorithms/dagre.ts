@@ -1,5 +1,6 @@
 import dagre from "dagre";
-import type { NodeKey } from "../../graph/types";
+import type { FieldMapping } from "../../graph/fieldMapping";
+import type { DagNode, NodeKey } from "../../graph/types";
 import type { LayoutEdgeRoute, LayoutResult } from "../types";
 import { buildVisibleGraph, type LayoutGraphNode } from "./shared";
 
@@ -8,11 +9,12 @@ const DEFAULT_NODE_HEIGHT = 74;
 const LAYER_EPSILON = 0.5;
 
 export function buildDagreLayout(
-  dag: Record<NodeKey, LayoutGraphNode | undefined>,
+  dag: Record<NodeKey, DagNode | undefined>,
   roots: NodeKey[],
+  mapping: FieldMapping,
   nodeSizes: Map<NodeKey, { width: number; height: number }>,
 ): LayoutResult {
-  const visible = buildVisibleGraph(dag, roots);
+  const visible = buildVisibleGraph(dag, roots, mapping);
   const graph = new dagre.graphlib.Graph({ multigraph: false, compound: false });
   graph.setGraph({
     rankdir: "LR",

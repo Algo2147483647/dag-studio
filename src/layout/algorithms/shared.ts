@@ -1,8 +1,9 @@
-import type { NodeKey } from "../../graph/types";
-import { getRelationKeys } from "../../graph/relations";
+import { getNodeChildKeys } from "../../graph/accessors";
+import type { FieldMapping } from "../../graph/fieldMapping";
+import type { DagNode, NodeKey } from "../../graph/types";
 
 export interface LayoutGraphNode {
-  children?: unknown;
+  [field: string]: unknown;
 }
 
 export interface VisibleGraph {
@@ -17,11 +18,11 @@ export function getExistingRoots(dag: Record<NodeKey, unknown>, roots: NodeKey[]
   return Array.from(new Set(roots.filter((root) => Boolean(dag[root]))));
 }
 
-export function collectReachableFromRoots(dag: Record<NodeKey, LayoutGraphNode | undefined>, roots: NodeKey[]): Set<NodeKey> {
-  return new Set(collectReachableInLevelOrder(dag, roots));
+export function collectReachableFromRoots(dag: Record<NodeKey, DagNode | undefined>, roots: NodeKey[], mapping: FieldMapping): Set<NodeKey> {
+  return new Set(collectReachableInLevelOrder(dag, roots, mapping));
 }
 
-export function collectReachableInLevelOrder(dag: Record<NodeKey, LayoutGraphNode | undefined>, roots: NodeKey[]): NodeKey[] {
+export function collectReachableInLevelOrder(dag: Record<NodeKey, DagNode | undefined>, roots: NodeKey[], mapping: FieldMapping): NodeKey[] {
   const queue = getExistingRoots(dag, roots);
   const visited = new Set(queue);
   const nodeKeys: NodeKey[] = [];
@@ -33,7 +34,7 @@ export function collectReachableInLevelOrder(dag: Record<NodeKey, LayoutGraphNod
       continue;
     }
     nodeKeys.push(key);
-    getRelationKeys(node.children).forEach((childKey) => {
+    getNodeChildKeys(node, mapping).forEach((childKey) => {
       if (dag[childKey] && !visited.has(childKey)) {
         visited.add(childKey);
         queue.push(childKey);
@@ -44,8 +45,8 @@ export function collectReachableInLevelOrder(dag: Record<NodeKey, LayoutGraphNod
   return nodeKeys;
 }
 
-export function buildVisibleGraph(dag: Record<NodeKey, LayoutGraphNode | undefined>, roots: NodeKey[]): VisibleGraph {
-  const nodeKeys = collectReachableInLevelOrder(dag, roots);
+export function buildVisibleGraph(dag: Record<NodeKey, DagNode | undefined>, roots: NodeKey[], mapping: FieldMapping): VisibleGraph {
+  const nodeKeys = collectReachableInLevelOrder(dag, roots, mapping);
   const visibleSet = new Set(nodeKeys);
   const incoming: Record<NodeKey, NodeKey[]> = {};
   const outgoing: Record<NodeKey, NodeKey[]> = {};
@@ -58,7 +59,11 @@ export function buildVisibleGraph(dag: Record<NodeKey, LayoutGraphNode | undefin
   });
 
   nodeKeys.forEach((sourceKey) => {
-    getRelationKeys(dag[sourceKey]?.children).forEach((targetKey) => {
+    const sourceNode = dag[sourceKey];
+    if (!sourceNode) {
+      return;
+    }
+    getNodeChildKeys(sourceNode, mapping).forEach((targetKey) => {
       if (visibleSet.has(targetKey)) {
         outgoing[sourceKey].push(targetKey);
         incoming[targetKey].push(sourceKey);

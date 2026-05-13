@@ -1,3 +1,5 @@
+import { createEmptyDagNode, getNodeRelation, getNodeRelationMap, setNodeRelation } from "./accessors";
+import type { FieldMapping } from "./fieldMapping";
 import { DEFAULT_RELATION_VALUE, type DagNode, type NodeKey, type NormalizedDag, type RelationField, type RelationValue } from "./types";
 
 export function uniqueKeys(keys: Iterable<unknown>): NodeKey[] {
@@ -67,16 +69,22 @@ export function toRelationMap(value: unknown, defaultRelationValue: RelationValu
   return relationMap;
 }
 
-export function addRelation(node: DagNode, fieldName: "parents" | "children", relationKey: NodeKey, relationValue: RelationValue = DEFAULT_RELATION_VALUE): void {
+export function addRelation(
+  node: DagNode,
+  mapping: FieldMapping,
+  fieldName: "parents" | "children",
+  relationKey: NodeKey,
+  relationValue: RelationValue = DEFAULT_RELATION_VALUE,
+): void {
   const targetKey = relationKey.trim();
   if (!targetKey) {
     return;
   }
 
-  const currentValue = node[fieldName];
+  const currentValue = getNodeRelation(node, mapping, fieldName);
   if (Array.isArray(currentValue)) {
     if (!currentValue.includes(targetKey)) {
-      node[fieldName] = [...currentValue, targetKey];
+      setNodeRelation(node, mapping, fieldName, [...currentValue, targetKey]);
     }
     return;
   }
@@ -85,38 +93,44 @@ export function addRelation(node: DagNode, fieldName: "parents" | "children", re
   if (!Object.prototype.hasOwnProperty.call(relationMap, targetKey)) {
     relationMap[targetKey] = relationValue;
   }
-  node[fieldName] = relationMap;
+  setNodeRelation(node, mapping, fieldName, relationMap);
 }
 
-export function removeRelation(node: DagNode, fieldName: "parents" | "children", relationKey: NodeKey): void {
+export function removeRelation(node: DagNode, mapping: FieldMapping, fieldName: "parents" | "children", relationKey: NodeKey): void {
   const targetKey = relationKey.trim();
   if (!targetKey) {
     return;
   }
 
-  const currentValue = node[fieldName];
+  const currentValue = getNodeRelation(node, mapping, fieldName);
   if (Array.isArray(currentValue)) {
-    node[fieldName] = currentValue.filter((item) => item !== targetKey);
+    setNodeRelation(node, mapping, fieldName, currentValue.filter((item) => item !== targetKey));
     return;
   }
 
   if (currentValue && typeof currentValue === "object") {
     const relationMap = { ...currentValue } as Record<NodeKey, RelationValue>;
     delete relationMap[targetKey];
-    node[fieldName] = relationMap;
+    setNodeRelation(node, mapping, fieldName, relationMap);
   }
 }
 
-export function renameRelation(node: DagNode, fieldName: "parents" | "children", oldKey: NodeKey, newKey: NodeKey): void {
+export function renameRelation(
+  node: DagNode,
+  mapping: FieldMapping,
+  fieldName: "parents" | "children",
+  oldKey: NodeKey,
+  newKey: NodeKey,
+): void {
   const sourceKey = oldKey.trim();
   const targetKey = newKey.trim();
   if (!sourceKey || !targetKey || sourceKey === targetKey) {
     return;
   }
 
-  const currentValue = node[fieldName];
+  const currentValue = getNodeRelation(node, mapping, fieldName);
   if (Array.isArray(currentValue)) {
-    node[fieldName] = uniqueKeys(currentValue.map((item) => (item === sourceKey ? targetKey : item)));
+    setNodeRelation(node, mapping, fieldName, uniqueKeys(currentValue.map((item) => (item === sourceKey ? targetKey : item))));
     return;
   }
 
@@ -127,16 +141,22 @@ export function renameRelation(node: DagNode, fieldName: "parents" | "children",
     if (!Object.prototype.hasOwnProperty.call(relationMap, targetKey)) {
       relationMap[targetKey] = relation;
     }
-    node[fieldName] = relationMap;
+    setNodeRelation(node, mapping, fieldName, relationMap);
   }
 }
 
-export function setRelations(node: DagNode, fieldName: "parents" | "children", keys: NodeKey[], defaultRelationValue: RelationValue = DEFAULT_RELATION_VALUE): void {
+export function setRelations(
+  node: DagNode,
+  mapping: FieldMapping,
+  fieldName: "parents" | "children",
+  keys: NodeKey[],
+  defaultRelationValue: RelationValue = DEFAULT_RELATION_VALUE,
+): void {
   const normalizedKeys = uniqueKeys(keys);
-  const currentValue = node[fieldName];
+  const currentValue = getNodeRelation(node, mapping, fieldName);
 
   if (Array.isArray(currentValue)) {
-    node[fieldName] = normalizedKeys;
+    setNodeRelation(node, mapping, fieldName, normalizedKeys);
     return;
   }
 
@@ -145,70 +165,48 @@ export function setRelations(node: DagNode, fieldName: "parents" | "children", k
   normalizedKeys.forEach((key) => {
     nextMap[key] = Object.prototype.hasOwnProperty.call(currentMap, key) ? currentMap[key] : defaultRelationValue;
   });
-  node[fieldName] = nextMap;
+  setNodeRelation(node, mapping, fieldName, nextMap);
 }
 
-export function ensureNodeExists(dag: NormalizedDag, nodeKey: NodeKey): DagNode {
+export function ensureNodeExists(dag: NormalizedDag, nodeKey: NodeKey, mapping: FieldMapping): DagNode {
   const key = nodeKey.trim();
   if (!dag[key]) {
-    dag[key] = { key, define: "", parents: {}, children: {} };
+    dag[key] = createEmptyDagNode(key, mapping);
   }
   return dag[key];
 }
 
-export function ensureReferencedNodes(dag: NormalizedDag, defaultRelationValue: RelationValue = DEFAULT_RELATION_VALUE): NormalizedDag {
-  Object.keys(dag).forEach((nodeKey) => {
-    const node = dag[nodeKey];
-    node.key = nodeKey;
-    node.children = normalizeRelationField(node.children);
-    node.parents = normalizeRelationField(node.parents);
-  });
-
-  Object.keys(dag).forEach((nodeKey) => {
-    const node = dag[nodeKey];
-    getRelationKeys(node.children).forEach((childKey) => {
-      const child = ensureNodeExists(dag, childKey);
-      addRelation(child, "parents", nodeKey, defaultRelationValue);
-    });
-    getRelationKeys(node.parents).forEach((parentKey) => {
-      const parent = ensureNodeExists(dag, parentKey);
-      addRelation(parent, "children", nodeKey, defaultRelationValue);
-    });
-  });
-
-  return dag;
-}
-
-export function syncBidirectionalRelations(dag: NormalizedDag, nodeKey: NodeKey, fieldName: "parents" | "children", nextKeys: NodeKey[]): void {
-  const node = ensureNodeExists(dag, nodeKey);
+export function syncBidirectionalRelations(dag: NormalizedDag, mapping: FieldMapping, nodeKey: NodeKey, fieldName: "parents" | "children", nextKeys: NodeKey[]): void {
+  const node = ensureNodeExists(dag, nodeKey, mapping);
   const oppositeField = fieldName === "parents" ? "children" : "parents";
-  const previousKeys = getRelationKeys(node[fieldName]);
+  const previousKeys = getRelationKeys(getNodeRelation(node, mapping, fieldName));
   const normalizedNextKeys = uniqueKeys(nextKeys).filter((key) => key !== nodeKey);
 
-  setRelations(node, fieldName, normalizedNextKeys);
+  setRelations(node, mapping, fieldName, normalizedNextKeys);
 
   previousKeys.forEach((relatedKey) => {
     if (!normalizedNextKeys.includes(relatedKey) && dag[relatedKey]) {
-      removeRelation(dag[relatedKey], oppositeField, nodeKey);
+      removeRelation(dag[relatedKey], mapping, oppositeField, nodeKey);
     }
   });
 
   normalizedNextKeys.forEach((relatedKey) => {
-    const relatedNode = ensureNodeExists(dag, relatedKey);
-    addRelation(relatedNode, oppositeField, nodeKey);
+    const relatedNode = ensureNodeExists(dag, relatedKey, mapping);
+    addRelation(relatedNode, mapping, oppositeField, nodeKey);
   });
 }
 
 export function syncBidirectionalRelationMap(
   dag: NormalizedDag,
+  mapping: FieldMapping,
   nodeKey: NodeKey,
   fieldName: "parents" | "children",
   nextRelations: Record<NodeKey, RelationValue>,
   defaultRelationValue: RelationValue = DEFAULT_RELATION_VALUE,
 ): void {
-  const node = ensureNodeExists(dag, nodeKey);
+  const node = ensureNodeExists(dag, nodeKey, mapping);
   const oppositeField = fieldName === "parents" ? "children" : "parents";
-  const previousKeys = getRelationKeys(node[fieldName]);
+  const previousKeys = getRelationKeys(getNodeRelation(node, mapping, fieldName));
   const normalizedNextRelations: Record<NodeKey, RelationValue> = {};
 
   Object.entries(nextRelations).forEach(([rawKey, rawValue]) => {
@@ -218,18 +216,18 @@ export function syncBidirectionalRelationMap(
     }
   });
 
-  node[fieldName] = normalizedNextRelations;
+  setNodeRelation(node, mapping, fieldName, normalizedNextRelations);
 
   previousKeys.forEach((relatedKey) => {
     if (!Object.prototype.hasOwnProperty.call(normalizedNextRelations, relatedKey) && dag[relatedKey]) {
-      removeRelation(dag[relatedKey], oppositeField, nodeKey);
+      removeRelation(dag[relatedKey], mapping, oppositeField, nodeKey);
     }
   });
 
   Object.entries(normalizedNextRelations).forEach(([relatedKey, relationValue]) => {
-    const relatedNode = ensureNodeExists(dag, relatedKey);
-    const oppositeMap = toRelationMap(relatedNode[oppositeField], defaultRelationValue);
+    const relatedNode = ensureNodeExists(dag, relatedKey, mapping);
+    const oppositeMap = getNodeRelationMap(relatedNode, mapping, oppositeField, defaultRelationValue);
     oppositeMap[nodeKey] = relationValue;
-    relatedNode[oppositeField] = oppositeMap;
+    setNodeRelation(relatedNode, mapping, oppositeField, oppositeMap);
   });
 }

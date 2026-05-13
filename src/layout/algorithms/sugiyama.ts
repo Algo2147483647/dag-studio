@@ -1,4 +1,5 @@
-import type { NodeKey } from "../../graph/types";
+import type { FieldMapping } from "../../graph/fieldMapping";
+import type { DagNode, NodeKey } from "../../graph/types";
 import type { LayoutEdgeRoute, LayoutResult } from "../types";
 import { buildVisibleGraph, getExistingRoots, type LayoutGraphNode, type VisibleGraph } from "./shared";
 
@@ -40,8 +41,8 @@ interface CrossingIndex {
   itemById: Record<NodeKey, LayoutItem>;
 }
 
-export function buildSugiyamaLayout(dag: Record<NodeKey, LayoutGraphNode | undefined>, roots: NodeKey[]): LayoutResult {
-  const graph = buildVisibleGraph(dag, roots);
+export function buildSugiyamaLayout(dag: Record<NodeKey, DagNode | undefined>, roots: NodeKey[], mapping: FieldMapping): LayoutResult {
+  const graph = buildVisibleGraph(dag, roots, mapping);
   const rootSet = new Set(getExistingRoots(dag, roots));
   const stableOrderByKey = buildStableOrderByKey(dag, graph);
   const layoutEdges = buildLayoutEdges(graph);

@@ -1,6 +1,8 @@
+import type { FieldMapping } from "./fieldMapping";
+import { normalizeNodeWithSchema } from "./accessors";
 import type { NodeKey, NormalizedDag, RawGraphNode } from "./types";
 
-export function serializeDag(dag: NormalizedDag): Record<NodeKey, RawGraphNode> {
+export function serializeDag(dag: NormalizedDag, mapping?: FieldMapping): Record<NodeKey, RawGraphNode> {
   const output: Record<NodeKey, RawGraphNode> = {};
 
   Object.entries(dag).forEach(([key, value]) => {
@@ -8,7 +10,8 @@ export function serializeDag(dag: NormalizedDag): Record<NodeKey, RawGraphNode> 
       return;
     }
 
-    const nodeValue = structuredCloneValue(value) as RawGraphNode;
+    const normalizedNode = mapping ? normalizeNodeWithSchema(value, mapping) : value;
+    const nodeValue = structuredCloneValue(normalizedNode) as RawGraphNode;
     if (nodeValue.key === key) {
       delete nodeValue.key;
     }

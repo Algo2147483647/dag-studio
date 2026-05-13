@@ -1,4 +1,6 @@
 import { applyGraphCommand, type CommandResult } from "../graph/commands";
+import { getCustomFieldNames, getNodeChildren, getNodeDefine, getNodeParents, getNodeTitle, getNodeType } from "../graph/accessors";
+import { getDefaultFieldMapping, type FieldMapping } from "../graph/fieldMapping";
 import { getRelationKeys } from "../graph/relations";
 import { structuredCloneValue } from "../graph/serialize";
 import type { NodeKey, NormalizedDag } from "../graph/types";
@@ -33,6 +35,7 @@ export function executeConsoleInstructions(
   dag: NormalizedDag,
   instructions: ConsoleInstruction[],
   initialContextNodeKey: NodeKey | null,
+  mapping: FieldMapping = getDefaultFieldMapping(),
 ): ConsoleRunResult {
   let workingDag = structuredCloneValue(dag);
   let contextNodeKey = initialContextNodeKey;
@@ -59,7 +62,7 @@ export function executeConsoleInstructions(
         }
         case "list": {
           const key = resolveExistingNodeKey(instruction.key, contextNodeKey, workingDag, instruction.line);
-          outputMessages.push(buildNodeSummary(key, workingDag));
+          outputMessages.push(buildNodeSummary(key, workingDag, mapping));
           break;
         }
         case "json": {
@@ -69,7 +72,7 @@ export function executeConsoleInstructions(
         }
         case "rename": {
           const oldKey = resolveExistingNodeKey(instruction.oldKey, contextNodeKey, workingDag, instruction.line);
-          const result = applyGraphCommand(workingDag, { type: "renameNode", oldKey, newKey: instruction.newKey });
+          const result = applyGraphCommand(workingDag, { type: "renameNode", oldKey, newKey: instruction.newKey }, mapping);
           workingDag = result.dag;
           contextNodeKey = remapContextKey(contextNodeKey, result);
           syncUiEffects(uiEffects, result);
@@ -78,7 +81,7 @@ export function executeConsoleInstructions(
         }
         case "delete": {
           const key = resolveExistingNodeKey(instruction.key, contextNodeKey, workingDag, instruction.line);
-          const result = applyGraphCommand(workingDag, instruction.recursive ? { type: "deleteSubtree", rootKey: key } : { type: "deleteNode", key });
+          const result = applyGraphCommand(workingDag, instruction.recursive ? { type: "deleteSubtree", rootKey: key } : { type: "deleteNode", key }, mapping);
           workingDag = result.dag;
           contextNodeKey = remapContextKey(contextNodeKey, result);
           syncUiEffects(uiEffects, result);
@@ -89,7 +92,7 @@ export function executeConsoleInstructions(
           const parentKey = instruction.parentKey
             ? resolveExistingNodeKey(instruction.parentKey, contextNodeKey, workingDag, instruction.line)
             : undefined;
-          const result = applyGraphCommand(workingDag, { type: "addNode", key: instruction.key, parentKey });
+          const result = applyGraphCommand(workingDag, { type: "addNode", key: instruction.key, parentKey }, mapping);
           workingDag = result.dag;
           contextNodeKey = remapContextKey(contextNodeKey, result);
           syncUiEffects(uiEffects, result);
@@ -101,7 +104,7 @@ export function executeConsoleInstructions(
           const parentKey = instruction.parentKey
             ? resolveExistingNodeKey(instruction.parentKey, contextNodeKey, workingDag, instruction.line)
             : undefined;
-          const result = applyGraphCommand(workingDag, { type: "copyNode", sourceKey, key: instruction.key, parentKey });
+          const result = applyGraphCommand(workingDag, { type: "copyNode", sourceKey, key: instruction.key, parentKey }, mapping);
           workingDag = result.dag;
           contextNodeKey = remapContextKey(contextNodeKey, result);
           syncUiEffects(uiEffects, result);
@@ -118,7 +121,7 @@ export function executeConsoleInstructions(
           if (instruction.createMissing) {
             [parentKey, childKey].forEach((key) => {
               if (!workingDag[key]) {
-                const addResult = applyGraphCommand(workingDag, { type: "addNode", key });
+                const addResult = applyGraphCommand(workingDag, { type: "addNode", key }, mapping);
                 workingDag = addResult.dag;
                 contextNodeKey = remapContextKey(contextNodeKey, addResult);
                 syncUiEffects(uiEffects, addResult);
@@ -126,7 +129,7 @@ export function executeConsoleInstructions(
               }
             });
           }
-          const result = applyGraphCommand(workingDag, { type: "setEdge", parentKey, childKey, weight: instruction.weight });
+          const result = applyGraphCommand(workingDag, { type: "setEdge", parentKey, childKey, weight: instruction.weight }, mapping);
           workingDag = result.dag;
           contextNodeKey = remapContextKey(contextNodeKey, result);
           syncUiEffects(uiEffects, result);
@@ -136,7 +139,7 @@ export function executeConsoleInstructions(
         case "removeEdge": {
           const parentKey = resolveExistingNodeKey(instruction.parentKey, contextNodeKey, workingDag, instruction.line);
           const childKey = resolveExistingNodeKey(instruction.childKey, contextNodeKey, workingDag, instruction.line);
-          const result = applyGraphCommand(workingDag, { type: "removeEdge", parentKey, childKey });
+          const result = applyGraphCommand(workingDag, { type: "removeEdge", parentKey, childKey }, mapping);
           workingDag = result.dag;
           contextNodeKey = remapContextKey(contextNodeKey, result);
           syncUiEffects(uiEffects, result);
@@ -146,7 +149,7 @@ export function executeConsoleInstructions(
         case "setParents": {
           const key = resolveExistingNodeKey(instruction.key, contextNodeKey, workingDag, instruction.line);
           const parents = instruction.keys.map((item) => resolveExistingNodeKey(item, contextNodeKey, workingDag, instruction.line));
-          const result = applyGraphCommand(workingDag, { type: "setParents", key, parents });
+          const result = applyGraphCommand(workingDag, { type: "setParents", key, parents }, mapping);
           workingDag = result.dag;
           contextNodeKey = remapContextKey(contextNodeKey, result);
           syncUiEffects(uiEffects, result);
@@ -156,7 +159,7 @@ export function executeConsoleInstructions(
         case "setChildren": {
           const key = resolveExistingNodeKey(instruction.key, contextNodeKey, workingDag, instruction.line);
           const children = instruction.keys.map((item) => resolveExistingNodeKey(item, contextNodeKey, workingDag, instruction.line));
-          const result = applyGraphCommand(workingDag, { type: "setChildren", key, children });
+          const result = applyGraphCommand(workingDag, { type: "setChildren", key, children }, mapping);
           workingDag = result.dag;
           contextNodeKey = remapContextKey(contextNodeKey, result);
           syncUiEffects(uiEffects, result);
@@ -177,7 +180,7 @@ export function executeConsoleInstructions(
           }
           const { key: _oldKey, ...fields } = structuredCloneValue(currentNode);
           fields[instruction.field] = instruction.value;
-          const result = applyGraphCommand(workingDag, { type: "updateNodeFields", key, fields });
+          const result = applyGraphCommand(workingDag, { type: "updateNodeFields", key, fields }, mapping);
           workingDag = result.dag;
           contextNodeKey = remapContextKey(contextNodeKey, result);
           syncUiEffects(uiEffects, result);
@@ -202,7 +205,7 @@ export function executeConsoleInstructions(
           }
           const { key: _oldKey, ...fields } = structuredCloneValue(currentNode);
           delete fields[instruction.field];
-          const result = applyGraphCommand(workingDag, { type: "updateNodeFields", key, fields });
+          const result = applyGraphCommand(workingDag, { type: "updateNodeFields", key, fields }, mapping);
           workingDag = result.dag;
           contextNodeKey = remapContextKey(contextNodeKey, result);
           syncUiEffects(uiEffects, result);
@@ -299,18 +302,18 @@ export function collectBatchEffects(results: CommandResult[]): { renamedKeys: Ar
   return { renamedKeys, deletedKeys: Array.from(deletedKeys) };
 }
 
-function buildNodeSummary(nodeKey: NodeKey, dag: NormalizedDag): string {
+function buildNodeSummary(nodeKey: NodeKey, dag: NormalizedDag, mapping: FieldMapping = getDefaultFieldMapping()): string {
   const node = dag[nodeKey];
   const lines = [
     `Node: ${nodeKey}`,
-    `title: ${formatScalarPreview(node.title)}`,
-    `type: ${formatScalarPreview(node.type)}`,
-    `define: ${formatScalarPreview(node.define)}`,
-    `parents: ${formatRelationPreview(node.parents)}`,
-    `children: ${formatRelationPreview(node.children)}`,
+    `title: ${formatScalarPreview(getNodeTitle(node, mapping))}`,
+    `type: ${formatScalarPreview(getNodeType(node, mapping))}`,
+    `define: ${formatScalarPreview(getNodeDefine(node, mapping))}`,
+    `parents: ${formatRelationPreview(getNodeParents(node, mapping))}`,
+    `children: ${formatRelationPreview(getNodeChildren(node, mapping))}`,
   ];
 
-  const customFieldNames = Object.keys(node).filter((fieldName) => !["key", "title", "type", "define", "parents", "children"].includes(fieldName));
+  const customFieldNames = getCustomFieldNames(node, mapping);
   if (customFieldNames.length) {
     lines.push(`custom: ${customFieldNames.join(", ")}`);
   }

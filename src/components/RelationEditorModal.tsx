@@ -36,7 +36,7 @@ export default function RelationEditorModal({ open, nodeKey, field, fieldLabel, 
 
   useEffect(() => {
     if (open && node && field) {
-      const nextRows = buildRelationRows(node[field], createRow);
+      const nextRows = buildRelationRows(node[field] as RelationField, createRow);
       setRows(nextRows);
       setValue(formatRelationKeys(nextRows));
       setError("");

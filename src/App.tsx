@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { buildStageData } from "./layout/stage-layout";
+import { getNodeTitle } from "./graph/accessors";
 import { applyGraphCommand, type GraphCommand } from "./graph/commands";
 import { createInitialCanvasDag, INITIAL_CANVAS_FILE_NAME } from "./graph/initialCanvas";
 import {
-  canonicalizeGraphForFieldMappingChange,
   getDefaultFieldMapping,
   getDisplayFieldName,
-  remapGraphInputToSystemFields,
-  remapGraphOutputFromSystemFields,
   type FieldMapping,
 } from "./graph/fieldMapping";
 import { normalizeDagInput } from "./graph/normalize";
@@ -64,7 +62,7 @@ export default function App() {
   const svgRef = useRef<SVGSVGElement>(null);
   const topbarRef = useRef<HTMLElement>(null);
 
-  useDefaultGraph(dispatch, suppressDefaultGraphRef);
+  useDefaultGraph(dispatch, suppressDefaultGraphRef, fieldMapping);
 
   useEffect(() => {
     saveGraphPagePreferences({
@@ -88,8 +86,8 @@ export default function App() {
     setActiveSuggestionIndex(0);
   }, [consoleInput]);
 
-  const stage = useMemo(() => state.dag ? buildStageData({ dag: state.dag, selection: state.selection, layoutMode: state.layout.mode, theme, showNodeDetail }) : null, [showNodeDetail, state.dag, state.layout.mode, state.selection, theme]);
-  const parentSelection = useMemo(() => state.dag && stage ? getParentLevelSelection(state.dag, stage.topLevelKeys) : null, [stage, state.dag]);
+  const stage = useMemo(() => state.dag ? buildStageData({ dag: state.dag, mapping: fieldMapping, selection: state.selection, layoutMode: state.layout.mode, theme, showNodeDetail }) : null, [fieldMapping, showNodeDetail, state.dag, state.layout.mode, state.selection, theme]);
+  const parentSelection = useMemo(() => state.dag && stage ? getParentLevelSelection(state.dag, stage.topLevelKeys, fieldMapping) : null, [fieldMapping, stage, state.dag]);
   const consoleSidebarVisible = state.mode === "edit" && state.ui.consoleSidebarOpen;
   const consoleSuggestions = useMemo(() => getConsoleSuggestions(consoleInput), [consoleInput]);
   const status = useMemo(() => {
@@ -97,7 +95,8 @@ export default function App() {
       return state.ui.status;
     }
     const focusNode = stage.dag[stage.root];
-    const focusLabel = focusNode?.synthetic ? focusNode.title || "Selected roots" : sanitizeNodeLabel(focusNode?.title || stage.root);
+    const focusTitle = focusNode ? getNodeTitle(focusNode, fieldMapping) : "";
+    const focusLabel = focusNode?.synthetic ? focusTitle || "Selected roots" : sanitizeNodeLabel(focusTitle || stage.root);
     const modeLabel = state.mode === "edit" ? "Edit" : "Preview";
     const layoutLabel = getGraphLayoutLabel(state.layout.mode);
     const warningText = stage.warnings.length ? ` ${stage.warnings[0]}` : "";
@@ -152,7 +151,7 @@ export default function App() {
       return;
     }
     try {
-      const result = applyGraphCommand(state.dag, command);
+      const result = applyGraphCommand(state.dag, command, fieldMapping);
       const selection = repairSelectionAfterCommand(result.dag, state.selection, preferredSelection, result);
       const history = repairHistoryAfterCommand(state, result);
       const transaction: EditTransaction = {
@@ -203,7 +202,7 @@ export default function App() {
       return;
     }
 
-    const executed = executeConsoleInstructions(state.dag || {}, parsed.instructions, consoleContextNodeKey);
+    const executed = executeConsoleInstructions(state.dag || {}, parsed.instructions, consoleContextNodeKey, fieldMapping);
     if (!executed.ok) {
       setConsoleContextNodeKey(executed.contextNodeKey);
       appendConsoleEntry(
@@ -337,13 +336,13 @@ export default function App() {
     suppressDefaultGraphRef.current = true;
     try {
       const payload = await readJsonFile(file);
-      const dag = normalizeDagInput(remapGraphInputToSystemFields(payload, fieldMapping));
+      const dag = normalizeDagInput(payload);
       dispatch({
         type: "graphLoaded",
         dag,
         fileName: file.name,
         fileHandle,
-        selection: getInitialSelection(dag),
+        selection: getInitialSelection(dag, fieldMapping),
         status: `${Object.keys(dag).length} nodes loaded from ${file.name}.`,
       });
     } catch (error) {
@@ -354,12 +353,12 @@ export default function App() {
 
   function initializeCanvas() {
     suppressDefaultGraphRef.current = true;
-    const dag = createInitialCanvasDag();
+    const dag = createInitialCanvasDag(fieldMapping);
     dispatch({
       type: "canvasInitialized",
       dag,
       fileName: INITIAL_CANVAS_FILE_NAME,
-      selection: getInitialSelection(dag),
+      selection: getInitialSelection(dag, fieldMapping),
       status: "Initialized a new canvas with one starting node. Edit mode enabled.",
     });
   }
@@ -488,7 +487,7 @@ export default function App() {
   }
 
   function getCurrentJsonContent(): string {
-    return JSON.stringify(remapGraphOutputFromSystemFields(serializeDag(state.dag || {}), fieldMapping), null, 2);
+    return JSON.stringify(serializeDag(state.dag || {}, fieldMapping), null, 2);
   }
 
   async function handleOverwriteJson() {
@@ -690,22 +689,13 @@ export default function App() {
         open={fieldMappingOpen}
         mapping={fieldMapping}
         onSave={(nextMapping) => {
-          if (state.dag) {
-            const canonicalGraph = canonicalizeGraphForFieldMappingChange(serializeDag(state.dag), fieldMapping, nextMapping);
-            const nextDag = normalizeDagInput(canonicalGraph);
-            const nextSelection = isSelectionValid(state.selection, nextDag) ? state.selection : getInitialSelection(nextDag);
-            const nextHistory = state.history.filter((item) => isSelectionValid(item, nextDag));
-            dispatch({
-              type: "graphReinterpreted",
-              dag: nextDag,
-              selection: nextSelection,
-              history: nextHistory,
-              status: "Saved field mapping preferences and refreshed the loaded graph.",
-            });
-          } else {
-            dispatch({ type: "statusChanged", status: "Saved field mapping preferences." });
-          }
           setFieldMapping(nextMapping);
+          dispatch({
+            type: "statusChanged",
+            status: state.dag
+              ? "Saved field mapping preferences. The graph is now being interpreted with the updated field names."
+              : "Saved field mapping preferences.",
+          });
           setFieldMappingOpen(false);
         }}
         onClose={() => setFieldMappingOpen(false)}

@@ -3,7 +3,7 @@ import { applyGraphCommand, collectSubtreeNodeKeys } from "../graph/commands";
 import { getParentLevelSelection, getInitialSelection, remapSelectionKeys, removeSelectionKeys } from "../graph/selectors";
 import { serializeDag } from "../graph/serialize";
 import { defineSuite, defineTest } from "./harness";
-import { createForestDag, createSampleDag } from "./fixtures";
+import { createCustomFieldMapping, createForestDag, createMappedSampleDag, createSampleDag } from "./fixtures";
 
 export const graphSuite = defineSuite("graph", [
   defineTest("renameNode updates reciprocal relations without mutating the source dag", () => {
@@ -17,7 +17,7 @@ export const graphSuite = defineSuite("graph", [
     assert.equal(result.dag.B_Renamed.key, "B_Renamed");
     assert.ok(!("B" in result.dag));
     assert.deepEqual(result.dag.A.children, { B_Renamed: "edge_ab", C: "edge_ac" });
-    assert.deepEqual(result.dag.D.parents, { B_Renamed: "related_to" });
+    assert.deepEqual(result.dag.D.parents, { B_Renamed: "edge_bd" });
   }),
 
   defineTest("deleteSubtree removes descendants and cleans dangling relations", () => {
@@ -47,13 +47,47 @@ export const graphSuite = defineSuite("graph", [
     assert.deepEqual(result.dag.C.parents, { B: "linked_from_b" });
     assert.deepEqual(result.dag.B.children, { D: "edge_bd", C: "related_to" });
     assert.deepEqual(result.dag.A.children, { B: "edge_ab" });
-    assert.deepEqual(result.dag.D.parents, { B: "related_to", C: "related_to" });
+    assert.deepEqual(result.dag.D.parents, { B: "edge_bd", C: "related_to" });
   }),
 
   defineTest("selectors derive initial and parent-level selections correctly", () => {
     assert.deepEqual(getInitialSelection(createForestDag()), { type: "full" });
     assert.deepEqual(getInitialSelection(createSampleDag()), { type: "node", key: "A" });
     assert.deepEqual(getParentLevelSelection(createSampleDag(), ["D"]), { type: "node", key: "B" });
+  }),
+
+  defineTest("commands preserve raw mapped field names while operating on semantic relations", () => {
+    const mapping = createCustomFieldMapping();
+    const sourceDag = createMappedSampleDag();
+    const result = applyGraphCommand(sourceDag, {
+      type: "updateNodeFields",
+      key: "C",
+      fields: {
+        label: "Gamma 2",
+        description: "Moved",
+        kind: "task",
+        prev: { B: "linked_from_b" },
+        next: { D: "edge_cd" },
+      },
+    }, mapping);
+
+    assert.equal(result.dag.C.label, "Gamma 2");
+    assert.deepEqual(result.dag.C.prev, { B: "linked_from_b" });
+    assert.deepEqual(result.dag.C.next, { D: "edge_cd" });
+    assert.deepEqual(result.dag.B.next, { D: "edge_bd", C: "related_to" });
+    assert.deepEqual(result.dag.A.next, { B: "edge_ab" });
+    assert.deepEqual(result.dag.D.prev, { B: "edge_bd", C: "related_to" });
+    assert.equal("children" in result.dag.C, false);
+    assert.equal("parents" in result.dag.C, false);
+    assert.deepEqual(getInitialSelection(sourceDag, mapping), { type: "node", key: "A" });
+    assert.deepEqual(getParentLevelSelection(sourceDag, ["D"], mapping), { type: "node", key: "B" });
+    assert.deepEqual(serializeDag(result.dag, mapping).C, {
+      label: "Gamma 2",
+      description: "Moved",
+      kind: "task",
+      prev: { B: "linked_from_b" },
+      next: { D: "edge_cd" },
+    });
   }),
 
   defineTest("selection remapping helpers preserve only valid keys", () => {

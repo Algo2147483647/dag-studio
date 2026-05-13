@@ -6,11 +6,6 @@ export type RelationField = NodeKey[] | Record<NodeKey, RelationValue>;
 
 export interface RawGraphNode {
   key?: NodeKey;
-  title?: string;
-  type?: string;
-  define?: string;
-  parents?: RelationField;
-  children?: RelationField;
   [field: string]: unknown;
 }
 
@@ -21,8 +16,6 @@ export type RawGraphInput =
 
 export interface DagNode extends RawGraphNode {
   key: NodeKey;
-  parents: RelationField;
-  children: RelationField;
 }
 
 export type NormalizedDag = Record<NodeKey, DagNode>;

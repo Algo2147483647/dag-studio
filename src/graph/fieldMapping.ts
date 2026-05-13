@@ -58,177 +58,54 @@ export function getDisplayFieldName(fieldName: string, mapping: FieldMapping): s
   return isMappableSystemFieldKey(fieldName) ? mapping[fieldName] : fieldName;
 }
 
-export function remapGraphInputToSystemFields(input: unknown, mapping: FieldMapping): unknown {
-  if (Array.isArray(input)) {
-    return input.map((item) => remapNodeInput(item, mapping));
-  }
-
-  if (!input || typeof input !== "object") {
-    return input;
-  }
-
-  const objectValue = input as Record<string, unknown>;
-  if (Array.isArray(objectValue.nodes)) {
-    return {
-      ...objectValue,
-      nodes: objectValue.nodes.map((item) => remapNodeInput(item, mapping)),
-    };
-  }
-
-  return Object.fromEntries(
-    Object.entries(objectValue).map(([nodeKey, nodeValue]) => [nodeKey, remapNodeInput(nodeValue, mapping)]),
-  );
+export function getMappedFieldName(mapping: FieldMapping, fieldName: MappableSystemFieldKey): string {
+  return mapping[fieldName];
 }
 
-export function remapGraphOutputFromSystemFields(input: unknown, mapping: FieldMapping): unknown {
-  if (Array.isArray(input)) {
-    return input.map((item) => remapNodeOutput(item, mapping));
+export function getSemanticFieldName(fieldName: string, mapping: FieldMapping): MappableSystemFieldKey | null {
+  for (const systemKey of MAPPABLE_SYSTEM_FIELD_KEYS) {
+    if (mapping[systemKey] === fieldName) {
+      return systemKey;
+    }
   }
+  return isMappableSystemFieldKey(fieldName) ? fieldName : null;
+}
 
-  if (!input || typeof input !== "object") {
-    return input;
+export function formatMappedFieldLabel(fieldName: string, mapping: FieldMapping): string {
+  const semanticFieldName = getSemanticFieldName(fieldName, mapping);
+  if (!semanticFieldName) {
+    return fieldName;
   }
+  const mappedFieldName = mapping[semanticFieldName];
+  return mappedFieldName === semanticFieldName
+    ? mappedFieldName
+    : `${mappedFieldName} (${semanticFieldName})`;
+}
 
-  const objectValue = input as Record<string, unknown>;
-  if (Array.isArray(objectValue.nodes)) {
-    return {
-      ...objectValue,
-      nodes: objectValue.nodes.map((item) => remapNodeOutput(item, mapping)),
-    };
-  }
+export function isMappableSystemFieldKey(fieldName: string): fieldName is MappableSystemFieldKey {
+  return MAPPABLE_FIELD_SET.has(fieldName);
+}
 
-  return Object.fromEntries(
-    Object.entries(objectValue).map(([nodeKey, nodeValue]) => [nodeKey, remapNodeOutput(nodeValue, mapping)]),
-  );
+export function remapGraphInputToSystemFields(input: unknown, _mapping: FieldMapping): unknown {
+  return input;
+}
+
+export function remapGraphOutputFromSystemFields(input: unknown, _mapping: FieldMapping): unknown {
+  return input;
 }
 
 export function canonicalizeGraphForFieldMappingChange(
   input: unknown,
-  previousMapping: FieldMapping,
-  nextMapping: FieldMapping,
+  _previousMapping: FieldMapping,
+  _nextMapping: FieldMapping,
 ): unknown {
-  if (Array.isArray(input)) {
-    return input.map((item) => canonicalizeNodeForFieldMappingChange(item, previousMapping, nextMapping));
-  }
-
-  if (!input || typeof input !== "object") {
-    return input;
-  }
-
-  const objectValue = input as Record<string, unknown>;
-  if (Array.isArray(objectValue.nodes)) {
-    return {
-      ...objectValue,
-      nodes: objectValue.nodes.map((item) => canonicalizeNodeForFieldMappingChange(item, previousMapping, nextMapping)),
-    };
-  }
-
-  return Object.fromEntries(
-    Object.entries(objectValue).map(([nodeKey, nodeValue]) => [
-      nodeKey,
-      canonicalizeNodeForFieldMappingChange(nodeValue, previousMapping, nextMapping),
-    ]),
-  );
+  return input;
 }
 
-export function remapNodeInput(input: unknown, mapping: FieldMapping): unknown {
-  if (!input || typeof input !== "object" || Array.isArray(input)) {
-    return input;
-  }
-
-  const reverseMapping = buildReverseFieldMapping(mapping);
-  const output: Record<string, unknown> = {};
-
-  Object.entries(input as Record<string, unknown>).forEach(([rawFieldName, fieldValue]) => {
-    const systemFieldName = resolveSystemFieldName(rawFieldName, reverseMapping);
-    const shouldOverrideExisting = systemFieldName !== rawFieldName;
-    if (!shouldOverrideExisting && Object.prototype.hasOwnProperty.call(output, systemFieldName)) {
-      return;
-    }
-    output[systemFieldName] = fieldValue;
-  });
-
-  return output;
+export function remapNodeInput(input: unknown, _mapping: FieldMapping): unknown {
+  return input;
 }
 
-export function remapNodeOutput(input: unknown, mapping: FieldMapping): unknown {
-  if (!input || typeof input !== "object" || Array.isArray(input)) {
-    return input;
-  }
-
-  const output: Record<string, unknown> = {};
-  Object.entries(input as Record<string, unknown>).forEach(([systemFieldName, fieldValue]) => {
-    output[getDisplayFieldName(systemFieldName, mapping)] = fieldValue;
-  });
-  return output;
-}
-
-function buildReverseFieldMapping(mapping: FieldMapping): Record<string, MappableSystemFieldKey> {
-  const reverseMapping: Partial<Record<string, MappableSystemFieldKey>> = {};
-
-  MAPPABLE_SYSTEM_FIELD_KEYS.forEach((systemKey) => {
-    reverseMapping[systemKey] = systemKey;
-    reverseMapping[mapping[systemKey]] = systemKey;
-  });
-
-  return reverseMapping as Record<string, MappableSystemFieldKey>;
-}
-
-function canonicalizeNodeForFieldMappingChange(
-  input: unknown,
-  previousMapping: FieldMapping,
-  nextMapping: FieldMapping,
-): unknown {
-  if (!input || typeof input !== "object" || Array.isArray(input)) {
-    return input;
-  }
-
-  const source = input as Record<string, unknown>;
-  const output: Record<string, unknown> = { ...source };
-
-  MAPPABLE_SYSTEM_FIELD_KEYS.forEach((systemKey) => {
-    const aliases = uniqueFieldAliases(systemKey, previousMapping, nextMapping);
-    const canonicalValue = pickFirstDefinedValue(source, aliases);
-
-    aliases.forEach((alias) => {
-      delete output[alias];
-    });
-
-    if (canonicalValue !== undefined) {
-      output[systemKey] = canonicalValue;
-    }
-  });
-
-  return output;
-}
-
-function uniqueFieldAliases(
-  systemKey: MappableSystemFieldKey,
-  previousMapping: FieldMapping,
-  nextMapping: FieldMapping,
-): string[] {
-  return Array.from(new Set([systemKey, previousMapping[systemKey], nextMapping[systemKey]].filter(Boolean)));
-}
-
-function pickFirstDefinedValue(source: Record<string, unknown>, aliases: string[]): unknown {
-  for (const alias of aliases) {
-    if (Object.prototype.hasOwnProperty.call(source, alias)) {
-      return source[alias];
-    }
-  }
-  return undefined;
-}
-
-function resolveSystemFieldName(
-  fieldName: string,
-  reverseMapping: Record<string, MappableSystemFieldKey>,
-): string {
-  if (Object.prototype.hasOwnProperty.call(reverseMapping, fieldName)) {
-    return reverseMapping[fieldName];
-  }
-  return isMappableSystemFieldKey(fieldName) ? fieldName : fieldName;
-}
-
-function isMappableSystemFieldKey(fieldName: string): fieldName is MappableSystemFieldKey {
-  return MAPPABLE_FIELD_SET.has(fieldName);
+export function remapNodeOutput(input: unknown, _mapping: FieldMapping): unknown {
+  return input;
 }

@@ -1,5 +1,4 @@
 import type { DagNode, NodeKey, NormalizedDag, RawGraphInput, RawGraphNode } from "./types";
-import { ensureReferencedNodes, normalizeRelationField } from "./relations";
 
 export function normalizeDagInput(input: unknown): NormalizedDag {
   const dag: NormalizedDag = {};
@@ -15,7 +14,7 @@ export function normalizeDagInput(input: unknown): NormalizedDag {
       }
       dag[key] = normalizeNodeValue(key, item as RawGraphNode);
     });
-    return ensureReferencedNodes(dag);
+    return dag;
   }
 
   if (hasNodesArray(input)) {
@@ -32,7 +31,7 @@ export function normalizeDagInput(input: unknown): NormalizedDag {
     });
   }
 
-  return ensureReferencedNodes(dag);
+  return dag;
 }
 
 function hasNodesArray(input: unknown): input is Extract<RawGraphInput, { nodes: RawGraphNode[] }> {
@@ -42,7 +41,5 @@ function hasNodesArray(input: unknown): input is Extract<RawGraphInput, { nodes:
 export function normalizeNodeValue(key: NodeKey, value: RawGraphNode): DagNode {
   const nodeValue = value && typeof value === "object" ? { ...value } : {};
   nodeValue.key = key;
-  nodeValue.children = normalizeRelationField(nodeValue.children);
-  nodeValue.parents = normalizeRelationField(nodeValue.parents);
   return nodeValue as DagNode;
 }

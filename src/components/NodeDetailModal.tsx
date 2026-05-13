@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { DagNode, GraphMode, NodeKey } from "../graph/types";
-import type { FieldMapping } from "../graph/fieldMapping";
+import { getMappedFieldName, type FieldMapping } from "../graph/fieldMapping";
 import { getRelationKeys } from "../graph/relations";
 import NodeFieldEditor, { buildEditableFields, formatEditorValue, parseNodeFieldValue, supportsMarkdown, type EditableField } from "./NodeFieldEditor";
 import { buildRawNodeEditorValue, parseRawNodeEditorValue } from "./nodeDetailRawJson";
@@ -167,7 +167,7 @@ export default function NodeDetailModal({ open, nodeKey, node, mode, fieldMappin
         setError(parsed.message);
         return;
       }
-      if (!validateNodeRelations(parsed.nextKey, parsed.fields)) {
+      if (!validateNodeRelations(parsed.nextKey, parsed.fields, fieldMapping)) {
         setError("A node cannot reference itself.");
         return;
       }
@@ -198,7 +198,7 @@ export default function NodeDetailModal({ open, nodeKey, node, mode, fieldMappin
       patch[field.name] = parsed.value;
     }
 
-    if (!validateNodeRelations(nextKey, patch)) {
+    if (!validateNodeRelations(nextKey, patch, fieldMapping)) {
       setError("A node cannot reference itself.");
       return;
     }
@@ -233,16 +233,16 @@ function tryBuildRawJsonFromFieldValues(
     patch[field.name] = parsed.value;
   }
 
-  if (!validateNodeRelations(nextKey, patch)) {
+  if (!validateNodeRelations(nextKey, patch, fieldMapping)) {
     return null;
   }
 
   return buildRawNodeEditorValue(nextKey, patch, fieldMapping);
 }
 
-function validateNodeRelations(nextKey: NodeKey, fields: Record<string, unknown>): boolean {
-  const parentKeys = getRelationKeys(fields.parents);
-  const childKeys = getRelationKeys(fields.children);
+function validateNodeRelations(nextKey: NodeKey, fields: Record<string, unknown>, fieldMapping: FieldMapping): boolean {
+  const parentKeys = getRelationKeys(fields[getMappedFieldName(fieldMapping, "parents")]);
+  const childKeys = getRelationKeys(fields[getMappedFieldName(fieldMapping, "children")]);
   return !parentKeys.includes(nextKey) && !childKeys.includes(nextKey);
 }
 

@@ -1,10 +1,15 @@
+import type { FieldMapping } from "../graph/fieldMapping";
 import { useEffect } from "react";
 import { normalizeDagInput } from "../graph/normalize";
 import { getInitialSelection } from "../graph/selectors";
 import { loadDefaultSample } from "../adapters/sampleLoader";
 import type { GraphAction } from "../state/graphActions";
 
-export function useDefaultGraph(dispatch: React.Dispatch<GraphAction>, suppressAutoLoadRef: React.MutableRefObject<boolean>): void {
+export function useDefaultGraph(
+  dispatch: React.Dispatch<GraphAction>,
+  suppressAutoLoadRef: React.MutableRefObject<boolean>,
+  mapping: FieldMapping,
+): void {
   useEffect(() => {
     let cancelled = false;
 
@@ -15,7 +20,7 @@ export function useDefaultGraph(dispatch: React.Dispatch<GraphAction>, suppressA
           return;
         }
         const dag = normalizeDagInput(payload);
-        const selection = getInitialSelection(dag);
+        const selection = getInitialSelection(dag, mapping);
         dispatch({
           type: "graphLoaded",
           dag,
@@ -37,5 +42,5 @@ export function useDefaultGraph(dispatch: React.Dispatch<GraphAction>, suppressA
     return () => {
       cancelled = true;
     };
-  }, [dispatch, suppressAutoLoadRef]);
+  }, [dispatch, mapping, suppressAutoLoadRef]);
 }

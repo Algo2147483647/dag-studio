@@ -1,4 +1,5 @@
 import { normalizeDagInput } from "../graph/normalize";
+import { getDefaultFieldMapping, type FieldMapping } from "../graph/fieldMapping";
 import type { NormalizedDag } from "../graph/types";
 
 export function createSampleDag(): NormalizedDag {
@@ -14,6 +15,9 @@ export function createSampleDag(): NormalizedDag {
     B: {
       title: "Beta",
       define: "Child B",
+      parents: {
+        A: "edge_ab",
+      },
       children: {
         D: "edge_bd",
       },
@@ -21,10 +25,16 @@ export function createSampleDag(): NormalizedDag {
     C: {
       title: "Gamma",
       define: "Child C",
+      parents: {
+        A: "edge_ac",
+      },
     },
     D: {
       title: "Delta",
       define: "Leaf D",
+      parents: {
+        B: "edge_bd",
+      },
       meta: { priority: 1 },
     },
   });
@@ -34,5 +44,58 @@ export function createForestDag(): NormalizedDag {
   return normalizeDagInput({
     Left: { define: "Left root" },
     Right: { define: "Right root" },
+  });
+}
+
+export function createCustomFieldMapping(): FieldMapping {
+  return {
+    ...getDefaultFieldMapping(),
+    title: "label",
+    define: "description",
+    children: "next",
+    parents: "prev",
+    type: "kind",
+  };
+}
+
+export function createMappedSampleDag(): NormalizedDag {
+  return normalizeDagInput({
+    A: {
+      label: "Alpha",
+      description: "Root node",
+      kind: "root",
+      next: {
+        B: "edge_ab",
+        C: "edge_ac",
+      },
+    },
+    B: {
+      label: "Beta",
+      description: "Child B",
+      kind: "task",
+      prev: {
+        A: "edge_ab",
+      },
+      next: {
+        D: "edge_bd",
+      },
+    },
+    C: {
+      label: "Gamma",
+      description: "Child C",
+      kind: "task",
+      prev: {
+        A: "edge_ac",
+      },
+    },
+    D: {
+      label: "Delta",
+      description: "Leaf D",
+      kind: "task",
+      prev: {
+        B: "edge_bd",
+      },
+      meta: { priority: 1 },
+    },
   });
 }

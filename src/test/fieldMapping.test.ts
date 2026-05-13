@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
 import {
-  canonicalizeGraphForFieldMappingChange,
+  formatMappedFieldLabel,
+  getDisplayFieldName,
   getDefaultFieldMapping,
-  remapGraphInputToSystemFields,
-  remapGraphOutputFromSystemFields,
+  getSemanticFieldName,
   sanitizeFieldMapping,
   validateFieldMapping,
 } from "../graph/fieldMapping";
+import { serializeDag } from "../graph/serialize";
 import { defineSuite, defineTest } from "./harness";
+import { createCustomFieldMapping, createMappedSampleDag } from "./fixtures";
 
 export const fieldMappingSuite = defineSuite("field-mapping", [
   defineTest("sanitizeFieldMapping falls back when aliases are duplicated or invalid", () => {
@@ -28,79 +30,41 @@ export const fieldMappingSuite = defineSuite("field-mapping", [
     });
   }),
 
-  defineTest("remapGraphInputToSystemFields understands display aliases", () => {
-    const mapping = {
-      ...getDefaultFieldMapping(),
-      title: "label",
-      define: "description",
-      children: "next",
-      parents: "prev",
-    };
+  defineTest("schema helpers resolve semantic names without rewriting raw field names", () => {
+    const mapping = createCustomFieldMapping();
 
-    const remapped = remapGraphInputToSystemFields({
-      A: {
-        label: "Alpha",
-        description: "From alias",
-        next: { B: "edge_ab" },
-        extra: 1,
-      },
-    }, mapping) as Record<string, Record<string, unknown>>;
-
-    assert.deepEqual(remapped.A, {
-      title: "Alpha",
-      define: "From alias",
-      children: { B: "edge_ab" },
-      extra: 1,
-    });
+    assert.equal(getDisplayFieldName("title", mapping), "label");
+    assert.equal(getDisplayFieldName("meta", mapping), "meta");
+    assert.equal(getSemanticFieldName("label", mapping), "title");
+    assert.equal(getSemanticFieldName("description", mapping), "define");
+    assert.equal(getSemanticFieldName("next", mapping), "children");
+    assert.equal(getSemanticFieldName("meta", mapping), null);
+    assert.equal(formatMappedFieldLabel("label", mapping), "label (title)");
+    assert.equal(formatMappedFieldLabel("meta", mapping), "meta");
   }),
 
-  defineTest("canonicalizeGraphForFieldMappingChange preserves first defined semantic value", () => {
-    const previousMapping = {
-      ...getDefaultFieldMapping(),
-      title: "label",
-      define: "description",
-    };
-    const nextMapping = {
-      ...getDefaultFieldMapping(),
-      title: "name",
-      define: "summary",
-    };
+  defineTest("serializeDag preserves mapped raw field names", () => {
+    const mapping = createCustomFieldMapping();
+    const dag = createMappedSampleDag();
 
-    const canonical = canonicalizeGraphForFieldMappingChange({
-      A: {
-        label: "Old title",
-        name: "New title that should not win",
-        description: "Old define",
-        summary: "New define that should not win",
-      },
-    }, previousMapping, nextMapping) as Record<string, Record<string, unknown>>;
-
-    assert.deepEqual(canonical.A, {
-      title: "Old title",
-      define: "Old define",
-    });
-  }),
-
-  defineTest("remapGraphOutputFromSystemFields emits display aliases and validateFieldMapping rejects duplicates", () => {
-    const mapping = {
-      ...getDefaultFieldMapping(),
-      title: "label",
-      define: "description",
-    };
-
-    const exported = remapGraphOutputFromSystemFields({
-      A: {
-        title: "Alpha",
-        define: "Root",
-        children: { B: "edge_ab" },
-      },
-    }, mapping) as Record<string, Record<string, unknown>>;
-
-    assert.deepEqual(exported.A, {
+    assert.deepEqual(serializeDag(dag, mapping).A, {
       label: "Alpha",
-      description: "Root",
-      children: { B: "edge_ab" },
+      description: "Root node",
+      kind: "root",
+      next: {
+        B: "edge_ab",
+        C: "edge_ac",
+      },
     });
+  }),
+
+  defineTest("validateFieldMapping accepts unique names and rejects duplicates", () => {
+    const mapping = {
+      ...getDefaultFieldMapping(),
+      title: "label",
+      define: "description",
+    };
+
     assert.deepEqual(validateFieldMapping(mapping), { ok: true });
     assert.deepEqual(validateFieldMapping({ ...mapping, type: "label" }), {
       ok: false,

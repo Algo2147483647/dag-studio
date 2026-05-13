@@ -1,24 +1,25 @@
+import { getNodeChildKeys, getNodeParentKeys } from "./accessors";
+import { getDefaultFieldMapping, type FieldMapping } from "./fieldMapping";
 import type { GraphSelection, NodeKey, NormalizedDag } from "./types";
-import { getRelationKeys } from "./relations";
 
-export function findRootsFromDag(dag: NormalizedDag): NodeKey[] {
+export function findRootsFromDag(dag: NormalizedDag, mapping: FieldMapping = getDefaultFieldMapping()): NodeKey[] {
   const nodeKeys = Object.keys(dag);
-  const rootsByParents = nodeKeys.filter((nodeKey) => getRelationKeys(dag[nodeKey]?.parents).length === 0);
+  const rootsByParents = nodeKeys.filter((nodeKey) => getNodeParentKeys(dag[nodeKey], mapping).length === 0);
   if (rootsByParents.length) {
     return rootsByParents;
   }
 
   const allNodes = new Set(nodeKeys);
   nodeKeys.forEach((nodeKey) => {
-    getRelationKeys(dag[nodeKey]?.children).forEach((childKey) => allNodes.delete(childKey));
+    getNodeChildKeys(dag[nodeKey], mapping).forEach((childKey) => allNodes.delete(childKey));
   });
 
   const inferredRoots = Array.from(allNodes);
   return inferredRoots.length ? inferredRoots : nodeKeys;
 }
 
-export function getInitialSelection(dag: NormalizedDag): GraphSelection {
-  const roots = findRootsFromDag(dag);
+export function getInitialSelection(dag: NormalizedDag, mapping: FieldMapping = getDefaultFieldMapping()): GraphSelection {
+  const roots = findRootsFromDag(dag, mapping);
   if (roots.length === 1) {
     return { type: "node", key: roots[0] };
   }
@@ -78,12 +79,12 @@ export function removeSelectionKeys(selection: GraphSelection | null, deleteSet:
   return remapSelectionKeys(selection, (key) => (deleteSet.has(key) ? null : key));
 }
 
-export function getParentLevelSelection(dag: NormalizedDag, topLevelKeys: NodeKey[]): GraphSelection | null {
+export function getParentLevelSelection(dag: NormalizedDag, topLevelKeys: NodeKey[], mapping: FieldMapping = getDefaultFieldMapping()): GraphSelection | null {
   if (!topLevelKeys.length) {
     return null;
   }
 
-  const parentKeys = Array.from(new Set(topLevelKeys.flatMap((nodeKey) => getRelationKeys(dag[nodeKey]?.parents))));
+  const parentKeys = Array.from(new Set(topLevelKeys.flatMap((nodeKey) => getNodeParentKeys(dag[nodeKey], mapping))));
   if (!parentKeys.length) {
     return null;
   }

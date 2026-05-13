@@ -1,30 +1,34 @@
+import { getNodeDefine, getNodeTitle } from "../graph/accessors";
+import type { FieldMapping } from "../graph/fieldMapping";
 import type { DagNode, NodeKey } from "../graph/types";
 import { sanitizeNodeLabel } from "../graph/selectors";
 
 export function getNodeVisual(
   nodeKey: NodeKey,
   node: DagNode & { synthetic?: boolean },
+  mapping: FieldMapping,
   minNodeWidth: number,
   maxNodeWidth: number,
   showDetail: boolean,
 ): { title: string; detail: string; width: number } {
   if (node.synthetic) {
+    const syntheticTitle = getNodeTitle(node, mapping) || "Selected roots";
     return {
-      title: node.title || "Selected roots",
+      title: syntheticTitle,
       detail: showDetail ? "Combined entry point for every detected root branch." : "",
       width: clamp(232, minNodeWidth, maxNodeWidth),
     };
   }
 
-  const title = sanitizeNodeLabel(node.title || nodeKey);
-  const detail = showDetail ? getNodeDetail(node, title) : "";
+  const title = sanitizeNodeLabel(getNodeTitle(node, mapping) || nodeKey);
+  const detail = showDetail ? getNodeDetail(node, title, mapping) : "";
   const longestLine = Math.max(title.length, detail.length * 0.76);
   const width = clamp(132 + longestLine * 6.1, minNodeWidth, maxNodeWidth);
   return { title: title || nodeKey, detail, width };
 }
 
-export function getNodeDetail(node: DagNode, fallbackTitle: string): string {
-  const defineText = stripRichText(node.define || "");
+export function getNodeDetail(node: DagNode, fallbackTitle: string, mapping: FieldMapping): string {
+  const defineText = stripRichText(getNodeDefine(node, mapping));
   return firstMeaningfulSegment(defineText) || fallbackTitle;
 }
 

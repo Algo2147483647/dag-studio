@@ -1,6 +1,8 @@
+import { createEmptyDagNode, getNodeChildKeys, getNodeChildren, getNodeParentKeys, getNodeParents, getNodeRelationMap, setNodeChildren, setNodeParents } from "./accessors";
+import { getDefaultFieldMapping, type FieldMapping } from "./fieldMapping";
 import type { DagNode, NodeKey, NormalizedDag, RelationValue } from "./types";
 import { DEFAULT_RELATION_VALUE } from "./types";
-import { ensureReferencedNodes, getRelationKeys, removeRelation, renameRelation, syncBidirectionalRelationMap, syncBidirectionalRelations, toRelationMap } from "./relations";
+import { ensureNodeExists, getRelationKeys, removeRelation, renameRelation, syncBidirectionalRelationMap, syncBidirectionalRelations, toRelationMap } from "./relations";
 import { structuredCloneValue } from "./serialize";
 
 export type GraphCommand =
@@ -25,46 +27,42 @@ export interface CommandResult {
   message?: string;
 }
 
-export function applyGraphCommand(sourceDag: NormalizedDag, command: GraphCommand): CommandResult {
+export function applyGraphCommand(sourceDag: NormalizedDag, command: GraphCommand, mapping: FieldMapping = getDefaultFieldMapping()): CommandResult {
   const dag = structuredCloneValue(sourceDag);
 
   switch (command.type) {
     case "renameNode":
-      return renameNode(dag, command.oldKey, command.newKey);
+      return renameNode(dag, mapping, command.oldKey, command.newKey);
     case "deleteNode":
-      return deleteNodes(dag, [command.key], `Deleted node ${command.key}.`);
+      return deleteNodes(dag, mapping, [command.key], `Deleted node ${command.key}.`);
     case "deleteSubtree":
-      return deleteNodes(dag, collectSubtreeNodeKeys(dag, command.rootKey), `Deleted subtree rooted at ${command.rootKey}.`);
+      return deleteNodes(dag, mapping, collectSubtreeNodeKeys(dag, command.rootKey, mapping), `Deleted subtree rooted at ${command.rootKey}.`);
     case "addNode":
-      return addNode(dag, command.key, command.parentKey);
+      return addNode(dag, mapping, command.key, command.parentKey);
     case "copyNode":
-      return copyNode(dag, command.sourceKey, command.key, command.parentKey);
+      return copyNode(dag, mapping, command.sourceKey, command.key, command.parentKey);
     case "setEdge":
-      return setEdge(dag, command.parentKey, command.childKey, command.weight);
+      return setEdge(dag, mapping, command.parentKey, command.childKey, command.weight);
     case "removeEdge":
-      return removeEdge(dag, command.parentKey, command.childKey);
+      return removeEdge(dag, mapping, command.parentKey, command.childKey);
     case "setParents":
-      syncBidirectionalRelations(dag, command.key, "parents", command.parents);
-      ensureReferencedNodes(dag);
+      syncBidirectionalRelations(dag, mapping, command.key, "parents", command.parents);
       return { dag, changedKeys: [command.key, ...command.parents], message: `Updated parents for ${command.key}.` };
     case "setChildren":
-      syncBidirectionalRelations(dag, command.key, "children", command.children);
-      ensureReferencedNodes(dag);
+      syncBidirectionalRelations(dag, mapping, command.key, "children", command.children);
       return { dag, changedKeys: [command.key, ...command.children], message: `Updated children for ${command.key}.` };
     case "setParentRelations":
-      syncBidirectionalRelationMap(dag, command.key, "parents", command.parents);
-      ensureReferencedNodes(dag);
+      syncBidirectionalRelationMap(dag, mapping, command.key, "parents", command.parents);
       return { dag, changedKeys: [command.key, ...Object.keys(command.parents)], message: `Updated parents for ${command.key}.` };
     case "setChildRelations":
-      syncBidirectionalRelationMap(dag, command.key, "children", command.children);
-      ensureReferencedNodes(dag);
+      syncBidirectionalRelationMap(dag, mapping, command.key, "children", command.children);
       return { dag, changedKeys: [command.key, ...Object.keys(command.children)], message: `Updated children for ${command.key}.` };
     case "updateNodeFields":
-      return updateNodeFields(dag, command.key, command.nextKey || command.key, command.fields);
+      return updateNodeFields(dag, mapping, command.key, command.nextKey || command.key, command.fields);
   }
 }
 
-function renameNode(dag: NormalizedDag, oldKey: NodeKey, newKey: NodeKey): CommandResult {
+function renameNode(dag: NormalizedDag, mapping: FieldMapping, oldKey: NodeKey, newKey: NodeKey): CommandResult {
   const sourceKey = oldKey.trim();
   const targetKey = newKey.trim();
   assertValidNewKey(dag, targetKey, sourceKey);
@@ -76,10 +74,9 @@ function renameNode(dag: NormalizedDag, oldKey: NodeKey, newKey: NodeKey): Comma
   delete dag[sourceKey];
   dag[targetKey] = { ...nodeValue, key: targetKey };
   Object.keys(dag).forEach((nodeKey) => {
-    renameRelation(dag[nodeKey], "parents", sourceKey, targetKey);
-    renameRelation(dag[nodeKey], "children", sourceKey, targetKey);
+    renameRelation(dag[nodeKey], mapping, "parents", sourceKey, targetKey);
+    renameRelation(dag[nodeKey], mapping, "children", sourceKey, targetKey);
   });
-  ensureReferencedNodes(dag);
   return {
     dag,
     changedKeys: [targetKey],
@@ -88,7 +85,7 @@ function renameNode(dag: NormalizedDag, oldKey: NodeKey, newKey: NodeKey): Comma
   };
 }
 
-function deleteNodes(dag: NormalizedDag, nodeKeys: NodeKey[], message: string): CommandResult {
+function deleteNodes(dag: NormalizedDag, mapping: FieldMapping, nodeKeys: NodeKey[], message: string): CommandResult {
   const deleteSet = new Set(nodeKeys.filter((nodeKey) => Boolean(dag[nodeKey])));
   if (!deleteSet.size) {
     throw new Error("No matching nodes were found.");
@@ -103,15 +100,14 @@ function deleteNodes(dag: NormalizedDag, nodeKeys: NodeKey[], message: string): 
 
   Object.keys(dag).forEach((otherKey) => {
     deleteSet.forEach((deletedKey) => {
-      removeRelation(dag[otherKey], "parents", deletedKey);
-      removeRelation(dag[otherKey], "children", deletedKey);
+      removeRelation(dag[otherKey], mapping, "parents", deletedKey);
+      removeRelation(dag[otherKey], mapping, "children", deletedKey);
     });
   });
-  ensureReferencedNodes(dag);
   return { dag, changedKeys: Object.keys(dag), deletedKeys: Array.from(deleteSet), message };
 }
 
-export function collectSubtreeNodeKeys(dag: NormalizedDag, rootKey: NodeKey): NodeKey[] {
+export function collectSubtreeNodeKeys(dag: NormalizedDag, rootKey: NodeKey, mapping: FieldMapping = getDefaultFieldMapping()): NodeKey[] {
   if (!dag[rootKey]) {
     return [];
   }
@@ -124,23 +120,22 @@ export function collectSubtreeNodeKeys(dag: NormalizedDag, rootKey: NodeKey): No
       continue;
     }
     visited.add(currentKey);
-    getRelationKeys(dag[currentKey].children).forEach((childKey) => stack.push(childKey));
+    getNodeChildKeys(dag[currentKey], mapping).forEach((childKey) => stack.push(childKey));
   }
   return Array.from(visited);
 }
 
-function addNode(dag: NormalizedDag, key: NodeKey, parentKey?: NodeKey): CommandResult {
+function addNode(dag: NormalizedDag, mapping: FieldMapping, key: NodeKey, parentKey?: NodeKey): CommandResult {
   const nextKey = key.trim();
   assertValidNewKey(dag, nextKey);
-  dag[nextKey] = { key: nextKey, define: "", parents: {}, children: {} };
+  dag[nextKey] = createEmptyDagNode(nextKey, mapping);
   if (parentKey && dag[parentKey]) {
-    syncBidirectionalRelations(dag, parentKey, "children", [...getRelationKeys(dag[parentKey].children), nextKey]);
+    syncBidirectionalRelations(dag, mapping, parentKey, "children", [...getNodeChildKeys(dag[parentKey], mapping), nextKey]);
   }
-  ensureReferencedNodes(dag);
   return { dag, changedKeys: parentKey ? [nextKey, parentKey] : [nextKey], message: `Added node ${nextKey}.` };
 }
 
-function copyNode(dag: NormalizedDag, sourceKey: NodeKey, key: NodeKey, parentKey?: NodeKey): CommandResult {
+function copyNode(dag: NormalizedDag, mapping: FieldMapping, sourceKey: NodeKey, key: NodeKey, parentKey?: NodeKey): CommandResult {
   const sourceNode = dag[sourceKey.trim()];
   if (!sourceNode) {
     throw new Error(`Node "${sourceKey}" does not exist.`);
@@ -149,19 +144,16 @@ function copyNode(dag: NormalizedDag, sourceKey: NodeKey, key: NodeKey, parentKe
   const nextKey = key.trim();
   assertValidNewKey(dag, nextKey);
 
-  const { key: _oldKey, parents: _oldParents, children: _oldChildren, ...copiedFields } = sourceNode;
-  dag[nextKey] = {
-    ...copiedFields,
-    key: nextKey,
-    parents: {},
-    children: {},
-  };
+  const copiedFields = structuredCloneValue(sourceNode);
+  copiedFields.key = nextKey;
+  setNodeParents(copiedFields, mapping, {});
+  setNodeChildren(copiedFields, mapping, {});
+  dag[nextKey] = copiedFields;
 
   if (parentKey && dag[parentKey]) {
-    syncBidirectionalRelations(dag, parentKey, "children", [...getRelationKeys(dag[parentKey].children), nextKey]);
+    syncBidirectionalRelations(dag, mapping, parentKey, "children", [...getNodeChildKeys(dag[parentKey], mapping), nextKey]);
   }
 
-  ensureReferencedNodes(dag);
   return {
     dag,
     changedKeys: parentKey ? [nextKey, parentKey] : [nextKey],
@@ -169,7 +161,7 @@ function copyNode(dag: NormalizedDag, sourceKey: NodeKey, key: NodeKey, parentKe
   };
 }
 
-function setEdge(dag: NormalizedDag, parentKey: NodeKey, childKey: NodeKey, weight: RelationValue = DEFAULT_RELATION_VALUE): CommandResult {
+function setEdge(dag: NormalizedDag, mapping: FieldMapping, parentKey: NodeKey, childKey: NodeKey, weight: RelationValue = DEFAULT_RELATION_VALUE): CommandResult {
   const sourceKey = parentKey.trim();
   const targetKey = childKey.trim();
   const parentNode = dag[sourceKey];
@@ -185,15 +177,14 @@ function setEdge(dag: NormalizedDag, parentKey: NodeKey, childKey: NodeKey, weig
     throw new Error("A node cannot reference itself.");
   }
 
-  const nextChildren = toRelationMap(parentNode.children);
+  const nextChildren = toRelationMap(getNodeChildren(parentNode, mapping));
   nextChildren[targetKey] = weight;
-  parentNode.children = nextChildren;
+  setNodeChildren(parentNode, mapping, nextChildren);
 
-  const nextParents = toRelationMap(childNode.parents);
+  const nextParents = toRelationMap(getNodeParents(childNode, mapping));
   nextParents[sourceKey] = weight;
-  childNode.parents = nextParents;
+  setNodeParents(childNode, mapping, nextParents);
 
-  ensureReferencedNodes(dag);
   return {
     dag,
     changedKeys: [sourceKey, targetKey],
@@ -203,7 +194,7 @@ function setEdge(dag: NormalizedDag, parentKey: NodeKey, childKey: NodeKey, weig
   };
 }
 
-function removeEdge(dag: NormalizedDag, parentKey: NodeKey, childKey: NodeKey): CommandResult {
+function removeEdge(dag: NormalizedDag, mapping: FieldMapping, parentKey: NodeKey, childKey: NodeKey): CommandResult {
   const sourceKey = parentKey.trim();
   const targetKey = childKey.trim();
   const parentNode = dag[sourceKey];
@@ -215,13 +206,12 @@ function removeEdge(dag: NormalizedDag, parentKey: NodeKey, childKey: NodeKey): 
   if (!childNode) {
     throw new Error(`Node "${targetKey}" does not exist.`);
   }
-  if (!getRelationKeys(parentNode.children).includes(targetKey)) {
+  if (!getNodeChildKeys(parentNode, mapping).includes(targetKey)) {
     throw new Error(`Edge "${sourceKey}" -> "${targetKey}" does not exist.`);
   }
 
-  removeRelation(parentNode, "children", targetKey);
-  removeRelation(childNode, "parents", sourceKey);
-  ensureReferencedNodes(dag);
+  removeRelation(parentNode, mapping, "children", targetKey);
+  removeRelation(childNode, mapping, "parents", sourceKey);
 
   return {
     dag,
@@ -230,7 +220,7 @@ function removeEdge(dag: NormalizedDag, parentKey: NodeKey, childKey: NodeKey): 
   };
 }
 
-function updateNodeFields(dag: NormalizedDag, oldKey: NodeKey, nextKey: NodeKey, fields: Record<string, unknown>): CommandResult {
+function updateNodeFields(dag: NormalizedDag, mapping: FieldMapping, oldKey: NodeKey, nextKey: NodeKey, fields: Record<string, unknown>): CommandResult {
   const sourceKey = oldKey.trim();
   const targetKey = nextKey.trim();
   assertValidNewKey(dag, targetKey, sourceKey);
@@ -238,27 +228,26 @@ function updateNodeFields(dag: NormalizedDag, oldKey: NodeKey, nextKey: NodeKey,
     throw new Error(`Node "${sourceKey}" does not exist.`);
   }
 
-  const nextNode = { ...fields, key: targetKey } as DagNode;
-  nextNode.parents = normalizePatchRelation(nextNode.parents);
-  nextNode.children = normalizePatchRelation(nextNode.children);
-  if (getRelationKeys(nextNode.parents).includes(targetKey) || getRelationKeys(nextNode.children).includes(targetKey)) {
+  const nextNode = { ...structuredCloneValue(fields), key: targetKey } as DagNode;
+  const nextParentKeys = getRelationKeys(nextNode[mapping.parents]);
+  const nextChildKeys = getRelationKeys(nextNode[mapping.children]);
+  if (nextParentKeys.includes(targetKey) || nextChildKeys.includes(targetKey)) {
     throw new Error("A node cannot reference itself.");
   }
 
-  const previousParentKeys = getRelationKeys(dag[sourceKey].parents);
-  const previousChildKeys = getRelationKeys(dag[sourceKey].children);
+  const previousParentKeys = getNodeParentKeys(dag[sourceKey], mapping);
+  const previousChildKeys = getNodeChildKeys(dag[sourceKey], mapping);
 
   if (sourceKey !== targetKey) {
     delete dag[sourceKey];
     Object.keys(dag).forEach((nodeKey) => {
-      renameRelation(dag[nodeKey], "parents", sourceKey, targetKey);
-      renameRelation(dag[nodeKey], "children", sourceKey, targetKey);
+      renameRelation(dag[nodeKey], mapping, "parents", sourceKey, targetKey);
+      renameRelation(dag[nodeKey], mapping, "children", sourceKey, targetKey);
     });
   }
 
   dag[targetKey] = nextNode;
-  syncEditedNodeRelations(dag, targetKey, previousParentKeys, previousChildKeys, getRelationKeys(nextNode.parents), getRelationKeys(nextNode.children));
-  ensureReferencedNodes(dag);
+  syncEditedNodeRelations(dag, mapping, targetKey, previousParentKeys, previousChildKeys, nextParentKeys, nextChildKeys);
 
   return {
     dag,
@@ -268,25 +257,9 @@ function updateNodeFields(dag: NormalizedDag, oldKey: NodeKey, nextKey: NodeKey,
   };
 }
 
-function normalizePatchRelation(value: unknown): Record<NodeKey, RelationValue> | NodeKey[] {
-  if (Array.isArray(value)) {
-    return Array.from(new Set(value.map((item) => String(item ?? "").trim()).filter(Boolean)));
-  }
-  if (value && typeof value === "object") {
-    const map: Record<NodeKey, RelationValue> = {};
-    Object.entries(value as Record<string, unknown>).forEach(([rawKey, rawValue]) => {
-      const key = rawKey.trim();
-      if (key) {
-        map[key] = typeof rawValue === "string" || typeof rawValue === "number" || typeof rawValue === "boolean" || rawValue === null ? rawValue : String(rawValue);
-      }
-    });
-    return map;
-  }
-  return {};
-}
-
 function syncEditedNodeRelations(
   dag: NormalizedDag,
+  mapping: FieldMapping,
   nodeKey: NodeKey,
   previousParentKeys: NodeKey[],
   previousChildKeys: NodeKey[],
@@ -295,16 +268,16 @@ function syncEditedNodeRelations(
 ): void {
   previousParentKeys.forEach((parentKey) => {
     if (!nextParentKeys.includes(parentKey) && dag[parentKey]) {
-      removeRelation(dag[parentKey], "children", nodeKey);
+      removeRelation(dag[parentKey], mapping, "children", nodeKey);
     }
   });
   previousChildKeys.forEach((childKey) => {
     if (!nextChildKeys.includes(childKey) && dag[childKey]) {
-      removeRelation(dag[childKey], "parents", nodeKey);
+      removeRelation(dag[childKey], mapping, "parents", nodeKey);
     }
   });
-  syncBidirectionalRelations(dag, nodeKey, "parents", nextParentKeys);
-  syncBidirectionalRelations(dag, nodeKey, "children", nextChildKeys);
+  syncBidirectionalRelations(dag, mapping, nodeKey, "parents", nextParentKeys);
+  syncBidirectionalRelations(dag, mapping, nodeKey, "children", nextChildKeys);
 }
 
 function assertValidNewKey(dag: NormalizedDag, key: NodeKey, currentKey?: NodeKey): void {
