@@ -15,6 +15,22 @@ import { buildSugiyamaStageRoutes, buildSugiyamaVerticalPlanner } from "./sugiya
 
 const DETAIL_MAX_LINE_LENGTH = 48;
 const DETAIL_MAX_LINES = 2;
+type TypeColorSwatch = {
+  hue: number;
+  saturation: number;
+  lightness: number;
+};
+
+const TYPE_COLOR_SWATCHES = [
+  { hue: 356, saturation: 58, lightness: 47 },
+  { hue: 214, saturation: 62, lightness: 44 },
+  { hue: 145, saturation: 52, lightness: 40 },
+  { hue: 32, saturation: 66, lightness: 47 },
+  { hue: 188, saturation: 54, lightness: 42 },
+  { hue: 265, saturation: 48, lightness: 48 },
+  { hue: 325, saturation: 48, lightness: 48 },
+  { hue: 210, saturation: 24, lightness: 44 },
+] satisfies TypeColorSwatch[];
 
 export function buildStageData(input: {
   dag: NormalizedDag;
@@ -513,10 +529,21 @@ function buildTypeColorMap(dag: NormalizedDag, mapping: FieldMapping): Map<strin
     return colorMap;
   }
 
+  if (typeLabels.length <= TYPE_COLOR_SWATCHES.length) {
+    typeLabels.forEach((typeLabel, index) => {
+      colorMap.set(typeLabel, createNodeColorTokens(TYPE_COLOR_SWATCHES[index]));
+    });
+    return colorMap;
+  }
+
   const hueStep = 360 / typeLabels.length;
   typeLabels.forEach((typeLabel, index) => {
-    const hue = (index * hueStep + 18) % 360;
-    colorMap.set(typeLabel, createNodeColorTokens(hue));
+    const hue = (index * hueStep + TYPE_COLOR_SWATCHES[0].hue) % 360;
+    colorMap.set(typeLabel, createNodeColorTokens({
+      hue,
+      saturation: 58,
+      lightness: 45,
+    }));
   });
   return colorMap;
 }
@@ -529,20 +556,22 @@ function normalizeTypeLabel(value: unknown): string | undefined {
   return trimmed || undefined;
 }
 
-function createNodeColorTokens(hue: number): StageNodeColorTokens {
+function createNodeColorTokens(swatch: TypeColorSwatch): StageNodeColorTokens {
+  const { hue, saturation, lightness } = swatch;
+
   return {
-    glow: hsla(hue, 74, 48, 0.12),
+    glow: hsla(hue, saturation + 8, lightness + 2, 0.13),
     fill: "rgba(252, 253, 255, 0.88)",
     rootFill: "rgba(252, 254, 255, 0.94)",
     activeFill: "rgba(251, 253, 255, 0.96)",
-    border: hsla(hue, 34, 48, 0.26),
-    borderStrong: hsla(hue, 42, 40, 0.38),
-    activeBorder: hsla(hue, 56, 42, 0.5),
-    pinFill: hsla(hue, 74, 50, 0.16),
-    pinStroke: hsla(hue, 70, 44, 0.28),
-    pinCore: hsla(hue, 72, 36, 0.82),
-    affordanceBg: hsla(hue, 48, 93, 0.96),
-    affordanceText: hsla(hue, 62, 32, 0.82),
+    border: hsla(hue, saturation, lightness, 0.34),
+    borderStrong: hsla(hue, saturation + 4, lightness - 5, 0.52),
+    activeBorder: hsla(hue, saturation + 8, lightness - 3, 0.66),
+    pinFill: hsla(hue, saturation + 8, lightness + 4, 0.2),
+    pinStroke: hsla(hue, saturation + 6, lightness - 2, 0.34),
+    pinCore: hsla(hue, saturation + 8, lightness - 9, 0.88),
+    affordanceBg: hsla(hue, Math.max(24, saturation - 10), 94, 0.98),
+    affordanceText: hsla(hue, saturation + 6, lightness - 14, 0.88),
   };
 }
 
