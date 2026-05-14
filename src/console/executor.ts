@@ -50,6 +50,9 @@ export function executeConsoleInstructions(
           outputMessages.push(buildConsoleHelpText());
           break;
         }
+        case "clear": {
+          break;
+        }
         case "use": {
           const key = resolveExistingNodeKey(instruction.key, contextNodeKey, workingDag, instruction.line);
           contextNodeKey = key;

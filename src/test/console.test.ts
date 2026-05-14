@@ -36,6 +36,37 @@ export const consoleSuite = defineSuite("console", [
     });
   }),
 
+  defineTest("parser and executor accept clear inside multiline batches", () => {
+    const dag = createSampleDag();
+    const parsed = parseConsoleSource([
+      "use A",
+      "clear",
+      "cls",
+      "set . type concept",
+    ].join("\n"));
+
+    assert.equal(parsed.ok, true);
+    if (!parsed.ok) {
+      return;
+    }
+
+    assert.deepEqual(parsed.instructions.slice(1, 3), [
+      { type: "clear", line: 2 },
+      { type: "clear", line: 3 },
+    ]);
+
+    const executed = executeConsoleInstructions(dag, parsed.instructions, null);
+    assert.equal(executed.ok, true);
+    if (!executed.ok) {
+      return;
+    }
+
+    assert.equal(executed.dag.A.type, "concept");
+    assert.equal(executed.contextNodeKey, "A");
+    assert.equal(executed.instructionCount, 4);
+    assert.equal(executed.mutationCount, 1);
+  }),
+
   defineTest("executor applies batch mutations and tracks ui effects", () => {
     const dag = createSampleDag();
     const parsed = parseConsoleSource([

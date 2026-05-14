@@ -202,7 +202,10 @@ export default function App() {
       appendConsoleEntry(setConsoleEntries, "info", "No instructions were found.");
       return;
     }
-    if (!state.dag && !parsed.instructions.every((instruction) => instruction.type === "help")) {
+    if (parsed.instructions.some((instruction) => instruction.type === "clear")) {
+      setConsoleEntries([{ id: Date.now(), tone: "info", text: "Console cleared." }]);
+    }
+    if (!state.dag && !parsed.instructions.every((instruction) => instruction.type === "help" || instruction.type === "clear")) {
       appendConsoleEntry(setConsoleEntries, "error", "No graph loaded. Load or initialize a graph before running console instructions.");
       return;
     }

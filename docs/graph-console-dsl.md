@@ -129,6 +129,7 @@ The console maintains one implicit **current-node context register**.
 | Mnemonic | Category | Effect |
 | --- | --- | --- |
 | `help` | Reference | Show the available command reference |
+| `clear`, `cls` | Console UI | Clear the console output; accepted inside multi-line batches |
 | `ls` | Reference | Print a compact node summary |
 | `show` | UI | Open node detail view |
 | `use` | Context | Set current context node |
@@ -817,6 +818,7 @@ children . = AVL,RedBlack
 ```ts
 type ConsoleInstruction =
   | { type: "help"; line: number }
+  | { type: "clear"; line: number }
   | { type: "list"; key: string; line: number }
   | { type: "show"; key: string; line: number }
   | { type: "use"; key: string; line: number }
