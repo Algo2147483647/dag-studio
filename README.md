@@ -82,3 +82,7 @@ For the recommended data model and additional examples, see [Data Format Guide](
 - [`public/example.json`](public/example.json): sample graph data
 - [`docs/`](docs/): user and developer documentation
 - [`src/styles/`](src/styles/): split global styles (tokens, layout, controls, graph, console, modals)
+
+## License
+
+MIT License. See [LICENSE](LICENSE) for details.
