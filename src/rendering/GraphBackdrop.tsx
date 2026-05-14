@@ -5,8 +5,6 @@ interface GraphBackdropProps {
 }
 
 export default function GraphBackdrop({ stage }: GraphBackdropProps) {
-  const rootNode = stage.nodeMap[stage.root];
-
   return (
     <g className="graph-stage">
       <rect className="graph-stage__halo" x={24} y={24} width={stage.stageWidth - 48} height={stage.stageHeight - 48} rx={28} ry={28} />
@@ -18,16 +16,6 @@ export default function GraphBackdrop({ stage }: GraphBackdropProps) {
           </text>
         </g>
       ))}
-      {rootNode ? (
-        <ellipse
-          className="graph-stage__focus"
-          cx={rootNode.x}
-          cy={rootNode.y}
-          rx={rootNode.width * 0.9}
-          ry={92}
-          filter="url(#soft-glow)"
-        />
-      ) : null}
     </g>
   );
 }
