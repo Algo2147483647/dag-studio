@@ -10,6 +10,7 @@ export interface GraphPagePreferences {
   theme: GraphTheme;
   showNodeDetail: boolean;
   hideNodeBorders: boolean;
+  alignNodeWidthsToMax: boolean;
   consoleSidebarOpen: boolean;
   consoleSidebarWidth: number;
   fieldMapping: FieldMapping;
@@ -27,6 +28,7 @@ export function getInitialGraphPagePreferences(): GraphPagePreferences {
     theme: DEFAULT_GRAPH_THEME,
     showNodeDetail: true,
     hideNodeBorders: false,
+    alignNodeWidthsToMax: false,
     consoleSidebarOpen: false,
     consoleSidebarWidth: 360,
     fieldMapping: getDefaultFieldMapping(),
@@ -75,6 +77,7 @@ export function parseGraphPagePreferences(raw: string | null): Partial<GraphPage
     theme?: unknown;
     showNodeDetail?: unknown;
     hideNodeBorders?: unknown;
+    alignNodeWidthsToMax?: unknown;
     fieldMapping?: unknown;
   } | null;
   try {
@@ -101,6 +104,9 @@ export function parseGraphPagePreferences(raw: string | null): Partial<GraphPage
   }
   if (typeof parsed.hideNodeBorders === "boolean") {
     next.hideNodeBorders = parsed.hideNodeBorders;
+  }
+  if (typeof parsed.alignNodeWidthsToMax === "boolean") {
+    next.alignNodeWidthsToMax = parsed.alignNodeWidthsToMax;
   }
   if (typeof parsed.consoleSidebarOpen === "boolean") {
     next.consoleSidebarOpen = parsed.consoleSidebarOpen;

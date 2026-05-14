@@ -39,8 +39,9 @@ export function buildStageData(input: {
   layoutMode?: GraphLayoutMode;
   theme?: GraphTheme;
   showNodeDetail?: boolean;
+  alignNodeWidthsToMax?: boolean;
 }): StageData | null {
-  const { dag: sourceDag, mapping = getDefaultFieldMapping(), selection: requestedSelection, layoutMode = "sugiyama", theme = DEFAULT_GRAPH_THEME, showNodeDetail = true } = input;
+  const { dag: sourceDag, mapping = getDefaultFieldMapping(), selection: requestedSelection, layoutMode = "sugiyama", theme = DEFAULT_GRAPH_THEME, showNodeDetail = true, alignNodeWidthsToMax = false } = input;
   if (!sourceDag || Object.keys(sourceDag).length === 0) {
     return null;
   }
@@ -54,7 +55,7 @@ export function buildStageData(input: {
     ? collectReachableFromRoots(layoutDag, selection.topLevelKeys, mapping)
     : collectReachableNodes(layoutDag, selection.rootKey, mapping);
   const typeColorMap = buildTypeColorMap(sourceDag, mapping);
-  const visualByKey = buildNodeVisualMap(layoutDag, reachable, mapping, theme, showNodeDetail);
+  const visualByKey = buildNodeVisualMap(layoutDag, reachable, mapping, theme, showNodeDetail, alignNodeWidthsToMax);
   const layoutResult = resolveLayout(layoutMode, layoutDag, layoutRoots, mapping, visualByKey, theme);
   const coordinates = layoutResult.coordinates;
   const nodeKeys = Array.from(reachable).filter((key) => layoutDag[key] && coordinates.has(key));
@@ -305,6 +306,7 @@ function buildNodeVisualMap(
   mapping: FieldMapping,
   theme: GraphTheme,
   showNodeDetail: boolean,
+  alignNodeWidthsToMax: boolean,
 ): Map<NodeKey, ReturnType<typeof getNodeVisual>> {
   const visuals = new Map<NodeKey, ReturnType<typeof getNodeVisual>>();
   nodeKeys.forEach((nodeKey) => {
@@ -312,7 +314,7 @@ function buildNodeVisualMap(
     if (!node) {
       return;
     }
-    visuals.set(nodeKey, getNodeVisual(nodeKey, node, mapping, theme.minNodeWidth, theme.maxNodeWidth, showNodeDetail));
+    visuals.set(nodeKey, getNodeVisual(nodeKey, node, mapping, theme.minNodeWidth, theme.maxNodeWidth, showNodeDetail, alignNodeWidthsToMax));
   });
   return visuals;
 }

@@ -10,20 +10,21 @@ export function getNodeVisual(
   minNodeWidth: number,
   maxNodeWidth: number,
   showDetail: boolean,
+  alignToMaxWidth = false,
 ): { title: string; detail: string; width: number } {
   if (node.synthetic) {
     const syntheticTitle = getNodeTitle(node, mapping) || "Selected roots";
     return {
       title: syntheticTitle,
       detail: showDetail ? "Combined entry point for every detected root branch." : "",
-      width: clamp(232, minNodeWidth, maxNodeWidth),
+      width: alignToMaxWidth ? maxNodeWidth : clamp(232, minNodeWidth, maxNodeWidth),
     };
   }
 
   const title = sanitizeNodeLabel(getNodeTitle(node, mapping) || nodeKey);
   const detail = showDetail ? getNodeDetail(node, title, mapping) : "";
   const longestLine = Math.max(title.length, detail.length * 0.76);
-  const width = clamp(132 + longestLine * 6.1, minNodeWidth, maxNodeWidth);
+  const width = alignToMaxWidth ? maxNodeWidth : clamp(132 + longestLine * 6.1, minNodeWidth, maxNodeWidth);
   return { title: title || nodeKey, detail, width };
 }
 

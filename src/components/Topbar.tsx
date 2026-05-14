@@ -7,6 +7,7 @@ interface TopbarProps {
   theme: GraphTheme;
   showNodeDetail: boolean;
   hideNodeBorders: boolean;
+  alignNodeWidthsToMax: boolean;
   status: string;
   fileName: string;
   hasGraph: boolean;
@@ -36,6 +37,7 @@ interface TopbarProps {
   onThemeReset: () => void;
   onNodeDetailToggle: () => void;
   onNodeBordersToggle: () => void;
+  onNodeWidthAlignToggle: () => void;
   onFileInputClick: (event: React.MouseEvent<HTMLInputElement>) => void;
   onFileInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onInitializeCanvas: () => void;
@@ -51,6 +53,7 @@ export default function Topbar({
   theme,
   showNodeDetail,
   hideNodeBorders,
+  alignNodeWidthsToMax,
   status,
   fileName,
   hasGraph,
@@ -80,6 +83,7 @@ export default function Topbar({
   onThemeReset,
   onNodeDetailToggle,
   onNodeBordersToggle,
+  onNodeWidthAlignToggle,
   onFileInputClick,
   onFileInputChange,
   onInitializeCanvas,
@@ -165,6 +169,11 @@ export default function Topbar({
               <section className="settings-section" aria-labelledby="workspace-options-title">
                 <p id="workspace-options-title" className="control-label">Workspace</p>
                 <div className="workspace-action-row">
+                  <button id="field-mapping-btn" className="ghost-btn settings-action-btn" type="button" onClick={onFieldMappingOpen}>Field Mapping</button>
+                  <button id="init-canvas-btn" className="ghost-btn settings-action-btn" type="button" onClick={onInitializeCanvas}>Initialize</button>
+                  <button id="export-btn" className="ghost-btn settings-action-btn" type="button" disabled={!hasGraph} onClick={onExport}>Export SVG</button>
+                </div>
+                <div className="workspace-action-row">
                   {mode === "edit" ? (
                     <button
                       id="console-sidebar-toggle-btn"
@@ -176,7 +185,6 @@ export default function Topbar({
                       {consoleSidebarOpen ? "Hide Console" : "Show Console"}
                     </button>
                   ) : null}
-                  <button id="field-mapping-btn" className="ghost-btn settings-action-btn" type="button" onClick={onFieldMappingOpen}>Field Mapping</button>
                   <button
                     type="button"
                     className={`ghost-btn settings-action-btn${showNodeDetail ? " settings-action-btn-active" : ""}`}
@@ -185,8 +193,6 @@ export default function Topbar({
                   >
                     {showNodeDetail ? "Hide Details" : "Show Details"}
                   </button>
-                </div>
-                <div className="workspace-action-row">
                   <button
                     type="button"
                     className={`ghost-btn settings-action-btn${hideNodeBorders ? " settings-action-btn-active" : ""}`}
@@ -195,8 +201,14 @@ export default function Topbar({
                   >
                     {hideNodeBorders ? "Show Borders" : "Hide Borders"}
                   </button>
-                  <button id="init-canvas-btn" className="ghost-btn settings-action-btn" type="button" onClick={onInitializeCanvas}>Initialize</button>
-                  <button id="export-btn" className="ghost-btn settings-action-btn" type="button" disabled={!hasGraph} onClick={onExport}>Export SVG</button>
+                  <button
+                    type="button"
+                    className={`ghost-btn settings-action-btn${alignNodeWidthsToMax ? " settings-action-btn-active" : ""}`}
+                    aria-pressed={alignNodeWidthsToMax}
+                    onClick={onNodeWidthAlignToggle}
+                  >
+                    {alignNodeWidthsToMax ? "Auto Width" : "Max Width"}
+                  </button>
                 </div>
               </section>
               <label htmlFor="fileInput" className="file-input-label">

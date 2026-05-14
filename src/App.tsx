@@ -48,6 +48,7 @@ export default function App() {
   const [theme, setTheme] = useState<GraphTheme>(() => loadGraphPagePreferences().theme || DEFAULT_GRAPH_THEME);
   const [showNodeDetail, setShowNodeDetail] = useState<boolean>(() => loadGraphPagePreferences().showNodeDetail ?? true);
   const [hideNodeBorders, setHideNodeBorders] = useState<boolean>(() => loadGraphPagePreferences().hideNodeBorders ?? false);
+  const [alignNodeWidthsToMax, setAlignNodeWidthsToMax] = useState<boolean>(() => loadGraphPagePreferences().alignNodeWidthsToMax ?? false);
   const [fieldMappingOpen, setFieldMappingOpen] = useState(false);
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
   const [consoleInput, setConsoleInput] = useState("");
@@ -73,11 +74,12 @@ export default function App() {
       theme,
       showNodeDetail,
       hideNodeBorders,
+      alignNodeWidthsToMax,
       consoleSidebarOpen: state.ui.consoleSidebarOpen,
       consoleSidebarWidth: state.ui.consoleSidebarWidth,
       fieldMapping,
     });
-  }, [fieldMapping, hideNodeBorders, showNodeDetail, state.layout.mode, state.mode, state.ui.consoleSidebarOpen, state.ui.consoleSidebarWidth, theme]);
+  }, [alignNodeWidthsToMax, fieldMapping, hideNodeBorders, showNodeDetail, state.layout.mode, state.mode, state.ui.consoleSidebarOpen, state.ui.consoleSidebarWidth, theme]);
 
   useEffect(() => {
     if (consoleContextNodeKey && state.dag && !state.dag[consoleContextNodeKey]) {
@@ -89,7 +91,7 @@ export default function App() {
     setActiveSuggestionIndex(0);
   }, [consoleInput]);
 
-  const stage = useMemo(() => state.dag ? buildStageData({ dag: state.dag, mapping: fieldMapping, selection: state.selection, layoutMode: state.layout.mode, theme, showNodeDetail }) : null, [fieldMapping, showNodeDetail, state.dag, state.layout.mode, state.selection, theme]);
+  const stage = useMemo(() => state.dag ? buildStageData({ dag: state.dag, mapping: fieldMapping, selection: state.selection, layoutMode: state.layout.mode, theme, showNodeDetail, alignNodeWidthsToMax }) : null, [alignNodeWidthsToMax, fieldMapping, showNodeDetail, state.dag, state.layout.mode, state.selection, theme]);
   const parentSelection = useMemo(() => state.dag && stage ? getParentLevelSelection(state.dag, stage.topLevelKeys, fieldMapping) : null, [fieldMapping, stage, state.dag]);
   const consoleSidebarVisible = state.mode === "edit" && state.ui.consoleSidebarOpen;
   const consoleSuggestions = useMemo(() => getConsoleSuggestions(consoleInput), [consoleInput]);
@@ -537,6 +539,7 @@ export default function App() {
         theme={theme}
         showNodeDetail={showNodeDetail}
         hideNodeBorders={hideNodeBorders}
+        alignNodeWidthsToMax={alignNodeWidthsToMax}
         status={status}
         fileName={state.source.fileName}
         hasGraph={Boolean(stage)}
@@ -566,6 +569,7 @@ export default function App() {
         onThemeReset={handleThemeReset}
         onNodeDetailToggle={handleNodeDetailToggle}
         onNodeBordersToggle={() => setHideNodeBorders((current) => !current)}
+        onNodeWidthAlignToggle={() => setAlignNodeWidthsToMax((current) => !current)}
         onFileInputClick={handleFileInputClick}
         onFileInputChange={handleFileInputChange}
         onInitializeCanvas={initializeCanvas}
