@@ -24,6 +24,7 @@ interface UseGraphZoomInput {
 
 export function useGraphZoom({ containerRef, svgRef, topbarRef, stage, scale, minScale, maxScale, onZoomChange }: UseGraphZoomInput) {
   const zoomStateRef = useRef({ scale, minScale, maxScale });
+  const wheelZoomRef = useRef<{ frame: number; deltaY: number; anchor: ZoomAnchor | null }>({ frame: 0, deltaY: 0, anchor: null });
 
   useEffect(() => {
     zoomStateRef.current = { scale, minScale, maxScale };
@@ -82,13 +83,30 @@ export function useGraphZoom({ containerRef, svgRef, topbarRef, stage, scale, mi
         return;
       }
       event.preventDefault();
-      const normalizedDelta = clamp(event.deltaY, -MAX_WHEEL_DELTA, MAX_WHEEL_DELTA);
-      const factor = Math.exp(-normalizedDelta * WHEEL_ZOOM_SENSITIVITY);
-      zoomBy(factor, { clientX: event.clientX, clientY: event.clientY });
+      wheelZoomRef.current.deltaY += clamp(event.deltaY, -MAX_WHEEL_DELTA, MAX_WHEEL_DELTA);
+      wheelZoomRef.current.anchor = { clientX: event.clientX, clientY: event.clientY };
+      if (wheelZoomRef.current.frame) {
+        return;
+      }
+      wheelZoomRef.current.frame = window.requestAnimationFrame(() => {
+        const { deltaY, anchor } = wheelZoomRef.current;
+        wheelZoomRef.current = { frame: 0, deltaY: 0, anchor: null };
+        if (!anchor || Math.abs(deltaY) < 0.01) {
+          return;
+        }
+        const factor = Math.exp(-deltaY * WHEEL_ZOOM_SENSITIVITY);
+        zoomBy(factor, anchor);
+      });
     }
 
     container.addEventListener("wheel", handleWheel, { passive: false });
-    return () => container.removeEventListener("wheel", handleWheel);
+    return () => {
+      container.removeEventListener("wheel", handleWheel);
+      if (wheelZoomRef.current.frame) {
+        window.cancelAnimationFrame(wheelZoomRef.current.frame);
+        wheelZoomRef.current = { frame: 0, deltaY: 0, anchor: null };
+      }
+    };
   }, [containerRef, stage, zoomBy]);
 
   return useMemo(() => ({
