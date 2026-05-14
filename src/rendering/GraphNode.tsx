@@ -2,6 +2,10 @@ import { memo, type CSSProperties, type KeyboardEvent } from "react";
 import type { StageNode } from "../layout/types";
 
 const DETAIL_LINE_HEIGHT = 10;
+const AFFORDANCE_HORIZONTAL_PADDING = 8;
+const AFFORDANCE_MIN_WIDTH = 32;
+const AFFORDANCE_MAX_INSET = 16;
+const AFFORDANCE_TEXT_AVERAGE_WIDTH = 5.2;
 
 interface GraphNodeProps {
   node: StageNode;
@@ -38,6 +42,15 @@ const GraphNode = memo(function GraphNode({
     node.isRoot ? "is-root" : "",
     isActive ? "is-active" : "",
   ].filter(Boolean).join(" ");
+  const affordanceLabel = node.typeLabel || "";
+  const affordanceWidth = Math.min(
+    Math.max(
+      Math.ceil(affordanceLabel.length * AFFORDANCE_TEXT_AVERAGE_WIDTH) + AFFORDANCE_HORIZONTAL_PADDING * 2,
+      AFFORDANCE_MIN_WIDTH,
+    ),
+    node.width - AFFORDANCE_MAX_INSET * 2,
+  );
+  const affordanceX = node.width - AFFORDANCE_MAX_INSET - affordanceWidth;
 
   function handleKeyDown(event: KeyboardEvent<SVGGElement>) {
     if (event.key === "Enter" || event.key === " ") {
@@ -89,12 +102,14 @@ const GraphNode = memo(function GraphNode({
           ))}
         </text>
       ) : null}
-      <g className="graph-node__affordance">
-        <rect className="graph-node__affordance-bg" x={node.width - 90} y={node.height - 21} width={74} height={14} rx={7} ry={7} />
-        <text className="graph-node__affordance-text" x={node.width - 53} y={node.height - 10} textAnchor="middle">
-          {node.isRoot ? "Focused" : "Refocus"}
-        </text>
-      </g>
+      {affordanceLabel ? (
+        <g className="graph-node__affordance">
+          <rect className="graph-node__affordance-bg" x={affordanceX} y={node.height - 21} width={affordanceWidth} height={14} rx={7} ry={7} />
+          <text className="graph-node__affordance-text" x={affordanceX + affordanceWidth / 2} y={node.height - 10} textAnchor="middle">
+            {affordanceLabel}
+          </text>
+        </g>
+      ) : null}
     </g>
   );
 }, areEqualGraphNodeProps);
