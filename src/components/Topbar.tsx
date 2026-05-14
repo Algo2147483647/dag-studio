@@ -6,6 +6,7 @@ interface TopbarProps {
   layoutMode: GraphLayoutMode;
   theme: GraphTheme;
   showNodeDetail: boolean;
+  hideNodeBorders: boolean;
   status: string;
   fileName: string;
   hasGraph: boolean;
@@ -34,6 +35,7 @@ interface TopbarProps {
   onThemeChange: <K extends keyof GraphTheme>(key: K, value: GraphTheme[K]) => void;
   onThemeReset: () => void;
   onNodeDetailToggle: () => void;
+  onNodeBordersToggle: () => void;
   onFileInputClick: (event: React.MouseEvent<HTMLInputElement>) => void;
   onFileInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onInitializeCanvas: () => void;
@@ -48,6 +50,7 @@ export default function Topbar({
   layoutMode,
   theme,
   showNodeDetail,
+  hideNodeBorders,
   status,
   fileName,
   hasGraph,
@@ -76,6 +79,7 @@ export default function Topbar({
   onThemeChange,
   onThemeReset,
   onNodeDetailToggle,
+  onNodeBordersToggle,
   onFileInputClick,
   onFileInputChange,
   onInitializeCanvas,
@@ -183,6 +187,14 @@ export default function Topbar({
                   </button>
                 </div>
                 <div className="workspace-action-row">
+                  <button
+                    type="button"
+                    className={`ghost-btn settings-action-btn${hideNodeBorders ? " settings-action-btn-active" : ""}`}
+                    aria-pressed={hideNodeBorders}
+                    onClick={onNodeBordersToggle}
+                  >
+                    {hideNodeBorders ? "Show Borders" : "Hide Borders"}
+                  </button>
                   <button id="init-canvas-btn" className="ghost-btn settings-action-btn" type="button" onClick={onInitializeCanvas}>Initialize</button>
                   <button id="export-btn" className="ghost-btn settings-action-btn" type="button" disabled={!hasGraph} onClick={onExport}>Export SVG</button>
                 </div>

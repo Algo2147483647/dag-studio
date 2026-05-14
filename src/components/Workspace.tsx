@@ -12,6 +12,7 @@ interface WorkspaceProps {
   sidebarWidth: number;
   onInitializeCanvas: () => void;
   focusedKey: string | null;
+  hideNodeBorders: boolean;
   onNodeClick: (key: string) => void;
   onNodeContextMenu: (event: React.MouseEvent<SVGGElement>, key: string) => void;
   onFocusChange: (key: string | null) => void;
@@ -29,6 +30,7 @@ export default function Workspace({
   sidebarWidth,
   onInitializeCanvas,
   focusedKey,
+  hideNodeBorders,
   onNodeClick,
   onNodeContextMenu,
   onFocusChange,
@@ -59,6 +61,7 @@ export default function Workspace({
               <GraphStage
                 stage={stage}
                 focusedKey={focusedKey}
+                hideNodeBorders={hideNodeBorders}
                 svgRef={svgRef}
                 onNodeClick={onNodeClick}
                 onNodeContextMenu={onNodeContextMenu}

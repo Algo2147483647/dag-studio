@@ -47,6 +47,7 @@ export default function App() {
   const [fieldMapping, setFieldMapping] = useState<FieldMapping>(() => loadGraphPagePreferences().fieldMapping || getDefaultFieldMapping());
   const [theme, setTheme] = useState<GraphTheme>(() => loadGraphPagePreferences().theme || DEFAULT_GRAPH_THEME);
   const [showNodeDetail, setShowNodeDetail] = useState<boolean>(() => loadGraphPagePreferences().showNodeDetail ?? true);
+  const [hideNodeBorders, setHideNodeBorders] = useState<boolean>(() => loadGraphPagePreferences().hideNodeBorders ?? false);
   const [fieldMappingOpen, setFieldMappingOpen] = useState(false);
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
   const [consoleInput, setConsoleInput] = useState("");
@@ -71,11 +72,12 @@ export default function App() {
       layoutMode: state.layout.mode,
       theme,
       showNodeDetail,
+      hideNodeBorders,
       consoleSidebarOpen: state.ui.consoleSidebarOpen,
       consoleSidebarWidth: state.ui.consoleSidebarWidth,
       fieldMapping,
     });
-  }, [fieldMapping, showNodeDetail, state.layout.mode, state.mode, state.ui.consoleSidebarOpen, state.ui.consoleSidebarWidth, theme]);
+  }, [fieldMapping, hideNodeBorders, showNodeDetail, state.layout.mode, state.mode, state.ui.consoleSidebarOpen, state.ui.consoleSidebarWidth, theme]);
 
   useEffect(() => {
     if (consoleContextNodeKey && state.dag && !state.dag[consoleContextNodeKey]) {
@@ -534,6 +536,7 @@ export default function App() {
         layoutMode={state.layout.mode}
         theme={theme}
         showNodeDetail={showNodeDetail}
+        hideNodeBorders={hideNodeBorders}
         status={status}
         fileName={state.source.fileName}
         hasGraph={Boolean(stage)}
@@ -562,6 +565,7 @@ export default function App() {
         onThemeChange={handleThemeChange}
         onThemeReset={handleThemeReset}
         onNodeDetailToggle={handleNodeDetailToggle}
+        onNodeBordersToggle={() => setHideNodeBorders((current) => !current)}
         onFileInputClick={handleFileInputClick}
         onFileInputChange={handleFileInputChange}
         onInitializeCanvas={initializeCanvas}
@@ -642,6 +646,7 @@ export default function App() {
         sidebarWidth={state.ui.consoleSidebarWidth}
         onInitializeCanvas={initializeCanvas}
         focusedKey={focusedKey}
+        hideNodeBorders={hideNodeBorders}
         onNodeClick={handleNodeClick}
         onNodeContextMenu={handleNodeContextMenu}
         onFocusChange={setFocusedKey}

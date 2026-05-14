@@ -87,6 +87,14 @@
   transition: fill 0.18s ease, stroke 0.18s ease, transform 0.18s ease, filter 0.18s ease;
 }
 
+.graph-stage--borderless .graph-node__shape,
+.graph-stage--borderless .graph-node:hover .graph-node__shape,
+.graph-stage--borderless .graph-node.is-current .graph-node__shape,
+.graph-stage--borderless .graph-node.is-active .graph-node__shape,
+.graph-stage--borderless .graph-node.is-root .graph-node__shape {
+  stroke: transparent;
+}
+
 .graph-node__pin {
   fill: var(--graph-node-pin-fill, rgba(40, 95, 223, 0.14));
   stroke: var(--graph-node-pin-stroke, rgba(40, 95, 223, 0.24));

@@ -13,13 +13,14 @@ const DENSE_STAGE_AREA_THRESHOLD = 20_000_000;
 interface GraphStageProps {
   stage: StageData;
   focusedKey: string | null;
+  hideNodeBorders: boolean;
   svgRef: React.RefObject<SVGSVGElement>;
   onNodeClick: (key: string) => void;
   onNodeContextMenu: (event: React.MouseEvent<SVGGElement>, key: string) => void;
   onFocusChange: (key: string | null) => void;
 }
 
-export default function GraphStage({ stage, focusedKey, svgRef, onNodeClick, onNodeContextMenu, onFocusChange }: GraphStageProps) {
+export default function GraphStage({ stage, focusedKey, hideNodeBorders, svgRef, onNodeClick, onNodeContextMenu, onFocusChange }: GraphStageProps) {
   const hoveredKeyRef = useRef<string | null>(null);
   const focusedKeyRef = useRef<string | null>(focusedKey);
   const appliedInteractiveKeyRef = useRef<string | null>(null);
@@ -197,7 +198,7 @@ export default function GraphStage({ stage, focusedKey, svgRef, onNodeClick, onN
 
   return (
     <svg
-      className={`graph-stage${isDenseStage ? " graph-stage--dense" : ""}`}
+      className={`graph-stage${isDenseStage ? " graph-stage--dense" : ""}${hideNodeBorders ? " graph-stage--borderless" : ""}`}
       ref={svgRef}
       viewBox={`0 0 ${stage.stageWidth} ${stage.stageHeight}`}
       width={stage.stageWidth}
