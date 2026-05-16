@@ -119,6 +119,10 @@
 }
 
 .context-menu-item {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  align-items: center;
+  column-gap: 8px;
   width: 100%;
   border: none;
   border-radius: 6px;
@@ -134,6 +138,22 @@
     background-color 120ms ease,
     color 120ms ease,
     transform 80ms ease;
+}
+
+.context-menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(15, 23, 42, 0.72);
+}
+
+.context-menu-icon-svg {
+  width: 14px;
+  height: 14px;
+}
+
+.context-menu-label {
+  min-width: 0;
 }
 
 .context-menu-item:not(:disabled):hover {
@@ -157,6 +177,10 @@
 
 .context-menu-item-danger {
   color: #8e2f2f;
+}
+
+.context-menu-item-danger .context-menu-icon {
+  color: rgba(142, 47, 47, 0.82);
 }
 
 .context-menu-item-danger:not(:disabled):hover {
