@@ -6,6 +6,7 @@ export interface ConsoleCommandReference {
 
 export const CONSOLE_COMMAND_REFERENCE: ConsoleCommandReference[] = [
   { label: "help", insertText: "help", help: "Show this command reference." },
+  { label: "keys", insertText: "keys", help: "List every node key in the current graph." },
   { label: "ls <node>", insertText: "ls ", help: "Print a compact node summary in the console output." },
   { label: "use <node>", insertText: "use ", help: "Set the current context node. Use . to refer to the current context in later commands." },
   { label: "show <node>", insertText: "show ", help: "Open the node viewer for a node." },
@@ -33,6 +34,7 @@ export function buildConsoleHelpText(): string {
   return [
     "Available commands:",
     '- help: Show this command reference.',
+    '- keys: List every node key in the current graph.',
     '- ls <node>: Print a compact node summary in the console output.',
     '- use <node>: Set the current context node. Use . to refer to the current context in later commands.',
     '- show <node>: Open the node viewer for a node.',

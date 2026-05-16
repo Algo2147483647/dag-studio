@@ -67,6 +67,26 @@ export const consoleSuite = defineSuite("console", [
     assert.equal(executed.mutationCount, 1);
   }),
 
+  defineTest("keys lists all node keys without mutating the graph", () => {
+    const parsed = parseConsoleSource("keys");
+    assert.equal(parsed.ok, true);
+    if (!parsed.ok) {
+      return;
+    }
+
+    assert.deepEqual(parsed.instructions, [{ type: "keys", line: 1 }]);
+
+    const executed = executeConsoleInstructions(createSampleDag(), parsed.instructions, null);
+    assert.equal(executed.ok, true);
+    if (!executed.ok) {
+      return;
+    }
+
+    assert.deepEqual(executed.outputMessages, ["Keys (4):\nA\nB\nC\nD"]);
+    assert.equal(executed.instructionCount, 1);
+    assert.equal(executed.mutationCount, 0);
+  }),
+
   defineTest("executor applies batch mutations and tracks ui effects", () => {
     const dag = createSampleDag();
     const parsed = parseConsoleSource([

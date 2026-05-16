@@ -10,6 +10,7 @@ export type ConsoleNodeOperand =
 export type ConsoleInstruction =
   | { type: "help"; line: number }
   | { type: "clear"; line: number }
+  | { type: "keys"; line: number }
   | { type: "show"; key: ConsoleNodeOperand; line: number }
   | { type: "list"; key: ConsoleNodeOperand; line: number }
   | { type: "use"; key: ConsoleNodeOperand; line: number }
@@ -124,6 +125,8 @@ function parseInstruction(tokens: ConsoleToken[], line: number): { ok: true; ins
     case "clear":
     case "cls":
       return parseClearInstruction(tokens, line);
+    case "keys":
+      return parseKeysInstruction(tokens, line);
     case "show":
       return parseSingleNodeInstruction(tokens, line, "show");
     case "ls":
@@ -169,6 +172,13 @@ function parseClearInstruction(tokens: ConsoleToken[], line: number): { ok: true
     return { ok: false, error: { line, message: "clear does not accept any arguments." } };
   }
   return { ok: true, instruction: { type: "clear", line } };
+}
+
+function parseKeysInstruction(tokens: ConsoleToken[], line: number): { ok: true; instruction: ConsoleInstruction } | { ok: false; error: ConsoleLineError } {
+  if (tokens.length !== 1) {
+    return { ok: false, error: { line, message: "keys does not accept any arguments." } };
+  }
+  return { ok: true, instruction: { type: "keys", line } };
 }
 
 function parseSingleNodeInstruction(

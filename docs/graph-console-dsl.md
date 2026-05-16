@@ -130,6 +130,7 @@ The console maintains one implicit **current-node context register**.
 | --- | --- | --- |
 | `help` | Reference | Show the available command reference |
 | `clear`, `cls` | Console UI | Clear the console output; accepted inside multi-line batches |
+| `keys` | Reference | List every node key in the current graph |
 | `ls` | Reference | Print a compact node summary |
 | `show` | UI | Open node detail view |
 | `use` | Context | Set current context node |
@@ -157,6 +158,7 @@ The console maintains one implicit **current-node context register**.
 | Command | Layer | Effect |
 | --- | --- | --- |
 | `help` | DSL instruction | Print the available command reference in the console output |
+| `keys` | DSL instruction | List every node key in the current graph |
 | `ls` | DSL instruction | Print a compact node summary in the console output |
 | `clear` | Console UI | Clear the console output |
 | `cls` | Console UI | Alias for `clear` |
@@ -194,7 +196,36 @@ help
 
 ---
 
-## 7.2 `show`
+## 7.2 `keys`
+
+### Synopsis
+
+```sh
+keys
+```
+
+### Description
+
+Prints all node keys in the current graph to the console output. The first line includes the total count, followed by one key per line in sorted order.
+
+### Behavioral Notes
+
+| Item | Behavior |
+| --- | --- |
+| Graph mutation | None |
+| Graph required | No |
+| Undo history | Not added as a graph edit |
+| Typical use | Discover exact keys before using node-specific commands |
+
+### Examples
+
+```sh
+keys
+```
+
+---
+
+## 7.3 `show`
 
 ### Synopsis
 
@@ -231,7 +262,7 @@ show .
 
 ---
 
-## 7.3 `ls`
+## 7.4 `ls`
 
 ### Synopsis
 
@@ -254,7 +285,7 @@ ls .
 
 ---
 
-## 7.4 `use`
+## 7.5 `use`
 
 ### Synopsis
 
@@ -289,7 +320,7 @@ use "Binary Tree"
 
 ---
 
-## 7.5 `mv`
+## 7.6 `mv`
 
 ### Synopsis
 
@@ -331,7 +362,7 @@ mv "Binary Tree" "Binary Search Tree"
 
 ---
 
-## 7.6 `rm`
+## 7.7 `rm`
 
 ### Synopsis
 
@@ -376,7 +407,7 @@ rm -r Tree
 
 ---
 
-## 7.7 `add`
+## 7.8 `add`
 
 ### Synopsis
 
@@ -421,7 +452,7 @@ add RedBlack -p .
 
 ---
 
-## 7.8 `cp`
+## 7.9 `cp`
 
 ### Synopsis
 
@@ -466,7 +497,7 @@ cp . Snapshot -p .
 
 ---
 
-## 7.9 `parents`
+## 7.10 `parents`
 
 ### Synopsis
 
@@ -511,7 +542,7 @@ parents Draft =
 
 ---
 
-## 7.10 `children`
+## 7.11 `children`
 
 ### Synopsis
 
@@ -556,7 +587,7 @@ children Leaf =
 
 ---
 
-## 7.11 `edge`
+## 7.12 `edge`
 
 ### Synopsis
 
@@ -598,7 +629,7 @@ edge . RedBlack balanced_by
 
 ---
 
-## 7.12 `rm-edge`
+## 7.13 `rm-edge`
 
 ### Synopsis
 
@@ -633,7 +664,7 @@ rm-edge . RedBlack
 
 ---
 
-## 7.13 `set`
+## 7.14 `set`
 
 ### Synopsis
 
@@ -674,7 +705,7 @@ set AVL metadata {"height":2,"balanced":true}
 
 ---
 
-## 7.14 `unset`
+## 7.15 `unset`
 
 ### Synopsis
 
@@ -696,7 +727,7 @@ unset . metadata
 
 ---
 
-## 7.15 `json`
+## 7.16 `json`
 
 ### Synopsis
 
@@ -819,6 +850,7 @@ children . = AVL,RedBlack
 type ConsoleInstruction =
   | { type: "help"; line: number }
   | { type: "clear"; line: number }
+  | { type: "keys"; line: number }
   | { type: "list"; key: string; line: number }
   | { type: "show"; key: string; line: number }
   | { type: "use"; key: string; line: number }
@@ -900,6 +932,7 @@ json .
 | --- | --- |
 | P0 | `use` |
 | P0 | `help` |
+| P0 | `keys` |
 | P0 | `ls` |
 | P0 | `show` |
 | P0 | `mv` |

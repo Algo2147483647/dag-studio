@@ -125,10 +125,12 @@ The console is designed for fast text-based graph edits:
 - command history is available with the arrow keys when suggestions are not open
 - `clear` or `cls` clears console output
 - `help` prints the command reference directly in the console
+- `keys` lists every node key in the current graph
 
 Common commands:
 
 - `help`
+- `keys`
 - `use <node>`
 - `show <node>`
 - `json <node>`

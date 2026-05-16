@@ -53,6 +53,10 @@ export function executeConsoleInstructions(
         case "clear": {
           break;
         }
+        case "keys": {
+          outputMessages.push(buildKeyList(workingDag));
+          break;
+        }
         case "use": {
           const key = resolveExistingNodeKey(instruction.key, contextNodeKey, workingDag, instruction.line);
           contextNodeKey = key;
@@ -303,6 +307,14 @@ export function collectBatchEffects(results: CommandResult[]): { renamedKeys: Ar
   });
 
   return { renamedKeys, deletedKeys: Array.from(deletedKeys) };
+}
+
+function buildKeyList(dag: NormalizedDag): string {
+  const keys = Object.keys(dag).sort((left, right) => left.localeCompare(right));
+  if (!keys.length) {
+    return "Keys (0)";
+  }
+  return [`Keys (${keys.length}):`, ...keys].join("\n");
 }
 
 function buildNodeSummary(nodeKey: NodeKey, dag: NormalizedDag, mapping: FieldMapping = getDefaultFieldMapping()): string {
