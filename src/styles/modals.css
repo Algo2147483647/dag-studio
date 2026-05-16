@@ -3,8 +3,8 @@
   z-index: 40;
   display: none;
   min-width: 184px;
-  padding: 8px;
-  border-radius: 12px;
+  padding: 6px;
+  border-radius: 10px;
   border: 1px solid rgba(66, 86, 119, 0.14);
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 12px 22px rgba(26, 39, 63, 0.18);
@@ -115,24 +115,34 @@
 
 .node-context-menu.is-visible {
   display: grid;
-  gap: 4px;
+  gap: 2px;
 }
 
 .context-menu-item {
   width: 100%;
   border: none;
-  border-radius: 8px;
-  padding: 8px 10px;
+  border-radius: 6px;
+  padding: 6px 10px;
   background: transparent;
   color: var(--text-strong);
   text-align: left;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
+  line-height: 1.25;
   cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    transform 80ms ease;
 }
 
-.context-menu-item:hover {
-  background: rgba(40, 95, 223, 0.1);
+.context-menu-item:not(:disabled):hover {
+  background: rgba(40, 95, 223, 0.09);
+}
+
+.context-menu-item:not(:disabled):active {
+  background: rgba(40, 95, 223, 0.14);
+  transform: translateY(1px);
 }
 
 .context-menu-item:disabled {
@@ -141,7 +151,7 @@
 
 .context-menu-divider {
   height: 1px;
-  margin: 3px 4px;
+  margin: 4px;
   background: rgba(66, 86, 119, 0.12);
 }
 
@@ -149,8 +159,12 @@
   color: #8e2f2f;
 }
 
-.context-menu-item-danger:hover {
+.context-menu-item-danger:not(:disabled):hover {
   background: rgba(180, 58, 46, 0.1);
+}
+
+.context-menu-item-danger:not(:disabled):active {
+  background: rgba(180, 58, 46, 0.15);
 }
 
 .relation-editor-modal {
