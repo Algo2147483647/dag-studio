@@ -15,6 +15,8 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.46) transparent;
   padding: 8px 10px;
   font: 13px/1.55 "Cascadia Mono", "IBM Plex Mono", Consolas, monospace;
 }
@@ -85,8 +87,47 @@
   gap: 4px;
   max-height: 176px;
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.46) transparent;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding: 8px 10px 0;
+}
+
+.console-terminal__output::-webkit-scrollbar,
+.console-terminal__suggestions::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+.console-terminal__output::-webkit-scrollbar-track,
+.console-terminal__suggestions::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.console-terminal__output::-webkit-scrollbar-thumb,
+.console-terminal__suggestions::-webkit-scrollbar-thumb {
+  min-height: 28px;
+  border: 2px solid #000;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.42);
+  background-clip: padding-box;
+}
+
+.console-terminal__output::-webkit-scrollbar-thumb:hover,
+.console-terminal__suggestions::-webkit-scrollbar-thumb:hover {
+  background: rgba(203, 213, 225, 0.62);
+  background-clip: padding-box;
+}
+
+.console-terminal__output::-webkit-scrollbar-thumb:active,
+.console-terminal__suggestions::-webkit-scrollbar-thumb:active {
+  background: rgba(226, 232, 240, 0.74);
+  background-clip: padding-box;
+}
+
+.console-terminal__output::-webkit-scrollbar-corner,
+.console-terminal__suggestions::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .console-terminal__suggestion {
