@@ -4,6 +4,8 @@ import type { StageData } from "../layout/types";
 const MIN_ZOOM_FLOOR = 0.05;
 const ZOOM_STEP_FACTOR = 1.15;
 const WHEEL_ZOOM_SENSITIVITY = Math.log(ZOOM_STEP_FACTOR) / 120;
+const TRACKPAD_PIXEL_DELTA_THRESHOLD = 60;
+const TRACKPAD_PIXEL_ZOOM_MULTIPLIER = 6;
 const MAX_WHEEL_DELTA = 360;
 
 interface ZoomAnchor {
@@ -83,7 +85,7 @@ export function useGraphZoom({ containerRef, svgRef, topbarRef, stage, scale, mi
         return;
       }
       event.preventDefault();
-      wheelZoomRef.current.deltaY += clamp(event.deltaY, -MAX_WHEEL_DELTA, MAX_WHEEL_DELTA);
+      wheelZoomRef.current.deltaY += clamp(getWheelZoomDelta(event), -MAX_WHEEL_DELTA, MAX_WHEEL_DELTA);
       wheelZoomRef.current.anchor = { clientX: event.clientX, clientY: event.clientY };
       if (wheelZoomRef.current.frame) {
         return;
@@ -165,6 +167,18 @@ function getAppliedZoomScale(svg: SVGSVGElement | null, fallbackScale: number): 
   }
   const appliedScale = Number(svg.dataset.zoomScale);
   return Number.isFinite(appliedScale) && appliedScale > 0 ? appliedScale : fallbackScale;
+}
+
+function getWheelZoomDelta(event: WheelEvent): number {
+  if (event.deltaMode !== WheelEvent.DOM_DELTA_PIXEL) {
+    return event.deltaY;
+  }
+
+  const absDeltaY = Math.abs(event.deltaY);
+  if (absDeltaY > 0 && absDeltaY < TRACKPAD_PIXEL_DELTA_THRESHOLD) {
+    return event.deltaY * TRACKPAD_PIXEL_ZOOM_MULTIPLIER;
+  }
+  return event.deltaY;
 }
 
 function getViewportMetrics(container: HTMLElement, topbar: HTMLElement | null) {

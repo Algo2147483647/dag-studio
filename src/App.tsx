@@ -506,10 +506,6 @@ export default function App() {
       return;
     }
     const sourceFileName = ensureJsonExtension(state.source.fileName || state.source.fileHandle.name || "graph.json");
-    if (!window.confirm(`Overwrite "${sourceFileName}" on disk?`)) {
-      dispatch({ type: "statusChanged", status: "Save cancelled." });
-      return;
-    }
     try {
       const granted = await requestWritablePermission(state.source.fileHandle);
       if (!granted) {

@@ -27,7 +27,7 @@ export default function SaveJsonModal({ open, sourceFileName, canOverwrite, onOv
             : `Direct overwrite is unavailable for "${normalizedFileName}". Reopen the JSON with file access, or save a new copy named "${newFileName}".`}
         </p>
         <div className="save-json-actions">
-          <button id="save-json-overwrite" className="primary-btn" type="button" disabled={!canOverwrite} title={canOverwrite ? `Overwrite ${normalizedFileName}` : "Open the JSON with file access to enable direct overwrite."} onClick={onOverwrite}>Overwrite Original</button>
+          <button id="save-json-overwrite" className="primary-btn save-json-overwrite-btn" type="button" disabled={!canOverwrite} title={canOverwrite ? `Overwrite ${normalizedFileName}` : "Open the JSON with file access to enable direct overwrite."} onClick={onOverwrite}>Overwrite Original</button>
           <button id="save-json-new" className="ghost-btn" type="button" onClick={onSaveNew}>Save New Copy</button>
           <button id="save-json-cancel" className="ghost-btn" type="button" onClick={onClose}>Cancel</button>
         </div>
