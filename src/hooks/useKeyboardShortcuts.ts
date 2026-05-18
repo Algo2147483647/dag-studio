@@ -4,16 +4,22 @@ interface KeyboardShortcutHandlers {
   onEscape: () => void;
   onUndo: () => void;
   onRedo: () => void;
+  onSave: () => void;
 }
 
-export function useKeyboardShortcuts({ onEscape, onUndo, onRedo }: KeyboardShortcutHandlers): void {
+export function useKeyboardShortcuts({ onEscape, onUndo, onRedo, onSave }: KeyboardShortcutHandlers): void {
   useEffect(() => {
     function handleKeydown(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+        const key = event.key.toLowerCase();
+        if (key === "s") {
+          event.preventDefault();
+          onSave();
+          return;
+        }
         if (isEditableTarget(event.target)) {
           return;
         }
-        const key = event.key.toLowerCase();
         if (key === "z") {
           event.preventDefault();
           if (event.shiftKey) {
@@ -36,7 +42,7 @@ export function useKeyboardShortcuts({ onEscape, onUndo, onRedo }: KeyboardShort
 
     document.addEventListener("keydown", handleKeydown);
     return () => document.removeEventListener("keydown", handleKeydown);
-  }, [onEscape, onRedo, onUndo]);
+  }, [onEscape, onRedo, onSave, onUndo]);
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {

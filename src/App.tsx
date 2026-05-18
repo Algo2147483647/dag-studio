@@ -149,6 +149,16 @@ export default function App() {
         dispatch({ type: "redoRequested" });
       }
     },
+    onSave: () => {
+      if (state.mode !== "edit") {
+        return;
+      }
+      if (state.dag) {
+        dispatch({ type: "saveDialogOpened" });
+      } else {
+        dispatch({ type: "statusChanged", status: "Load or render a graph before saving JSON." });
+      }
+    },
   });
 
   const commitCommand = useCallback((command: GraphCommand, preferredSelection = state.selection) => {

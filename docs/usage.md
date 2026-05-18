@@ -158,6 +158,7 @@ Keyboard shortcuts:
 - `Ctrl+Z` or `Cmd+Z`: undo
 - `Ctrl+Shift+Z` or `Cmd+Shift+Z`: redo
 - `Ctrl+Y`: redo
+- `Ctrl+S` or `Cmd+S`: open the JSON save dialog in `Edit` mode
 
 Shortcuts are ignored while typing in editable controls.
 
@@ -181,6 +182,7 @@ Direct overwrite uses the browser File System Access API. When file access is un
 
 Saving behavior notes:
 
+- `Overwrite Original` does not show an extra app confirmation after the save dialog action; the browser may still ask for write permission
 - `Save New Copy` does not mark the original source file as clean
 - saving preserves the document's active field names instead of rewriting them back to system names
 - changing field mapping affects interpretation, not the literal JSON keys written to disk
