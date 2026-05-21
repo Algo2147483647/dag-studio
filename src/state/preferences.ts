@@ -1,5 +1,5 @@
 import type { GraphLayoutMode, GraphMode, GraphTheme } from "../graph/types";
-import { DEFAULT_GRAPH_THEME } from "../graph/types";
+import { DEFAULT_GRAPH_THEME, GRAPH_TITLE_FONT_OPTIONS } from "../graph/types";
 import { getDefaultFieldMapping, sanitizeFieldMapping, type FieldMapping } from "../graph/fieldMapping";
 
 const GRAPH_PAGE_PREFERENCES_KEY = "dag-studio:page-preferences";
@@ -145,6 +145,14 @@ function sanitizeGraphTheme(input: object): GraphTheme {
     nodeHeight: clampNumericPreference(record.nodeHeight, DEFAULT_GRAPH_THEME.nodeHeight, 44, 160),
     minNodeWidth,
     maxNodeWidth,
+    titleFontFamily: sanitizeTitleFontFamily(record.titleFontFamily),
+    titleFontSize: clampNumericPreference(record.titleFontSize, DEFAULT_GRAPH_THEME.titleFontSize, 10, 28),
+    titleFontStyle: record.titleFontStyle === "normal" || record.titleFontStyle === "italic"
+      ? record.titleFontStyle
+      : DEFAULT_GRAPH_THEME.titleFontStyle,
+    titleFontWeight: record.titleFontWeight === 700 || record.titleFontWeight === "700"
+      ? 700
+      : DEFAULT_GRAPH_THEME.titleFontWeight,
   };
 }
 
@@ -153,4 +161,12 @@ function clampNumericPreference(value: unknown, fallback: number, min: number, m
     return fallback;
   }
   return Math.max(min, Math.min(max, Math.round(value)));
+}
+
+function sanitizeTitleFontFamily(value: unknown): GraphTheme["titleFontFamily"] {
+  if (typeof value !== "string") {
+    return DEFAULT_GRAPH_THEME.titleFontFamily;
+  }
+  const match = GRAPH_TITLE_FONT_OPTIONS.find((option) => option.value === value);
+  return match?.value || DEFAULT_GRAPH_THEME.titleFontFamily;
 }

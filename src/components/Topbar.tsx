@@ -1,4 +1,5 @@
 import type { GraphLayoutMode, GraphMode, GraphTheme } from "../graph/types";
+import { GRAPH_TITLE_FONT_OPTIONS } from "../graph/types";
 
 interface TopbarProps {
   topbarRef: React.RefObject<HTMLElement>;
@@ -163,6 +164,59 @@ export default function Topbar({
                       onChange={(value) => onThemeChange(control.key, value)}
                     />
                   ))}
+                </div>
+              </section>
+
+              <section className="settings-section title-style-section" aria-labelledby="title-style-title">
+                <p id="title-style-title" className="control-label">Title</p>
+                <div className="title-style-row">
+                  <select
+                    className="title-font-select"
+                    value={theme.titleFontFamily}
+                    aria-label="Title font"
+                    onChange={(event) => onThemeChange("titleFontFamily", event.currentTarget.value as GraphTheme["titleFontFamily"])}
+                  >
+                    {GRAPH_TITLE_FONT_OPTIONS.map((font) => (
+                      <option key={font.value} value={font.value}>{font.label}</option>
+                    ))}
+                  </select>
+                  <label className="title-size-control" htmlFor="title-font-size-input">
+                    <input
+                      id="title-font-size-input"
+                      className="title-size-input"
+                      type="number"
+                      min={10}
+                      max={28}
+                      step={1}
+                      value={theme.titleFontSize}
+                      aria-label="Title font size"
+                      onChange={(event) => onThemeChange("titleFontSize", clampNumberInput(event.currentTarget.value, 10, 28, theme.titleFontSize))}
+                      onBlur={(event) => onThemeChange("titleFontSize", clampNumberInput(event.currentTarget.value, 10, 28, theme.titleFontSize))}
+                    />
+                    <span className="title-size-unit">px</span>
+                  </label>
+                  <div className="title-format-buttons" role="group" aria-label="Title format">
+                    <button
+                      type="button"
+                      className={`title-format-btn${theme.titleFontWeight === 700 ? " is-active" : ""}`}
+                      title="Bold"
+                      aria-label="Bold title"
+                      aria-pressed={theme.titleFontWeight === 700}
+                      onClick={() => onThemeChange("titleFontWeight", theme.titleFontWeight === 700 ? 400 : 700)}
+                    >
+                      B
+                    </button>
+                    <button
+                      type="button"
+                      className={`title-format-btn title-format-btn-italic${theme.titleFontStyle === "italic" ? " is-active" : ""}`}
+                      title="Italic"
+                      aria-label="Italic title"
+                      aria-pressed={theme.titleFontStyle === "italic"}
+                      onClick={() => onThemeChange("titleFontStyle", theme.titleFontStyle === "italic" ? "normal" : "italic")}
+                    >
+                      I
+                    </button>
+                  </div>
                 </div>
               </section>
 
@@ -400,6 +454,14 @@ function SlidersIcon() {
 
 function truncateFileName(fileName: string): string {
   return fileName.length > 26 ? `${fileName.slice(0, 23)}...` : fileName;
+}
+
+function clampNumberInput(value: string, min: number, max: number, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, Math.round(parsed)));
 }
 
 type LayoutControlKey = "columnGap" | "rowGap" | "edgeLaneGap" | "nodeHeight" | "maxNodeWidth";

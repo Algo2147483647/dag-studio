@@ -10,6 +10,7 @@ const EXPORT_STYLE_PROPERTIES = [
   "opacity",
   "font-family",
   "font-size",
+  "font-style",
   "font-weight",
   "letter-spacing",
   "text-anchor",

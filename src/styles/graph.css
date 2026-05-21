@@ -107,10 +107,10 @@
 
 .graph-node__title {
   fill: var(--text-strong);
-  font-family: "Georgia", serif;
-  font-size: 15px;
-  font-style: italic;
-  font-weight: 400;
+  font-family: var(--graph-title-font-family, "Georgia", serif);
+  font-size: var(--graph-title-font-size, 15px);
+  font-style: var(--graph-title-font-style, italic);
+  font-weight: var(--graph-title-font-weight, 400);
   letter-spacing: 0;
 }
 

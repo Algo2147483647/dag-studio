@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, type CSSProperties } from "react";
 import type { StageData } from "../layout/types";
+import type { GraphTheme } from "../graph/types";
 import GraphBackdrop from "./GraphBackdrop";
 import GraphDefs from "./GraphDefs";
 import GraphEdge from "./GraphEdge";
@@ -14,13 +15,14 @@ interface GraphStageProps {
   stage: StageData;
   focusedKey: string | null;
   hideNodeBorders: boolean;
+  theme: GraphTheme;
   svgRef: React.RefObject<SVGSVGElement>;
   onNodeClick: (key: string) => void;
   onNodeContextMenu: (event: React.MouseEvent<SVGGElement>, key: string) => void;
   onFocusChange: (key: string | null) => void;
 }
 
-export default function GraphStage({ stage, focusedKey, hideNodeBorders, svgRef, onNodeClick, onNodeContextMenu, onFocusChange }: GraphStageProps) {
+export default function GraphStage({ stage, focusedKey, hideNodeBorders, theme, svgRef, onNodeClick, onNodeContextMenu, onFocusChange }: GraphStageProps) {
   const hoveredKeyRef = useRef<string | null>(null);
   const focusedKeyRef = useRef<string | null>(focusedKey);
   const appliedInteractiveKeyRef = useRef<string | null>(null);
@@ -32,6 +34,12 @@ export default function GraphStage({ stage, focusedKey, hideNodeBorders, svgRef,
   const isDenseStage = stage.nodes.length >= DENSE_STAGE_NODE_THRESHOLD
     || stage.edges.length >= DENSE_STAGE_EDGE_THRESHOLD
     || stage.stageWidth * stage.stageHeight >= DENSE_STAGE_AREA_THRESHOLD;
+  const stageStyle = {
+    "--graph-title-font-family": theme.titleFontFamily,
+    "--graph-title-font-size": `${theme.titleFontSize}px`,
+    "--graph-title-font-style": theme.titleFontStyle,
+    "--graph-title-font-weight": String(theme.titleFontWeight),
+  } as CSSProperties;
 
   const clearInteractiveClasses = useCallback(() => {
     const svgElement = svgRef.current;
@@ -203,6 +211,7 @@ export default function GraphStage({ stage, focusedKey, hideNodeBorders, svgRef,
       viewBox={`0 0 ${stage.stageWidth} ${stage.stageHeight}`}
       width={stage.stageWidth}
       height={stage.stageHeight}
+      style={stageStyle}
       role="img"
       aria-label={`DAG view focused on ${stage.selection.label}`}
     >

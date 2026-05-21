@@ -49,7 +49,24 @@ export interface GraphTheme {
   nodeHeight: number;
   minNodeWidth: number;
   maxNodeWidth: number;
+  titleFontFamily: GraphTitleFontFamily;
+  titleFontSize: number;
+  titleFontStyle: GraphTitleFontStyle;
+  titleFontWeight: GraphTitleFontWeight;
 }
+
+export type GraphTitleFontStyle = "normal" | "italic";
+export type GraphTitleFontWeight = 400 | 700;
+
+export const GRAPH_TITLE_FONT_OPTIONS = [
+  { label: "Georgia", value: "\"Georgia\", serif" },
+  { label: "Times", value: "\"Times New Roman\", serif" },
+  { label: "Sans", value: "\"IBM Plex Sans\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif" },
+  { label: "Display", value: "\"Cormorant Garamond\", \"Georgia\", serif" },
+  { label: "Mono", value: "\"IBM Plex Mono\", \"SFMono-Regular\", Consolas, monospace" },
+] as const;
+
+export type GraphTitleFontFamily = typeof GRAPH_TITLE_FONT_OPTIONS[number]["value"];
 
 export const DEFAULT_GRAPH_THEME: GraphTheme = {
   stagePaddingX: 108,
@@ -60,6 +77,10 @@ export const DEFAULT_GRAPH_THEME: GraphTheme = {
   nodeHeight: 74,
   minNodeWidth: 188,
   maxNodeWidth: 280,
+  titleFontFamily: "\"Georgia\", serif",
+  titleFontSize: 15,
+  titleFontStyle: "italic",
+  titleFontWeight: 400,
 };
 
 export const DEFAULT_RELATION_VALUE: RelationValue = "related_to";

@@ -657,6 +657,7 @@ export default function App() {
         )}
         sidebarOpen={consoleSidebarVisible}
         sidebarWidth={state.ui.consoleSidebarWidth}
+        theme={theme}
         onInitializeCanvas={initializeCanvas}
         focusedKey={focusedKey}
         hideNodeBorders={hideNodeBorders}
