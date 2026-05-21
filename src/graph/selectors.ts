@@ -108,7 +108,7 @@ export function sanitizeNodeLabel(text: unknown): string {
     .split("/")
     .pop()!
     .replace(/\.[^.]+$/, "")
-    .replace(/[_-]+/g, " ")
+    .replace(/_+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }

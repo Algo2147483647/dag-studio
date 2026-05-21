@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { applyGraphCommand, collectSubtreeNodeKeys } from "../graph/commands";
-import { getParentLevelSelection, getInitialSelection, remapSelectionKeys, removeSelectionKeys } from "../graph/selectors";
+import { getParentLevelSelection, getInitialSelection, remapSelectionKeys, removeSelectionKeys, sanitizeNodeLabel } from "../graph/selectors";
 import { serializeDag } from "../graph/serialize";
 import { defineSuite, defineTest } from "./harness";
 import { createChildOnlyDag, createCustomFieldMapping, createForestDag, createMappedSampleDag, createSampleDag } from "./fixtures";
@@ -55,6 +55,10 @@ export const graphSuite = defineSuite("graph", [
     assert.deepEqual(getInitialSelection(createSampleDag()), { type: "node", key: "A" });
     assert.deepEqual(getInitialSelection(createChildOnlyDag()), { type: "node", key: "Root" });
     assert.deepEqual(getParentLevelSelection(createSampleDag(), ["D"]), { type: "node", key: "B" });
+  }),
+
+  defineTest("node labels preserve title hyphens", () => {
+    assert.equal(sanitizeNodeLabel("Alpha-Beta_Title"), "Alpha-Beta Title");
   }),
 
   defineTest("commands preserve raw mapped field names while operating on semantic relations", () => {
