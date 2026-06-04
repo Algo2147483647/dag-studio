@@ -41,6 +41,8 @@ interface TopbarProps {
   onNodeWidthAlignToggle: () => void;
   onFileInputClick: (event: React.MouseEvent<HTMLInputElement>) => void;
   onFileInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onFolderInputClick: (event: React.MouseEvent<HTMLInputElement>) => void;
+  onFolderInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onInitializeCanvas: () => void;
   onExport: () => void;
   onSaveJson: () => void;
@@ -87,6 +89,8 @@ export default function Topbar({
   onNodeWidthAlignToggle,
   onFileInputClick,
   onFileInputChange,
+  onFolderInputClick,
+  onFolderInputChange,
   onInitializeCanvas,
   onExport,
   onSaveJson,
@@ -265,10 +269,27 @@ export default function Topbar({
                   </button>
                 </div>
               </section>
-              <label htmlFor="fileInput" className="file-input-label">
-                <span className="file-input-text">{truncateFileName(fileName)}</span>
-                <input type="file" id="fileInput" accept=".json" onClick={onFileInputClick} onChange={onFileInputChange} />
-              </label>
+              <section className="settings-section" aria-labelledby="import-options-title">
+                <p id="import-options-title" className="control-label">Import</p>
+                <div className="import-action-row">
+                  <label htmlFor="fileInput" className="file-input-label">
+                    <span className="file-input-text">{truncateFileName(fileName)}</span>
+                    <input type="file" id="fileInput" accept=".json,application/json" multiple onClick={onFileInputClick} onChange={onFileInputChange} />
+                  </label>
+                  <label htmlFor="folderInput" className="file-input-label folder-input-label">
+                    <span className="file-input-text">Open Folder</span>
+                    <input
+                      type="file"
+                      id="folderInput"
+                      accept=".json,application/json"
+                      multiple
+                      onClick={onFolderInputClick}
+                      onChange={onFolderInputChange}
+                      {...DIRECTORY_INPUT_PROPS}
+                    />
+                  </label>
+                </div>
+              </section>
               <p id="graph-summary" className="graph-summary">{status}</p>
             </div>
           </div>
@@ -455,6 +476,11 @@ function SlidersIcon() {
 function truncateFileName(fileName: string): string {
   return fileName.length > 26 ? `${fileName.slice(0, 23)}...` : fileName;
 }
+
+const DIRECTORY_INPUT_PROPS = {
+  directory: "",
+  webkitdirectory: "",
+} as Record<string, string>;
 
 function clampNumberInput(value: string, min: number, max: number, fallback: number): number {
   const parsed = Number(value);

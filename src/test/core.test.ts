@@ -1,12 +1,14 @@
 import { consoleSuite } from "./console.test";
 import { fieldMappingSuite } from "./fieldMapping.test";
 import { graphSuite } from "./graph.test";
+import { importMergeSuite } from "./importMerge.test";
 import { runSuites } from "./harness";
 import { stateSuite } from "./state.test";
 
 async function main() {
   const { passed, failed } = await runSuites([
     graphSuite,
+    importMergeSuite,
     consoleSuite,
     fieldMappingSuite,
     stateSuite,

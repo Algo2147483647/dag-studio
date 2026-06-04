@@ -6,16 +6,15 @@ import { createInitialCanvasDag, INITIAL_CANVAS_FILE_NAME } from "./graph/initia
 import {
   getDefaultFieldMapping,
   getDisplayFieldName,
-  inferFieldMapping,
   type FieldMapping,
 } from "./graph/fieldMapping";
-import { normalizeDagInput } from "./graph/normalize";
-import { getFullGraphSelection, getInitialSelection, getParentLevelSelection, isSelectionValid, sanitizeNodeLabel } from "./graph/selectors";
+import { getFullGraphSelection, getInitialSelection, getParentLevelSelection, sanitizeNodeLabel } from "./graph/selectors";
 import { serializeDag } from "./graph/serialize";
 import { copyTextToClipboard } from "./adapters/clipboard";
 import { buildTimestampFileName, downloadJsonFile, ensureJsonExtension } from "./adapters/download";
-import { canOverwrite, openJsonFileWithAccess, readJsonFile, requestWritablePermission, writeJsonToHandle } from "./adapters/fileAccess";
+import { canOverwrite, openJsonDirectoryWithAccess, openJsonFilesWithAccess, readJsonFile, requestWritablePermission, writeJsonToHandle, type PickedJsonFile } from "./adapters/fileAccess";
 import { downloadSvg } from "./rendering/export-svg";
+import { buildImportedDag, type ImportGraphDocument, type ImportWarning } from "./graph/importMerge";
 import { useDefaultGraph } from "./hooks/useDefaultGraph";
 import { useGraphPan } from "./hooks/useGraphPan";
 import { useGraphZoom } from "./hooks/useGraphZoom";
@@ -328,46 +327,138 @@ export default function App() {
     event.preventDefault();
     event.stopPropagation();
     try {
-      const pickedFile = await openJsonFileWithAccess();
-      if (pickedFile) {
-        await loadFile(pickedFile.file, pickedFile.handle);
+      const pickedFiles = await openJsonFilesWithAccess();
+      if (pickedFiles.files.length > 0) {
+        await loadPickedJsonFiles(pickedFiles.files, pickedFiles.name);
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
       console.error(error);
-      dispatch({ type: "statusChanged", status: "The selected file could not be opened as JSON." });
+      dispatch({ type: "statusChanged", status: "The selected JSON files could not be opened." });
     }
   }
 
   async function handleFileInputChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) {
+    const files = Array.from(event.target.files || []).map((file) => ({
+      file,
+      handle: null,
+      path: file.webkitRelativePath || file.name,
+    }));
+    if (!files.length) {
       return;
     }
-    await loadFile(file, null);
+    await loadPickedJsonFiles(files, files.length === 1 ? files[0].file.name : "selected-json-files.json");
     event.target.value = "";
   }
 
-  async function loadFile(file: File, fileHandle: FileSystemFileHandle | null) {
-    suppressDefaultGraphRef.current = true;
+  async function handleFolderInputClick(event: React.MouseEvent<HTMLInputElement>) {
+    if (typeof window.showDirectoryPicker !== "function") {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
     try {
-      const payload = await readJsonFile(file);
-      const inferredMapping = inferFieldMapping(payload, fieldMapping);
-      const dag = normalizeDagInput(payload);
-      setFieldMapping(inferredMapping);
+      const pickedDirectory = await openJsonDirectoryWithAccess();
+      if (pickedDirectory) {
+        await loadPickedJsonFiles(pickedDirectory.files, pickedDirectory.name, true);
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      console.error(error);
+      dispatch({ type: "statusChanged", status: "The selected folder could not be opened." });
+    }
+  }
+
+  async function handleFolderInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files || []).map((file) => ({
+      file,
+      handle: null,
+      path: file.webkitRelativePath || file.name,
+    }));
+    if (!files.length) {
+      return;
+    }
+
+    const firstPathPart = files[0].path.split(/[\\/]/)[0] || "folder";
+    await loadPickedJsonFiles(files, `${firstPathPart}-merged.json`, true);
+    event.target.value = "";
+  }
+
+  async function loadPickedJsonFiles(pickedFiles: PickedJsonFile[], sourceName: string, fromFolder = false) {
+    suppressDefaultGraphRef.current = true;
+    const jsonFiles = pickedFiles.filter((item) => isJsonFileName(item.path || item.file.name));
+    const skippedNonJsonCount = pickedFiles.length - jsonFiles.length;
+    if (jsonFiles.length === 0) {
+      dispatch({
+        type: "statusChanged",
+        status: fromFolder
+          ? "The selected folder did not contain any JSON files."
+          : "No JSON files were selected.",
+      });
+      return;
+    }
+
+    const documents: ImportGraphDocument[] = [];
+    const parseFailures: string[] = [];
+
+    for (const pickedFile of jsonFiles) {
+      const displayName = pickedFile.path || pickedFile.file.name;
+      try {
+        documents.push({
+          name: displayName,
+          payload: await readJsonFile(pickedFile.file),
+        });
+      } catch (error) {
+        console.error(error);
+        parseFailures.push(displayName);
+      }
+    }
+
+    if (!documents.length) {
+      dispatch({
+        type: "statusChanged",
+        status: `Could not parse any selected JSON file${jsonFiles.length === 1 ? "" : "s"}.`,
+      });
+      return;
+    }
+
+    try {
+      const imported = buildImportedDag(documents, fieldMapping);
+      const dag = imported.dag;
+      if (Object.keys(dag).length === 0) {
+        dispatch({
+          type: "statusChanged",
+          status: "The selected JSON did not contain any graph nodes.",
+        });
+        return;
+      }
+
+      const singleWritableSource = !fromFolder && jsonFiles.length === 1 && parseFailures.length === 0 ? jsonFiles[0] : null;
+      const fileName = singleWritableSource ? singleWritableSource.file.name : ensureJsonExtension(sourceName || "merged-graph.json");
+      setFieldMapping(imported.mapping);
       dispatch({
         type: "graphLoaded",
         dag,
-        fileName: file.name,
-        fileHandle,
-        selection: getInitialSelection(dag, inferredMapping),
-        status: `${Object.keys(dag).length} nodes loaded from ${file.name}.`,
+        fileName,
+        fileHandle: singleWritableSource?.handle || null,
+        selection: getInitialSelection(dag, imported.mapping),
+        status: buildImportStatus({
+          nodeCount: Object.keys(dag).length,
+          sourceName: fileName,
+          loadedJsonCount: documents.length,
+          selectedJsonCount: jsonFiles.length,
+          skippedNonJsonCount,
+          parseFailures,
+          warnings: imported.warnings,
+        }),
       });
     } catch (error) {
       console.error(error);
-      dispatch({ type: "statusChanged", status: "The selected file could not be parsed as JSON." });
+      dispatch({ type: "statusChanged", status: "The selected JSON files could not be loaded into a graph." });
     }
   }
 
@@ -581,6 +672,8 @@ export default function App() {
         onNodeWidthAlignToggle={() => setAlignNodeWidthsToMax((current) => !current)}
         onFileInputClick={handleFileInputClick}
         onFileInputChange={handleFileInputChange}
+        onFolderInputClick={handleFolderInputClick}
+        onFolderInputChange={handleFolderInputChange}
         onInitializeCanvas={initializeCanvas}
         onExport={handleExportSvg}
         onSaveJson={() => state.dag ? dispatch({ type: "saveDialogOpened" }) : dispatch({ type: "statusChanged", status: "Load or render a graph before saving JSON." })}
@@ -767,6 +860,49 @@ function appendConsoleInputEntries(
 
 function buildConsolePrompt(contextNodeKey: NodeKey | null): string {
   return contextNodeKey ? `${contextNodeKey}>` : "graph>";
+}
+
+function isJsonFileName(fileName: string): boolean {
+  return /\.json$/i.test(fileName);
+}
+
+function buildImportStatus({
+  nodeCount,
+  sourceName,
+  loadedJsonCount,
+  selectedJsonCount,
+  skippedNonJsonCount,
+  parseFailures,
+  warnings,
+}: {
+  nodeCount: number;
+  sourceName: string;
+  loadedJsonCount: number;
+  selectedJsonCount: number;
+  skippedNonJsonCount: number;
+  parseFailures: string[];
+  warnings: ImportWarning[];
+}): string {
+  const sourceLabel = loadedJsonCount === 1
+    ? sourceName
+    : `${sourceName} from ${loadedJsonCount} JSON files`;
+  const issueCount = parseFailures.length + warnings.length + skippedNonJsonCount;
+  const parsedSuffix = selectedJsonCount === loadedJsonCount
+    ? ""
+    : ` ${selectedJsonCount - loadedJsonCount} selected JSON file${selectedJsonCount - loadedJsonCount === 1 ? "" : "s"} could not be parsed.`;
+  const warningSuffix = issueCount > 0
+    ? ` ${issueCount} import warning${issueCount === 1 ? "" : "s"}; valid JSON files were loaded.`
+    : "";
+
+  if (warnings.length > 0 || parseFailures.length > 0) {
+    console.warn("DAG Studio import warnings", {
+      parseFailures,
+      warnings: warnings.map((warning) => warning.message),
+      skippedNonJsonCount,
+    });
+  }
+
+  return `${nodeCount} nodes loaded from ${sourceLabel}.${parsedSuffix}${warningSuffix}`;
 }
 
 interface ConsoleSuggestion {

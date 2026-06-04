@@ -243,6 +243,20 @@
   background: rgba(243, 247, 252, 0.9);
 }
 
+.import-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(116px, 0.72fr);
+  gap: 8px;
+}
+
+.import-action-row .file-input-label {
+  min-width: 0;
+}
+
+.folder-input-label {
+  border-style: solid;
+}
+
 #settings-panel input[type="file"] {
   position: absolute;
   inset: 0;
@@ -631,5 +645,9 @@
 
   .title-size-control {
     width: 82px;
+  }
+
+  .import-action-row {
+    grid-template-columns: 1fr;
   }
 }

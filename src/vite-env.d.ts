@@ -9,14 +9,31 @@ interface Window {
       description?: string;
     }>;
   }) => Promise<FileSystemFileHandle[]>;
+  showDirectoryPicker?: (options?: {
+    id?: string;
+    mode?: "read" | "readwrite";
+    startIn?: string;
+  }) => Promise<FileSystemDirectoryHandle>;
+}
+
+interface FileSystemHandle {
+  kind: "file" | "directory";
+  name: string;
 }
 
 interface FileSystemFileHandle {
+  kind?: "file";
   name: string;
   getFile: () => Promise<File>;
   createWritable?: () => Promise<FileSystemWritableFileStream>;
   queryPermission?: (options?: { mode?: "read" | "readwrite" }) => Promise<PermissionState>;
   requestPermission?: (options?: { mode?: "read" | "readwrite" }) => Promise<PermissionState>;
+}
+
+interface FileSystemDirectoryHandle {
+  kind?: "directory";
+  name: string;
+  entries?: () => AsyncIterableIterator<[string, FileSystemFileHandle | FileSystemDirectoryHandle]>;
 }
 
 interface FileSystemWritableFileStream {
