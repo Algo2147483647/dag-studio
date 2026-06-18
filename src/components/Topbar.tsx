@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GraphLayoutMode, GraphMode, GraphTheme } from "../graph/types";
 import { GRAPH_TITLE_FONT_OPTIONS } from "../graph/types";
@@ -55,7 +55,7 @@ interface TopbarProps {
   onSaveJson: () => void;
   onFieldMappingOpen: () => void;
   onAiSettingsChange: (settings: AiSettings) => void;
-  onAiConnectionTest: () => void;
+  onAiConnectionTest: () => Promise<boolean>;
 }
 
 export default function Topbar({
@@ -215,7 +215,7 @@ interface SettingsModalProps {
   onExport: () => void;
   onFieldMappingOpen: () => void;
   onAiSettingsChange: (settings: AiSettings) => void;
-  onAiConnectionTest: () => void;
+  onAiConnectionTest: () => Promise<boolean>;
 }
 
 function SettingsModal({
@@ -253,6 +253,7 @@ function SettingsModal({
 }: SettingsModalProps) {
   const [activeChapter, setActiveChapter] = useState<SettingsChapter>("general");
   const [providerMenuOpen, setProviderMenuOpen] = useState(false);
+  const [aiConnectionStatus, setAiConnectionStatus] = useState<AiConnectionStatus>("idle");
   const updateAiSetting = <K extends keyof AiSettings>(key: K, value: AiSettings[K]) => {
     onAiSettingsChange({ ...aiSettings, [key]: value });
   };
@@ -268,6 +269,17 @@ function SettingsModal({
     setProviderMenuOpen(false);
   };
   const selectedProvider = AI_PROVIDER_PRESETS[aiSettings.provider];
+  const aiConnectionButtonText = getAiConnectionButtonText(aiConnectionStatus, aiBusy);
+
+  useEffect(() => {
+    setAiConnectionStatus("idle");
+  }, [aiSettings.enabled, aiSettings.provider, aiSettings.baseUrl, aiSettings.model, aiSettings.apiKey]);
+
+  const handleAiConnectionTestClick = async () => {
+    setAiConnectionStatus("testing");
+    const ok = await onAiConnectionTest();
+    setAiConnectionStatus(ok ? "success" : "error");
+  };
 
   if (!open) {
     return null;
@@ -568,8 +580,13 @@ function SettingsModal({
                     <input id="ai-max-tokens-input" className="settings-text-input" type="number" min={128} max={8000} step={128} value={aiSettings.maxTokens} onChange={(event) => updateAiSetting("maxTokens", clampNumberInput(event.currentTarget.value, 128, 8000, aiSettings.maxTokens))} />
                   </label>
                 </div>
-                <button type="button" className="ghost-btn settings-action-btn" disabled={aiBusy || !aiSettings.enabled} onClick={onAiConnectionTest}>
-                  {aiBusy ? "Testing..." : "Test Connection"}
+                <button
+                  type="button"
+                  className={`ghost-btn settings-action-btn ai-connection-test-btn ai-connection-test-btn-${aiBusy ? "testing" : aiConnectionStatus}`}
+                  disabled={aiBusy}
+                  onClick={handleAiConnectionTestClick}
+                >
+                  {aiConnectionButtonText}
                 </button>
               </section>
             ) : null}
@@ -579,6 +596,21 @@ function SettingsModal({
     </div>,
     document.body,
   );
+}
+
+type AiConnectionStatus = "idle" | "testing" | "success" | "error";
+
+function getAiConnectionButtonText(status: AiConnectionStatus, aiBusy: boolean): string {
+  if (aiBusy || status === "testing") {
+    return "Testing connection...";
+  }
+  if (status === "success") {
+    return "Connection OK - Retest";
+  }
+  if (status === "error") {
+    return "Connection Failed - Retest";
+  }
+  return "Test Connection";
 }
 
 function ZoomInput({ value, disabled, onCommit }: { value: number; disabled: boolean; onCommit: (percent: number) => void }) {

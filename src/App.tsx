@@ -661,19 +661,21 @@ export default function App() {
   async function handleAiConnectionTest() {
     if (!aiSettings.enabled) {
       dispatch({ type: "statusChanged", status: "Enable AI before testing the connection." });
-      return;
+      return false;
     }
     if (!aiSettings.baseUrl.trim() || !aiSettings.model.trim()) {
       dispatch({ type: "statusChanged", status: "AI requires a base URL and model before testing." });
-      return;
+      return false;
     }
     setAiBusy(true);
     try {
       await testAiConnection(aiSettings);
       dispatch({ type: "statusChanged", status: `AI connection succeeded for ${aiSettings.model}.` });
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : "AI connection failed.";
       dispatch({ type: "statusChanged", status: message });
+      return false;
     } finally {
       setAiBusy(false);
     }
