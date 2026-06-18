@@ -8,9 +8,9 @@ export const consoleSuite = defineSuite("console", [
   defineTest("parser accepts comments, quoted strings, and create-missing edges", () => {
     const parsed = parseConsoleSource([
       "# comment",
-      "use A",
-      "set . define \"hello world\"",
-      "edge . Missing_Node true --create-missing",
+      "/use A",
+      "/set . define \"hello world\"",
+      "/edge . Missing_Node true --create-missing",
     ].join("\n"));
 
     assert.equal(parsed.ok, true);
@@ -39,10 +39,10 @@ export const consoleSuite = defineSuite("console", [
   defineTest("parser and executor accept clear inside multiline batches", () => {
     const dag = createSampleDag();
     const parsed = parseConsoleSource([
-      "use A",
-      "clear",
-      "cls",
-      "set . type concept",
+      "/use A",
+      "/clear",
+      "/cls",
+      "/set . type concept",
     ].join("\n"));
 
     assert.equal(parsed.ok, true);
@@ -68,7 +68,7 @@ export const consoleSuite = defineSuite("console", [
   }),
 
   defineTest("keys lists all node keys without mutating the graph", () => {
-    const parsed = parseConsoleSource("keys");
+    const parsed = parseConsoleSource("/keys");
     assert.equal(parsed.ok, true);
     if (!parsed.ok) {
       return;
@@ -87,14 +87,55 @@ export const consoleSuite = defineSuite("console", [
     assert.equal(executed.mutationCount, 0);
   }),
 
+  defineTest("read-only graph analysis commands inspect data without mutations", () => {
+    const parsed = parseConsoleSource([
+      "/graph",
+      "/find \"Alpha\"",
+      "/neighbors A 2",
+      "/path A D",
+    ].join("\n"));
+
+    assert.equal(parsed.ok, true);
+    if (!parsed.ok) {
+      return;
+    }
+
+    assert.deepEqual(parsed.instructions[0], { type: "graphStats", line: 1 });
+    assert.deepEqual(parsed.instructions[1], { type: "find", query: "Alpha", line: 2 });
+    assert.deepEqual(parsed.instructions[2], {
+      type: "neighbors",
+      key: { type: "key", value: "A" },
+      depth: 2,
+      line: 3,
+    });
+    assert.deepEqual(parsed.instructions[3], {
+      type: "path",
+      fromKey: { type: "key", value: "A" },
+      toKey: { type: "key", value: "D" },
+      line: 4,
+    });
+
+    const executed = executeConsoleInstructions(createSampleDag(), parsed.instructions, null);
+    assert.equal(executed.ok, true);
+    if (!executed.ok) {
+      return;
+    }
+
+    assert.equal(executed.mutationCount, 0);
+    assert.match(executed.outputMessages[0], /Graph: 4 nodes/);
+    assert.match(executed.outputMessages[1], /Matches/);
+    assert.match(executed.outputMessages[2], /Neighbors up to depth 2/);
+    assert.match(executed.outputMessages[3], /Path/);
+  }),
+
   defineTest("executor applies batch mutations and tracks ui effects", () => {
     const dag = createSampleDag();
     const parsed = parseConsoleSource([
-      "use A",
-      "add New_Node -p .",
-      "set New_Node title \"Created from console\"",
-      "json New_Node",
-      "mv New_Node Final_Node",
+      "/use A",
+      "/add New_Node -p .",
+      "/set New_Node title \"Created from console\"",
+      "/json New_Node",
+      "/mv New_Node Final_Node",
     ].join("\n"));
 
     assert.equal(parsed.ok, true);
@@ -120,7 +161,7 @@ export const consoleSuite = defineSuite("console", [
   }),
 
   defineTest("executor returns line-aware errors when context is missing", () => {
-    const parsed = parseConsoleSource("show .");
+    const parsed = parseConsoleSource("/show .");
     assert.equal(parsed.ok, true);
     if (!parsed.ok) {
       return;
@@ -134,5 +175,17 @@ export const consoleSuite = defineSuite("console", [
 
     assert.equal(executed.line, 1);
     assert.match(executed.message, /Current context is empty/);
+  }),
+
+  defineTest("parser requires slash-prefixed commands", () => {
+    const parsed = parseConsoleSource("keys");
+
+    assert.equal(parsed.ok, false);
+    if (parsed.ok) {
+      return;
+    }
+
+    assert.equal(parsed.error.line, 1);
+    assert.match(parsed.error.message, /must start with \//);
   }),
 ]);

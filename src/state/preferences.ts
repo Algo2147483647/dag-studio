@@ -1,6 +1,7 @@
 import type { GraphLayoutMode, GraphMode, GraphTheme } from "../graph/types";
 import { DEFAULT_GRAPH_THEME, GRAPH_TITLE_FONT_OPTIONS } from "../graph/types";
 import { getDefaultFieldMapping, sanitizeFieldMapping, type FieldMapping } from "../graph/fieldMapping";
+import type { AiExecutionMode, AiProvider, AiSettings } from "../ai/types";
 
 const GRAPH_PAGE_PREFERENCES_KEY = "dag-studio:page-preferences";
 
@@ -14,7 +15,19 @@ export interface GraphPagePreferences {
   consoleSidebarOpen: boolean;
   consoleSidebarWidth: number;
   fieldMapping: FieldMapping;
+  aiSettings: AiSettings;
 }
+
+export const DEFAULT_AI_SETTINGS: AiSettings = {
+  enabled: false,
+  provider: "openai-compatible",
+  baseUrl: "https://api.openai.com/v1",
+  apiKey: "",
+  model: "gpt-4.1-mini",
+  temperature: 0.2,
+  maxTokens: 900,
+  executionMode: "ask",
+};
 
 interface StorageLike {
   getItem(key: string): string | null;
@@ -32,6 +45,7 @@ export function getInitialGraphPagePreferences(): GraphPagePreferences {
     consoleSidebarOpen: false,
     consoleSidebarWidth: 360,
     fieldMapping: getDefaultFieldMapping(),
+    aiSettings: DEFAULT_AI_SETTINGS,
   };
 }
 
@@ -79,6 +93,7 @@ export function parseGraphPagePreferences(raw: string | null): Partial<GraphPage
     hideNodeBorders?: unknown;
     alignNodeWidthsToMax?: unknown;
     fieldMapping?: unknown;
+    aiSettings?: unknown;
   } | null;
   try {
     parsed = JSON.parse(raw) as { mode?: unknown; layoutMode?: unknown } | null;
@@ -116,6 +131,9 @@ export function parseGraphPagePreferences(raw: string | null): Partial<GraphPage
   }
   if (parsed.fieldMapping && typeof parsed.fieldMapping === "object" && !Array.isArray(parsed.fieldMapping)) {
     next.fieldMapping = sanitizeFieldMapping(parsed.fieldMapping);
+  }
+  if (parsed.aiSettings && typeof parsed.aiSettings === "object" && !Array.isArray(parsed.aiSettings)) {
+    next.aiSettings = sanitizeAiSettings(parsed.aiSettings);
   }
 
   return Object.keys(next).length ? next : null;
@@ -169,4 +187,41 @@ function sanitizeTitleFontFamily(value: unknown): GraphTheme["titleFontFamily"] 
   }
   const match = GRAPH_TITLE_FONT_OPTIONS.find((option) => option.value === value);
   return match?.value || DEFAULT_GRAPH_THEME.titleFontFamily;
+}
+
+function sanitizeAiSettings(input: object): AiSettings {
+  const record = input as Record<string, unknown>;
+  return {
+    enabled: typeof record.enabled === "boolean" ? record.enabled : DEFAULT_AI_SETTINGS.enabled,
+    provider: sanitizeAiProvider(record.provider),
+    baseUrl: sanitizeString(record.baseUrl, DEFAULT_AI_SETTINGS.baseUrl),
+    apiKey: sanitizeString(record.apiKey, DEFAULT_AI_SETTINGS.apiKey),
+    model: sanitizeString(record.model, DEFAULT_AI_SETTINGS.model),
+    temperature: clampFloatPreference(record.temperature, DEFAULT_AI_SETTINGS.temperature, 0, 2),
+    maxTokens: clampNumericPreference(record.maxTokens, DEFAULT_AI_SETTINGS.maxTokens, 128, 8000),
+    executionMode: sanitizeAiExecutionMode(record.executionMode),
+  };
+}
+
+function sanitizeAiProvider(value: unknown): AiProvider {
+  return value === "openai-compatible" || value === "deepseek" || value === "anthropic" || value === "gemini" || value === "ollama"
+    ? value
+    : DEFAULT_AI_SETTINGS.provider;
+}
+
+function sanitizeAiExecutionMode(value: unknown): AiExecutionMode {
+  return value === "ask" || value === "auto-readonly" || value === "auto-edit"
+    ? value
+    : DEFAULT_AI_SETTINGS.executionMode;
+}
+
+function sanitizeString(value: unknown, fallback: string): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function clampFloatPreference(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, value));
 }

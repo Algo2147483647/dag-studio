@@ -9,9 +9,11 @@ interface ConsoleSuggestion {
 interface ConsoleSidebarProps {
   mode: GraphMode;
   hasGraph: boolean;
-  entries: Array<{ id: number; tone: "input" | "success" | "error" | "info"; text: string }>;
+  entries: Array<{ id: number; tone: "input" | "success" | "error" | "info" | "ai" | "ai-action"; text: string }>;
   inputValue: string;
   contextNodeKey: NodeKey | null;
+  aiEnabled: boolean;
+  aiBusy: boolean;
   suggestions: ConsoleSuggestion[];
   activeSuggestionIndex: number;
   onInputChange: (value: string) => void;
@@ -26,6 +28,8 @@ export default function ConsoleSidebar({
   entries,
   inputValue,
   contextNodeKey,
+  aiEnabled,
+  aiBusy,
   suggestions,
   activeSuggestionIndex,
   onInputChange,
@@ -53,6 +57,7 @@ export default function ConsoleSidebar({
         ))}
         {!hasGraph ? <div className="console-terminal__line console-terminal__line--info">Load or initialize a graph to enable mutations.</div> : null}
         {mode !== "edit" ? <div className="console-terminal__line console-terminal__line--info">Switch to edit mode to run graph mutations.</div> : null}
+        {aiBusy ? <div className="console-terminal__line console-terminal__line--ai">AI is thinking...</div> : null}
       </div>
 
       <div className="console-terminal__input-wrap">
@@ -66,8 +71,8 @@ export default function ConsoleSidebar({
           spellCheck={false}
           autoComplete="off"
           value={inputValue}
-          disabled={!hasGraph || mode !== "edit"}
-          placeholder={hasGraph && mode === "edit" ? "type a command" : "console unavailable"}
+          disabled={mode !== "edit" || aiBusy}
+          placeholder={mode === "edit" ? (aiEnabled ? "type /help or ask AI" : "type /help") : "console unavailable"}
           onChange={(event) => onInputChange(event.currentTarget.value)}
           onKeyDown={onKeyDown}
           onPaste={onPaste}

@@ -18,6 +18,17 @@ Open the local Vite URL shown in the terminal. On first load, the app automatica
 
 The app remembers page preferences such as mode and layout selection across refreshes.
 
+## Controls
+
+The top bar controls button opens a settings dialog with four sections:
+
+- `General`: mode, layout engine, console visibility, initialization, and status
+- `Appearance`: layout tuning, title styling, detail visibility, borders, and width behavior
+- `Data`: field mapping, SVG export, JSON file import, and folder import
+- `AI`: provider, model, API key, execution mode, and connection test
+
+AI providers include OpenAI-compatible endpoints, DeepSeek, Anthropic, Gemini, and Ollama.
+
 ## Loading and Starting Graphs
 
 You can work from sample data or start from scratch.
@@ -120,27 +131,38 @@ The console is designed for fast text-based graph edits:
 
 - one line is one instruction
 - multiple lines run as one batch
+- console commands start with `/`
+- plain text input is sent to AI when AI is enabled
+- AI may automatically run read-only commands in `Ask` mode to inspect graph data, but edit commands still require an auto-edit execution mode
 - successful mutation batches commit as a single undo step
 - parse or execution errors stop at the first failing line
 - command history is available with the arrow keys when suggestions are not open
-- `clear` or `cls` clears console output
-- `help` prints the command reference directly in the console
-- `keys` lists every node key in the current graph
+- `/clear` or `/cls` clears console output
+- `/help` prints the command reference directly in the console
+- `/keys` lists every node key in the current graph
+- `/graph` summarizes graph size, roots, leaves, and node types
+- `/find <query>` searches node keys, titles, types, definitions, and custom fields
+- `/neighbors <node> [depth]` inspects local parent/child structure
+- `/path <from> <to>` finds the shortest directed path
 
 Common commands:
 
-- `help`
-- `keys`
-- `use <node>`
-- `show <node>`
-- `json <node>`
-- `mv <old-key> <new-key>`
-- `rm <node>` or `rm -r <node>`
-- `add <new-key>` or `add <new-key> -p <parent>`
-- `cp <source> <new-key>` or `cp <source> <new-key> -p <parent>`
-- `parents <node> = A,B`
-- `children <node> = A,B`
-- `set <node> <field> "value"`
+- `/help`
+- `/keys`
+- `/graph`
+- `/find <query>`
+- `/neighbors <node> [depth]`
+- `/path <from> <to>`
+- `/use <node>`
+- `/show <node>`
+- `/json <node>`
+- `/mv <old-key> <new-key>`
+- `/rm <node>` or `/rm -r <node>`
+- `/add <new-key>` or `/add <new-key> -p <parent>`
+- `/cp <source> <new-key>` or `/cp <source> <new-key> -p <parent>`
+- `/parents <node> = A,B`
+- `/children <node> = A,B`
+- `/set <node> <field> "value"`
 
 For the full command reference, see [Graph Console DSL](graph-console-dsl.md).
 

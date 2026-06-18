@@ -57,6 +57,25 @@ export function executeConsoleInstructions(
           outputMessages.push(buildKeyList(workingDag));
           break;
         }
+        case "graphStats": {
+          outputMessages.push(buildGraphStats(workingDag, mapping));
+          break;
+        }
+        case "find": {
+          outputMessages.push(buildFindResults(workingDag, instruction.query, mapping));
+          break;
+        }
+        case "neighbors": {
+          const key = resolveExistingNodeKey(instruction.key, contextNodeKey, workingDag, instruction.line);
+          outputMessages.push(buildNeighborSummary(key, workingDag, instruction.depth, mapping));
+          break;
+        }
+        case "path": {
+          const fromKey = resolveExistingNodeKey(instruction.fromKey, contextNodeKey, workingDag, instruction.line);
+          const toKey = resolveExistingNodeKey(instruction.toKey, contextNodeKey, workingDag, instruction.line);
+          outputMessages.push(buildDirectedPathSummary(fromKey, toKey, workingDag, mapping));
+          break;
+        }
         case "use": {
           const key = resolveExistingNodeKey(instruction.key, contextNodeKey, workingDag, instruction.line);
           contextNodeKey = key;
@@ -317,6 +336,133 @@ function buildKeyList(dag: NormalizedDag): string {
   return [`Keys (${keys.length}):`, ...keys].join("\n");
 }
 
+function buildGraphStats(dag: NormalizedDag, mapping: FieldMapping = getDefaultFieldMapping()): string {
+  const keys = Object.keys(dag).sort((left, right) => left.localeCompare(right));
+  const edgeCount = keys.reduce((count, key) => count + getRelationKeys(getNodeChildren(dag[key], mapping)).length, 0);
+  const roots = keys.filter((key) => getRelationKeys(getNodeParents(dag[key], mapping)).length === 0);
+  const leaves = keys.filter((key) => getRelationKeys(getNodeChildren(dag[key], mapping)).length === 0);
+  const typeCounts = keys.reduce<Record<string, number>>((counts, key) => {
+    const type = getNodeType(dag[key], mapping) || "(empty)";
+    counts[type] = (counts[type] || 0) + 1;
+    return counts;
+  }, {});
+  const typeLines = Object.entries(typeCounts)
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, 12)
+    .map(([type, count]) => `- ${type}: ${count}`);
+
+  return [
+    `Graph: ${keys.length} nodes, ${edgeCount} directed edges.`,
+    `Roots (${roots.length}): ${formatKeySample(roots)}`,
+    `Leaves (${leaves.length}): ${formatKeySample(leaves)}`,
+    "Types:",
+    ...(typeLines.length ? typeLines : ["- (none)"]),
+  ].join("\n");
+}
+
+function buildFindResults(dag: NormalizedDag, query: string, mapping: FieldMapping = getDefaultFieldMapping()): string {
+  const needle = normalizeSearchText(query);
+  const matches = Object.keys(dag)
+    .map((key) => ({ key, score: scoreNodeMatch(key, dag[key], needle, mapping) }))
+    .filter((match) => match.score > 0)
+    .sort((left, right) => right.score - left.score || left.key.localeCompare(right.key));
+
+  if (!matches.length) {
+    return `No matches for "${query}".`;
+  }
+
+  const shown = matches.slice(0, 20);
+  return [
+    `Matches (${shown.length}${matches.length > shown.length ? ` of ${matches.length}` : ""}) for "${query}":`,
+    ...shown.map(({ key }) => {
+      const node = dag[key];
+      return `- ${key} | title: ${formatScalarPreview(getNodeTitle(node, mapping))} | type: ${formatScalarPreview(getNodeType(node, mapping))} | define: ${formatScalarPreview(getNodeDefine(node, mapping))}`;
+    }),
+  ].join("\n");
+}
+
+function buildNeighborSummary(nodeKey: NodeKey, dag: NormalizedDag, depth: number, mapping: FieldMapping = getDefaultFieldMapping()): string {
+  const visited = new Set<NodeKey>([nodeKey]);
+  let frontier = [nodeKey];
+  const layers: Array<{ depth: number; parents: NodeKey[]; children: NodeKey[] }> = [];
+
+  for (let currentDepth = 1; currentDepth <= depth; currentDepth += 1) {
+    const parents = new Set<NodeKey>();
+    const children = new Set<NodeKey>();
+    frontier.forEach((key) => {
+      getRelationKeys(getNodeParents(dag[key], mapping)).forEach((parentKey) => {
+        if (!visited.has(parentKey) && dag[parentKey]) {
+          parents.add(parentKey);
+        }
+      });
+      getRelationKeys(getNodeChildren(dag[key], mapping)).forEach((childKey) => {
+        if (!visited.has(childKey) && dag[childKey]) {
+          children.add(childKey);
+        }
+      });
+    });
+
+    const nextKeys = [...parents, ...children].sort((left, right) => left.localeCompare(right));
+    if (!nextKeys.length) {
+      break;
+    }
+    nextKeys.forEach((key) => visited.add(key));
+    layers.push({
+      depth: currentDepth,
+      parents: Array.from(parents).sort((left, right) => left.localeCompare(right)),
+      children: Array.from(children).sort((left, right) => left.localeCompare(right)),
+    });
+    frontier = nextKeys;
+  }
+
+  const node = dag[nodeKey];
+  return [
+    buildNodeSummary(nodeKey, dag, mapping),
+    `Neighbors up to depth ${depth}:`,
+    ...(layers.length
+      ? layers.flatMap((layer) => [
+        `depth ${layer.depth} parents: ${formatKeySample(layer.parents)}`,
+        `depth ${layer.depth} children: ${formatKeySample(layer.children)}`,
+      ])
+      : ["(none)"]),
+    `Definition: ${formatScalarPreview(getNodeDefine(node, mapping))}`,
+  ].join("\n");
+}
+
+function buildDirectedPathSummary(fromKey: NodeKey, toKey: NodeKey, dag: NormalizedDag, mapping: FieldMapping = getDefaultFieldMapping()): string {
+  if (fromKey === toKey) {
+    return `Path: ${fromKey}`;
+  }
+
+  const queue: NodeKey[] = [fromKey];
+  const visited = new Set<NodeKey>([fromKey]);
+  const previous = new Map<NodeKey, NodeKey>();
+
+  while (queue.length) {
+    const currentKey = queue.shift() as NodeKey;
+    const children = getRelationKeys(getNodeChildren(dag[currentKey], mapping)).filter((key) => dag[key]);
+    for (const childKey of children) {
+      if (visited.has(childKey)) {
+        continue;
+      }
+      visited.add(childKey);
+      previous.set(childKey, currentKey);
+      if (childKey === toKey) {
+        const path = [toKey];
+        let cursor = toKey;
+        while (previous.has(cursor)) {
+          cursor = previous.get(cursor) as NodeKey;
+          path.push(cursor);
+        }
+        return `Path (${path.length - 1} edges): ${path.reverse().join(" -> ")}`;
+      }
+      queue.push(childKey);
+    }
+  }
+
+  return `No directed path from "${fromKey}" to "${toKey}".`;
+}
+
 function buildNodeSummary(nodeKey: NodeKey, dag: NormalizedDag, mapping: FieldMapping = getDefaultFieldMapping()): string {
   const node = dag[nodeKey];
   const lines = [
@@ -355,4 +501,50 @@ function formatRelationPreview(value: unknown): string {
     return keys.map((key) => `${key}:${formatScalarPreview((value as Record<string, unknown>)[key])}`).join(", ");
   }
   return keys.join(", ");
+}
+
+function formatKeySample(keys: NodeKey[], limit = 18): string {
+  if (!keys.length) {
+    return "(none)";
+  }
+  const shown = keys.slice(0, limit);
+  return `${shown.join(", ")}${keys.length > shown.length ? `, ... +${keys.length - shown.length}` : ""}`;
+}
+
+function normalizeSearchText(value: unknown): string {
+  return String(value ?? "").trim().toLocaleLowerCase();
+}
+
+function scoreNodeMatch(nodeKey: NodeKey, node: Record<string, unknown>, needle: string, mapping: FieldMapping): number {
+  if (!needle) {
+    return 0;
+  }
+
+  const key = normalizeSearchText(nodeKey);
+  const title = normalizeSearchText(getNodeTitle(node, mapping));
+  const type = normalizeSearchText(getNodeType(node, mapping));
+  const define = normalizeSearchText(getNodeDefine(node, mapping));
+  const custom = getCustomFieldNames(node, mapping)
+    .map((fieldName) => normalizeSearchText(node[fieldName]))
+    .join(" ");
+
+  if (key === needle || title === needle) {
+    return 100;
+  }
+  if (key.startsWith(needle) || title.startsWith(needle)) {
+    return 80;
+  }
+  if (key.includes(needle) || title.includes(needle)) {
+    return 60;
+  }
+  if (type.includes(needle)) {
+    return 40;
+  }
+  if (define.includes(needle)) {
+    return 25;
+  }
+  if (custom.includes(needle)) {
+    return 15;
+  }
+  return 0;
 }

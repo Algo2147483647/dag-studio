@@ -40,6 +40,12 @@ import type { EditTransaction } from "./state/initialState";
 import { collectBatchEffects, buildConsoleMutationLabel, executeConsoleInstructions } from "./console/executor";
 import { parseConsoleSource } from "./console/dsl";
 import { CONSOLE_COMMAND_REFERENCE } from "./console/reference";
+import { buildAiGraphContext } from "./ai/context";
+import { requestAiPlan, testAiConnection } from "./ai/providers";
+import type { AiSettings } from "./ai/types";
+
+type ConsoleEntryTone = "input" | "success" | "error" | "info" | "ai" | "ai-action";
+type ConsoleEntry = { id: number; tone: ConsoleEntryTone; text: string };
 
 export default function App() {
   const [state, dispatch] = useReducer(graphReducer, initialGraphAppState);
@@ -48,11 +54,13 @@ export default function App() {
   const [showNodeDetail, setShowNodeDetail] = useState<boolean>(() => loadGraphPagePreferences().showNodeDetail ?? true);
   const [hideNodeBorders, setHideNodeBorders] = useState<boolean>(() => loadGraphPagePreferences().hideNodeBorders ?? false);
   const [alignNodeWidthsToMax, setAlignNodeWidthsToMax] = useState<boolean>(() => loadGraphPagePreferences().alignNodeWidthsToMax ?? false);
+  const [aiSettings, setAiSettings] = useState<AiSettings>(() => loadGraphPagePreferences().aiSettings);
+  const [aiBusy, setAiBusy] = useState(false);
   const [fieldMappingOpen, setFieldMappingOpen] = useState(false);
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
   const [consoleInput, setConsoleInput] = useState("");
   const [consoleContextNodeKey, setConsoleContextNodeKey] = useState<NodeKey | null>(null);
-  const [consoleEntries, setConsoleEntries] = useState<Array<{ id: number; tone: "input" | "success" | "error" | "info"; text: string }>>([
+  const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([
     { id: 1, tone: "info", text: "Graph console ready." },
   ]);
   const [consoleHistory, setConsoleHistory] = useState<string[]>([]);
@@ -77,8 +85,9 @@ export default function App() {
       consoleSidebarOpen: state.ui.consoleSidebarOpen,
       consoleSidebarWidth: state.ui.consoleSidebarWidth,
       fieldMapping,
+      aiSettings,
     });
-  }, [alignNodeWidthsToMax, fieldMapping, hideNodeBorders, showNodeDetail, state.layout.mode, state.mode, state.ui.consoleSidebarOpen, state.ui.consoleSidebarWidth, theme]);
+  }, [aiSettings, alignNodeWidthsToMax, fieldMapping, hideNodeBorders, showNodeDetail, state.layout.mode, state.mode, state.ui.consoleSidebarOpen, state.ui.consoleSidebarWidth, theme]);
 
   useEffect(() => {
     if (consoleContextNodeKey && state.dag && !state.dag[consoleContextNodeKey]) {
@@ -197,7 +206,7 @@ export default function App() {
     setConsoleHistory((current) => (current[current.length - 1] === source ? current : [...current, source]));
     setConsoleHistoryIndex(null);
 
-    if (source === "clear" || source === "cls") {
+    if (source === "/clear" || source === "/cls") {
       setConsoleEntries([{ id: Date.now(), tone: "info", text: "Console cleared." }]);
       return;
     }
@@ -280,13 +289,74 @@ export default function App() {
     );
   }, [consoleContextNodeKey, state]);
 
+  const handleAiRequest = useCallback(async (rawMessage: string) => {
+    const message = rawMessage.trim();
+    if (!message || aiBusy) {
+      return;
+    }
+
+    appendConsoleInputEntries(setConsoleEntries, "ask>", message);
+    setConsoleHistory((current) => (current[current.length - 1] === message ? current : [...current, message]));
+    setConsoleHistoryIndex(null);
+
+    if (!aiSettings.enabled) {
+      appendConsoleEntry(setConsoleEntries, "error", "AI is disabled. Enable AI in the controls panel first.");
+      return;
+    }
+    if (!aiSettings.baseUrl.trim() || !aiSettings.model.trim()) {
+      appendConsoleEntry(setConsoleEntries, "error", "AI requires a base URL and model in the controls panel.");
+      return;
+    }
+
+    setAiBusy(true);
+    try {
+      const context = buildAiGraphContext({
+        dag: state.dag,
+        mode: state.mode,
+        layoutMode: state.layout.mode,
+        selection: state.selection,
+        contextNodeKey: consoleContextNodeKey,
+        mapping: fieldMapping,
+      });
+      const plan = await requestAiPlan({ settings: aiSettings, context, message });
+      if (plan.type === "answer") {
+        appendConsoleEntry(setConsoleEntries, "ai", plan.text);
+        return;
+      }
+
+      const commandBatch = plan.commands.join("\n");
+      appendConsoleEntry(setConsoleEntries, "ai", plan.explanation || "AI prepared console commands.");
+      appendConsoleEntry(setConsoleEntries, "ai-action", commandBatch);
+
+      const commandsAreReadOnly = plan.commands.every(isReadOnlyConsoleCommand);
+      if (aiSettings.executionMode === "ask" && !commandsAreReadOnly) {
+        appendConsoleEntry(setConsoleEntries, "info", "AI execution mode is Ask. Review the edit commands above, then switch to Auto Edit to allow automatic mutations.");
+        return;
+      }
+      if (aiSettings.executionMode === "auto-readonly" && !commandsAreReadOnly) {
+        appendConsoleEntry(setConsoleEntries, "error", "AI prepared edit commands, but execution mode is Auto Readonly.");
+        return;
+      }
+      runConsoleSource(commandBatch);
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : "AI request failed.";
+      appendConsoleEntry(setConsoleEntries, "error", messageText);
+    } finally {
+      setAiBusy(false);
+    }
+  }, [aiBusy, aiSettings, consoleContextNodeKey, fieldMapping, runConsoleSource, state.dag, state.layout.mode, state.mode, state.selection]);
+
   const handleConsoleRun = useCallback(() => {
     if (!consoleInput.trim()) {
       return;
     }
-    runConsoleSource(consoleInput);
+    if (consoleInput.trimStart().startsWith("/")) {
+      runConsoleSource(consoleInput);
+    } else {
+      void handleAiRequest(consoleInput);
+    }
     setConsoleInput("");
-  }, [consoleInput, runConsoleSource]);
+  }, [consoleInput, handleAiRequest, runConsoleSource]);
 
   const handleConsolePaste = useCallback((event: React.ClipboardEvent<HTMLInputElement>) => {
     const pastedText = event.clipboardData.getData("text");
@@ -299,9 +369,13 @@ export default function App() {
     const insertEnd = selectionEnd ?? insertStart;
     const nextValue = `${value.slice(0, insertStart)}${pastedText}${value.slice(insertEnd)}`;
     event.preventDefault();
-    runConsoleSource(nextValue);
+    if (nextValue.trimStart().startsWith("/")) {
+      runConsoleSource(nextValue);
+    } else {
+      void handleAiRequest(nextValue);
+    }
     setConsoleInput("");
-  }, [runConsoleSource]);
+  }, [handleAiRequest, runConsoleSource]);
 
   const handleConsoleSidebarResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const startX = event.clientX;
@@ -584,6 +658,27 @@ export default function App() {
     setTheme(DEFAULT_GRAPH_THEME);
   }
 
+  async function handleAiConnectionTest() {
+    if (!aiSettings.enabled) {
+      dispatch({ type: "statusChanged", status: "Enable AI before testing the connection." });
+      return;
+    }
+    if (!aiSettings.baseUrl.trim() || !aiSettings.model.trim()) {
+      dispatch({ type: "statusChanged", status: "AI requires a base URL and model before testing." });
+      return;
+    }
+    setAiBusy(true);
+    try {
+      await testAiConnection(aiSettings);
+      dispatch({ type: "statusChanged", status: `AI connection succeeded for ${aiSettings.model}.` });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "AI connection failed.";
+      dispatch({ type: "statusChanged", status: message });
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
   function handleNodeDetailToggle() {
     setShowNodeDetail((current) => !current);
   }
@@ -652,6 +747,8 @@ export default function App() {
         canZoomIn={Boolean(stage) && state.zoom.scale < state.zoom.maxScale - 0.001}
         settingsOpen={state.ui.settingsOpen}
         consoleSidebarOpen={consoleSidebarVisible}
+        aiSettings={aiSettings}
+        aiBusy={aiBusy}
         onBack={() => dispatch({ type: "navigateBack" })}
         onUp={() => parentSelection && dispatch({ type: "selectionChanged", selection: parentSelection, pushHistory: true })}
         onAll={() => dispatch({ type: "selectionChanged", selection: getFullGraphSelection(), pushHistory: true })}
@@ -678,6 +775,8 @@ export default function App() {
         onExport={handleExportSvg}
         onSaveJson={() => state.dag ? dispatch({ type: "saveDialogOpened" }) : dispatch({ type: "statusChanged", status: "Load or render a graph before saving JSON." })}
         onFieldMappingOpen={() => setFieldMappingOpen(true)}
+        onAiSettingsChange={setAiSettings}
+        onAiConnectionTest={handleAiConnectionTest}
       />
 
       <Workspace
@@ -692,6 +791,8 @@ export default function App() {
             entries={consoleEntries}
             inputValue={consoleInput}
             contextNodeKey={consoleContextNodeKey}
+            aiEnabled={aiSettings.enabled}
+            aiBusy={aiBusy}
             suggestions={consoleSuggestions}
             activeSuggestionIndex={activeSuggestionIndex}
             onInputChange={(value) => {
@@ -839,15 +940,15 @@ function buildConsoleSuccessMessage(
 }
 
 function appendConsoleEntry(
-  setEntries: React.Dispatch<React.SetStateAction<Array<{ id: number; tone: "input" | "success" | "error" | "info"; text: string }>>>,
-  tone: "input" | "success" | "error" | "info",
+  setEntries: React.Dispatch<React.SetStateAction<ConsoleEntry[]>>,
+  tone: ConsoleEntryTone,
   text: string,
 ): void {
   setEntries((current) => [...current, { id: Date.now() + current.length, tone, text }]);
 }
 
 function appendConsoleInputEntries(
-  setEntries: React.Dispatch<React.SetStateAction<Array<{ id: number; tone: "input" | "success" | "error" | "info"; text: string }>>>,
+  setEntries: React.Dispatch<React.SetStateAction<ConsoleEntry[]>>,
   prompt: string,
   source: string,
 ): void {
@@ -860,6 +961,24 @@ function appendConsoleInputEntries(
 
 function buildConsolePrompt(contextNodeKey: NodeKey | null): string {
   return contextNodeKey ? `${contextNodeKey}>` : "graph>";
+}
+
+function isReadOnlyConsoleCommand(command: string): boolean {
+  const normalized = command.trim().toLowerCase();
+  return (
+    normalized === "/help"
+    || normalized === "/keys"
+    || normalized === "/graph"
+    || normalized === "/clear"
+    || normalized === "/cls"
+    || normalized.startsWith("/find ")
+    || normalized.startsWith("/ls ")
+    || normalized.startsWith("/neighbors ")
+    || normalized.startsWith("/path ")
+    || normalized.startsWith("/use ")
+    || normalized.startsWith("/show ")
+    || normalized.startsWith("/json ")
+  );
 }
 
 function isJsonFileName(fileName: string): boolean {
@@ -916,7 +1035,7 @@ const COMMAND_TEMPLATES: ConsoleSuggestion[] = [
 
 function getConsoleSuggestions(input: string): ConsoleSuggestion[] {
   const trimmedStart = input.trimStart();
-  if (!trimmedStart) {
+  if (!trimmedStart || !trimmedStart.startsWith("/")) {
     return [];
   }
 

@@ -6,6 +6,8 @@ This document defines the **Graph Console DSL** used by `DAG Studio`.
 
 The DSL is a compact, line-oriented instruction set for editing graph JSON in **Edit Mode** through a left-side console panel. It is intended to feel closer to a shell, assembler, or low-level command monitor than to a general-purpose scripting language.
 
+User-entered console commands must start with `/`, such as `/help` or `/add Child -p Parent`. Internally, the parser strips that prefix before dispatching the mnemonic. Plain text without `/` is reserved for AI chat when AI is enabled.
+
 The DSL is not a second editing engine. It is a textual front end for the existing graph mutation core.
 
 For a higher-level overview of the app and related documentation, see the repository [README](../README.md) and the [Documentation Index](index.md).
@@ -87,7 +89,7 @@ The console maintains one implicit **current-node context register**.
 
 | Mechanism | Meaning |
 | --- | --- |
-| `use A` | Load node `A` into the current context register. |
+| `/use A` | Load node `A` into the current context register. |
 | `.` | Operand alias for the current context node. |
 | Empty context | Any use of `.` without an active context is an execution error. |
 
@@ -97,7 +99,7 @@ The console maintains one implicit **current-node context register**.
 
 | Form | Meaning |
 | --- | --- |
-| `instruction operands...` | Executable line |
+| `/instruction operands...` | Executable command line |
 | `` | Empty line |
 | `# comment` | Comment line |
 
@@ -128,23 +130,27 @@ The console maintains one implicit **current-node context register**.
 
 | Mnemonic | Category | Effect |
 | --- | --- | --- |
-| `help` | Reference | Show the available command reference |
-| `clear`, `cls` | Console UI | Clear the console output; accepted inside multi-line batches |
-| `keys` | Reference | List every node key in the current graph |
-| `ls` | Reference | Print a compact node summary |
-| `show` | UI | Open node detail view |
-| `use` | Context | Set current context node |
-| `mv` | Mutation | Rename a node key |
-| `rm` | Mutation | Delete a node |
-| `add` | Mutation | Create a node |
-| `cp` | Mutation | Copy a node |
-| `edge` | Mutation | Add or update one directed edge |
-| `rm-edge` | Mutation | Delete one directed edge |
-| `parents` | Mutation | Replace parent set |
-| `children` | Mutation | Replace child set |
-| `set` | Mutation | Replace one node field with text, scalar, or JSON |
-| `unset` | Mutation | Remove one node field |
-| `json` | UI | Open raw node JSON editor |
+| `/help` | Reference | Show the available command reference |
+| `/clear`, `/cls` | Console UI | Clear the console output; accepted inside multi-line batches |
+| `/keys` | Reference | List every node key in the current graph |
+| `/graph` | Analysis | Print graph statistics, roots, leaves, and type counts |
+| `/find` | Analysis | Search node keys, titles, types, definitions, and custom fields |
+| `/neighbors` | Analysis | Inspect parent and child structure around a node |
+| `/path` | Analysis | Find a shortest directed path between two nodes |
+| `/ls` | Reference | Print a compact node summary |
+| `/show` | UI | Open node detail view |
+| `/use` | Context | Set current context node |
+| `/mv` | Mutation | Rename a node key |
+| `/rm` | Mutation | Delete a node |
+| `/add` | Mutation | Create a node |
+| `/cp` | Mutation | Copy a node |
+| `/edge` | Mutation | Add or update one directed edge |
+| `/rm-edge` | Mutation | Delete one directed edge |
+| `/parents` | Mutation | Replace parent set |
+| `/children` | Mutation | Replace child set |
+| `/set` | Mutation | Replace one node field with text, scalar, or JSON |
+| `/unset` | Mutation | Remove one node field |
+| `/json` | UI | Open raw node JSON editor |
 
 ### 6.2 Modifier Table
 
@@ -157,11 +163,15 @@ The console maintains one implicit **current-node context register**.
 
 | Command | Layer | Effect |
 | --- | --- | --- |
-| `help` | DSL instruction | Print the available command reference in the console output |
-| `keys` | DSL instruction | List every node key in the current graph |
-| `ls` | DSL instruction | Print a compact node summary in the console output |
-| `clear` | Console UI | Clear the console output |
-| `cls` | Console UI | Alias for `clear` |
+| `/help` | DSL instruction | Print the available command reference in the console output |
+| `/keys` | DSL instruction | List every node key in the current graph |
+| `/graph` | DSL instruction | Print graph-level structure and type statistics |
+| `/find` | DSL instruction | Search graph data for exact or fuzzy node references |
+| `/neighbors` | DSL instruction | Print local structure around a node |
+| `/path` | DSL instruction | Find a directed path through child links |
+| `/ls` | DSL instruction | Print a compact node summary in the console output |
+| `/clear` | Console UI | Clear the console output |
+| `/cls` | Console UI | Alias for `/clear` |
 
 ## 7. Instruction Reference
 
@@ -172,7 +182,7 @@ The console maintains one implicit **current-node context register**.
 ### Synopsis
 
 ```sh
-help
+/help
 ```
 
 ### Description
@@ -191,7 +201,7 @@ Prints the available command reference directly in the console output.
 ### Examples
 
 ```sh
-help
+/help
 ```
 
 ---
@@ -201,7 +211,7 @@ help
 ### Synopsis
 
 ```sh
-keys
+/keys
 ```
 
 ### Description
@@ -220,7 +230,7 @@ Prints all node keys in the current graph to the console output. The first line 
 ### Examples
 
 ```sh
-keys
+/keys
 ```
 
 ---
@@ -230,8 +240,8 @@ keys
 ### Synopsis
 
 ```sh
-show <node>
-show .
+/show <node>
+/show .
 ```
 
 ### Description
@@ -255,9 +265,9 @@ Opens the node detail view for the target node.
 ### Examples
 
 ```sh
-show Tree
-use Tree
-show .
+/show Tree
+/use Tree
+/show .
 ```
 
 ---
@@ -267,8 +277,8 @@ show .
 ### Synopsis
 
 ```sh
-ls <node>
-ls .
+/ls <node>
+/ls .
 ```
 
 ### Description
@@ -278,9 +288,9 @@ Prints a compact summary of the target node in the console output, including tit
 ### Examples
 
 ```sh
-ls Tree
-use Tree
-ls .
+/ls Tree
+/use Tree
+/ls .
 ```
 
 ---
@@ -290,7 +300,7 @@ ls .
 ### Synopsis
 
 ```sh
-use <node>
+/use <node>
 ```
 
 ### Description
@@ -314,8 +324,8 @@ Loads the target node into the current context register.
 ### Examples
 
 ```sh
-use Tree
-use "Binary Tree"
+/use Tree
+/use "Binary Tree"
 ```
 
 ---
@@ -325,7 +335,7 @@ use "Binary Tree"
 ### Synopsis
 
 ```sh
-mv <old-key> <new-key>
+/mv <old-key> <new-key>
 ```
 
 ### Description
@@ -356,8 +366,8 @@ Renames a node key and remaps references to that node.
 ### Examples
 
 ```sh
-mv Tree RootTree
-mv "Binary Tree" "Binary Search Tree"
+/mv Tree RootTree
+/mv "Binary Tree" "Binary Search Tree"
 ```
 
 ---
@@ -367,10 +377,10 @@ mv "Binary Tree" "Binary Search Tree"
 ### Synopsis
 
 ```sh
-rm <node>
-rm -r <node>
-rm .
-rm -r .
+/rm <node>
+/rm -r <node>
+/rm .
+/rm -r .
 ```
 
 ### Description
@@ -401,8 +411,8 @@ Deletes either a single node or a full subtree.
 ### Examples
 
 ```sh
-rm DraftNode
-rm -r Tree
+/rm DraftNode
+/rm -r Tree
 ```
 
 ---
@@ -412,8 +422,8 @@ rm -r Tree
 ### Synopsis
 
 ```sh
-add <new-key>
-add <new-key> -p <parent>
+/add <new-key>
+/add <new-key> -p <parent>
 ```
 
 ### Description
@@ -444,10 +454,10 @@ Creates a new node. If `-p` is present, the new node is attached as a child of t
 ### Examples
 
 ```sh
-add AVL
-add AVL -p Tree
-use Tree
-add RedBlack -p .
+/add AVL
+/add AVL -p Tree
+/use Tree
+/add RedBlack -p .
 ```
 
 ---
@@ -457,8 +467,8 @@ add RedBlack -p .
 ### Synopsis
 
 ```sh
-cp <source> <new-key>
-cp <source> <new-key> -p <parent>
+/cp <source> <new-key>
+/cp <source> <new-key> -p <parent>
 ```
 
 ### Description
@@ -490,9 +500,9 @@ Copies a node into a new key. The copied node does not inherit source parent/chi
 ### Examples
 
 ```sh
-cp Tree Tree_Copy
-cp AVL AVL_Copy -p Tree
-cp . Snapshot -p .
+/cp Tree Tree_Copy
+/cp AVL AVL_Copy -p Tree
+/cp . Snapshot -p .
 ```
 
 ---
@@ -502,8 +512,8 @@ cp . Snapshot -p .
 ### Synopsis
 
 ```sh
-parents <node> = <list>
-parents <node> =
+/parents <node> = <list>
+/parents <node> =
 ```
 
 ### Description
@@ -535,9 +545,9 @@ Replaces the full parent set of the target node.
 ### Examples
 
 ```sh
-parents AVL = Tree
-parents . = Root,Index
-parents Draft =
+/parents AVL = Tree
+/parents . = Root,Index
+/parents Draft =
 ```
 
 ---
@@ -547,8 +557,8 @@ parents Draft =
 ### Synopsis
 
 ```sh
-children <node> = <list>
-children <node> =
+/children <node> = <list>
+/children <node> =
 ```
 
 ### Description
@@ -580,9 +590,9 @@ Replaces the full child set of the target node.
 ### Examples
 
 ```sh
-children Tree = AVL,RedBlack
-children . = Left,Right
-children Leaf =
+/children Tree = AVL,RedBlack
+/children . = Left,Right
+/children Leaf =
 ```
 
 ---
@@ -592,10 +602,10 @@ children Leaf =
 ### Synopsis
 
 ```sh
-edge <parent> <child>
-edge <parent> <child> <weight>
-edge --create-missing <parent> <child>
-edge --create-missing <parent> <child> <weight>
+/edge <parent> <child>
+/edge <parent> <child> <weight>
+/edge --create-missing <parent> <child>
+/edge --create-missing <parent> <child> <weight>
 ```
 
 ### Description
@@ -620,11 +630,11 @@ Adds a directed edge from the parent node to the child node. When `<weight>` is 
 ### Examples
 
 ```sh
-edge Tree AVL
-edge Tree AVL subtype_of
-edge --create-missing Draft_A Draft_B
-use Tree
-edge . RedBlack balanced_by
+/edge Tree AVL
+/edge Tree AVL subtype_of
+/edge --create-missing Draft_A Draft_B
+/use Tree
+/edge . RedBlack balanced_by
 ```
 
 ---
@@ -634,7 +644,7 @@ edge . RedBlack balanced_by
 ### Synopsis
 
 ```sh
-rm-edge <parent> <child>
+/rm-edge <parent> <child>
 ```
 
 ### Description
@@ -657,9 +667,9 @@ Deletes one directed edge without deleting either node.
 ### Examples
 
 ```sh
-rm-edge Tree AVL
-use Tree
-rm-edge . RedBlack
+/rm-edge Tree AVL
+/use Tree
+/rm-edge . RedBlack
 ```
 
 ---
@@ -669,7 +679,7 @@ rm-edge . RedBlack
 ### Synopsis
 
 ```sh
-set <node> <field> <value>
+/set <node> <field> <value>
 ```
 
 ### Description
@@ -695,12 +705,12 @@ Replaces one field on the target node. This is a compact single-field entry poin
 ### Examples
 
 ```sh
-set AVL define "Self-balanced binary search tree"
-set Tree title "Tree"
-set . type "concept"
-set AVL score 12
-set AVL enabled true
-set AVL metadata {"height":2,"balanced":true}
+/set AVL define "Self-balanced binary search tree"
+/set Tree title "Tree"
+/set . type "concept"
+/set AVL score 12
+/set AVL enabled true
+/set AVL metadata {"height":2,"balanced":true}
 ```
 
 ---
@@ -710,7 +720,7 @@ set AVL metadata {"height":2,"balanced":true}
 ### Synopsis
 
 ```sh
-unset <node> <field>
+/unset <node> <field>
 ```
 
 ### Description
@@ -720,9 +730,9 @@ Removes one non-relation field from the target node.
 ### Examples
 
 ```sh
-unset AVL note
-use Tree
-unset . metadata
+/unset AVL note
+/use Tree
+/unset . metadata
 ```
 
 ---
@@ -732,8 +742,8 @@ unset . metadata
 ### Synopsis
 
 ```sh
-json <node>
-json .
+/json <node>
+/json .
 ```
 
 ### Description
@@ -757,9 +767,9 @@ Opens the raw JSON editor for the target node.
 ### Examples
 
 ```sh
-json AVL
-use Tree
-json .
+/json AVL
+/use Tree
+/json .
 ```
 
 ## 8. Batch Semantics
@@ -781,12 +791,12 @@ A batch is the full multi-line source executed by one explicit console run actio
 ### 8.3 Example Batch
 
 ```sh
-use Tree
-add AVL -p .
-add RedBlack -p .
-set AVL define "Self-balanced BST"
-set RedBlack define "Balanced BST with color constraints"
-children . = AVL,RedBlack
+/use Tree
+/add AVL -p .
+/add RedBlack -p .
+/set AVL define "Self-balanced BST"
+/set RedBlack define "Balanced BST with color constraints"
+/children . = AVL,RedBlack
 ```
 
 ## 9. Diagnostics and Error Model
@@ -822,15 +832,15 @@ children . = AVL,RedBlack
 
 | Context Menu Action | Console Form |
 | --- | --- |
-| View Node | `show <node>` |
-| Rename Node Key | `mv <old> <new>` |
-| Delete Node | `rm <node>` |
-| Delete Subtree | `rm -r <node>` |
-| Edit Parents | `parents <node> = ...` |
-| Edit Children | `children <node> = ...` |
-| Add Node | `add <new> [-p <parent>]` |
-| Copy Node | `cp <source> <new> [-p <parent>]` |
-| Open Raw Node JSON | `json <node>` |
+| View Node | `/show <node>` |
+| Rename Node Key | `/mv <old> <new>` |
+| Delete Node | `/rm <node>` |
+| Delete Subtree | `/rm -r <node>` |
+| Edit Parents | `/parents <node> = ...` |
+| Edit Children | `/children <node> = ...` |
+| Add Node | `/add <new> [-p <parent>]` |
+| Copy Node | `/cp <source> <new> [-p <parent>]` |
+| Open Raw Node JSON | `/json <node>` |
 
 ## 11. Recommended Parser Strategy
 
@@ -851,6 +861,10 @@ type ConsoleInstruction =
   | { type: "help"; line: number }
   | { type: "clear"; line: number }
   | { type: "keys"; line: number }
+  | { type: "graphStats"; line: number }
+  | { type: "find"; query: string; line: number }
+  | { type: "neighbors"; key: string; depth: number; line: number }
+  | { type: "path"; fromKey: string; toKey: string; line: number }
   | { type: "list"; key: string; line: number }
   | { type: "show"; key: string; line: number }
   | { type: "use"; key: string; line: number }
@@ -897,31 +911,31 @@ Recommended V1 rule:
 ### 13.1 Create a Small Branch
 
 ```sh
-use Tree
-add AVL -p .
-add RedBlack -p .
-children . = AVL,RedBlack
+/use Tree
+/add AVL -p .
+/add RedBlack -p .
+/children . = AVL,RedBlack
 ```
 
 ### 13.2 Rename and Re-Describe a Node
 
 ```sh
-mv Graph DAG
-set DAG define "A directed acyclic graph"
+/mv Graph DAG
+/set DAG define "A directed acyclic graph"
 ```
 
 ### 13.3 Clear Relations
 
 ```sh
-parents Draft =
-children Draft =
+/parents Draft =
+/children Draft =
 ```
 
 ### 13.4 Open a Node for Raw JSON Work
 
 ```sh
-use AVL
-json .
+/use AVL
+/json .
 ```
 
 ## 14. Minimum Viable Instruction Set
@@ -930,33 +944,33 @@ json .
 
 | Priority | Instruction |
 | --- | --- |
-| P0 | `use` |
-| P0 | `help` |
-| P0 | `keys` |
-| P0 | `ls` |
-| P0 | `show` |
-| P0 | `mv` |
-| P0 | `rm` |
-| P0 | `rm -r` |
-| P0 | `add` |
-| P0 | `cp` |
-| P0 | `edge` |
-| P0 | `rm-edge` |
-| P0 | `parents` |
-| P0 | `children` |
-| P0 | `set` |
-| P0 | `unset` |
-| P0 | `json` |
+| P0 | `/use` |
+| P0 | `/help` |
+| P0 | `/keys` |
+| P0 | `/ls` |
+| P0 | `/show` |
+| P0 | `/mv` |
+| P0 | `/rm` |
+| P0 | `/rm -r` |
+| P0 | `/add` |
+| P0 | `/cp` |
+| P0 | `/edge` |
+| P0 | `/rm-edge` |
+| P0 | `/parents` |
+| P0 | `/children` |
+| P0 | `/set` |
+| P0 | `/unset` |
+| P0 | `/json` |
 
 ### 14.2 Optional V1.1 Extensions
 
 | Candidate | Purpose |
 | --- | --- |
 | `focus <node>` | Move graph viewport focus |
-| `ls <node>` | Show relation summary |
+| `/ls <node>` | Show relation summary |
 | `append-child <node> <child>` | Incremental relation edit |
 | `append-parent <node> <parent>` | Incremental relation edit |
-| `unset <node> <field>` | Field removal |
+| `/unset <node> <field>` | Field removal |
 | History recall | Operator productivity |
 | Autocomplete | Faster command entry |
 
@@ -968,6 +982,6 @@ The Graph Console DSL should behave like a compact graph-edit instruction set:
 - explicit like assembly mnemonics
 - transactional like an editor command buffer
 - backed by the existing graph mutation core
-- self-describing through an in-console `help` command
+- self-describing through an in-console `/help` command
 
 That combination gives the console the speed of typed operations without sacrificing the safety and consistency of the current JSON editing model.

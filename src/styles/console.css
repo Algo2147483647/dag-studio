@@ -46,6 +46,14 @@
   color: #9bbcff;
 }
 
+.console-terminal__line--ai {
+  color: #d7c3ff;
+}
+
+.console-terminal__line--ai-action {
+  color: #ffd18a;
+}
+
 .console-terminal__input-wrap {
   position: relative;
   display: flex;

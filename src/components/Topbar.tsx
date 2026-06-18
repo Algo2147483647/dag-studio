@@ -1,5 +1,10 @@
+import { useState } from "react";
+import { createPortal } from "react-dom";
 import type { GraphLayoutMode, GraphMode, GraphTheme } from "../graph/types";
 import { GRAPH_TITLE_FONT_OPTIONS } from "../graph/types";
+import type { AiExecutionMode, AiProvider, AiSettings } from "../ai/types";
+
+type SettingsChapter = "general" | "appearance" | "data" | "ai";
 
 interface TopbarProps {
   topbarRef: React.RefObject<HTMLElement>;
@@ -21,6 +26,8 @@ interface TopbarProps {
   canZoomIn: boolean;
   settingsOpen: boolean;
   consoleSidebarOpen: boolean;
+  aiSettings: AiSettings;
+  aiBusy: boolean;
   onBack: () => void;
   onUp: () => void;
   onAll: () => void;
@@ -47,6 +54,8 @@ interface TopbarProps {
   onExport: () => void;
   onSaveJson: () => void;
   onFieldMappingOpen: () => void;
+  onAiSettingsChange: (settings: AiSettings) => void;
+  onAiConnectionTest: () => void;
 }
 
 export default function Topbar({
@@ -69,6 +78,8 @@ export default function Topbar({
   canZoomIn,
   settingsOpen,
   consoleSidebarOpen,
+  aiSettings,
+  aiBusy,
   onBack,
   onUp,
   onAll,
@@ -95,6 +106,8 @@ export default function Topbar({
   onExport,
   onSaveJson,
   onFieldMappingOpen,
+  onAiSettingsChange,
+  onAiConnectionTest,
 }: TopbarProps) {
   return (
     <header ref={topbarRef} className="topbar">
@@ -127,175 +140,444 @@ export default function Topbar({
               label="Open controls"
               icon={<SlidersIcon />}
               ariaExpanded={settingsOpen}
-              ariaControls="settings-panel"
+              ariaControls="settings-modal"
               onClick={onSettingsToggle}
               className="settings-toggle-btn topbar-icon-btn"
             />
-            <div id="settings-panel" className={`settings-panel${settingsOpen ? " settings-panel-visible" : ""}`}>
-              <p className="control-label">Mode</p>
-              <div className="mode-toggle" role="group" aria-label="Graph mode">
-                <button id="mode-preview-btn" className={`mode-toggle-btn${mode === "preview" ? " is-active" : ""}`} type="button" data-mode="preview" aria-pressed={mode === "preview"} onClick={() => onModeChange("preview")}>Preview</button>
-                <button id="mode-edit-btn" className={`mode-toggle-btn${mode === "edit" ? " is-active" : ""}`} type="button" data-mode="edit" aria-pressed={mode === "edit"} onClick={() => onModeChange("edit")}>Edit</button>
-              </div>
-
-              <label className="layout-select-label" htmlFor="layout-mode-select">
-                <span className="control-label">Layout</span>
-                <select
-                  id="layout-mode-select"
-                  className="layout-select"
-                  value={layoutMode}
-                  onChange={(event) => onLayoutModeChange(event.currentTarget.value as GraphLayoutMode)}
-                >
-                  <option value="sugiyama">Sugiyama layered</option>
-                  <option value="level">Level layout</option>
-                  <option value="dagre">Dagre layered</option>
-                </select>
-              </label>
-
-              <section className="settings-section settings-section-emphasis" aria-labelledby="layout-tuning-title">
-                <div className="settings-section-header">
-                  <div>
-                    <p id="layout-tuning-title" className="control-label">Layout Tuning</p>
-                  </div>
-                  <button type="button" className="settings-link-btn" onClick={onThemeReset}>Reset</button>
-                </div>
-                <div className="settings-slider-grid">
-                  {LAYOUT_CONTROLS.map((control) => (
-                    <LayoutSliderControl
-                      key={control.key}
-                      control={control}
-                      value={theme[control.key]}
-                      onChange={(value) => onThemeChange(control.key, value)}
-                    />
-                  ))}
-                </div>
-              </section>
-
-              <section className="settings-section title-style-section" aria-labelledby="title-style-title">
-                <p id="title-style-title" className="control-label">Title</p>
-                <div className="title-style-row">
-                  <select
-                    className="title-font-select"
-                    value={theme.titleFontFamily}
-                    aria-label="Title font"
-                    onChange={(event) => onThemeChange("titleFontFamily", event.currentTarget.value as GraphTheme["titleFontFamily"])}
-                  >
-                    {GRAPH_TITLE_FONT_OPTIONS.map((font) => (
-                      <option key={font.value} value={font.value}>{font.label}</option>
-                    ))}
-                  </select>
-                  <label className="title-size-control" htmlFor="title-font-size-input">
-                    <input
-                      id="title-font-size-input"
-                      className="title-size-input"
-                      type="number"
-                      min={10}
-                      max={28}
-                      step={1}
-                      value={theme.titleFontSize}
-                      aria-label="Title font size"
-                      onChange={(event) => onThemeChange("titleFontSize", clampNumberInput(event.currentTarget.value, 10, 28, theme.titleFontSize))}
-                      onBlur={(event) => onThemeChange("titleFontSize", clampNumberInput(event.currentTarget.value, 10, 28, theme.titleFontSize))}
-                    />
-                    <span className="title-size-unit">px</span>
-                  </label>
-                  <div className="title-format-buttons" role="group" aria-label="Title format">
-                    <button
-                      type="button"
-                      className={`title-format-btn${theme.titleFontWeight === 700 ? " is-active" : ""}`}
-                      title="Bold"
-                      aria-label="Bold title"
-                      aria-pressed={theme.titleFontWeight === 700}
-                      onClick={() => onThemeChange("titleFontWeight", theme.titleFontWeight === 700 ? 400 : 700)}
-                    >
-                      B
-                    </button>
-                    <button
-                      type="button"
-                      className={`title-format-btn title-format-btn-italic${theme.titleFontStyle === "italic" ? " is-active" : ""}`}
-                      title="Italic"
-                      aria-label="Italic title"
-                      aria-pressed={theme.titleFontStyle === "italic"}
-                      onClick={() => onThemeChange("titleFontStyle", theme.titleFontStyle === "italic" ? "normal" : "italic")}
-                    >
-                      I
-                    </button>
-                  </div>
-                </div>
-              </section>
-
-              <section className="settings-section" aria-labelledby="workspace-options-title">
-                <p id="workspace-options-title" className="control-label">Workspace</p>
-                <div className="workspace-action-row">
-                  <button id="field-mapping-btn" className="ghost-btn settings-action-btn" type="button" onClick={onFieldMappingOpen}>Field Mapping</button>
-                  <button id="init-canvas-btn" className="ghost-btn settings-action-btn" type="button" onClick={onInitializeCanvas}>Initialize</button>
-                  <button id="export-btn" className="ghost-btn settings-action-btn" type="button" disabled={!hasGraph} onClick={onExport}>Export SVG</button>
-                </div>
-                <div className="workspace-action-row">
-                  {mode === "edit" ? (
-                    <button
-                      id="console-sidebar-toggle-btn"
-                      className={`ghost-btn settings-action-btn${consoleSidebarOpen ? " settings-action-btn-active" : ""}`}
-                      type="button"
-                      aria-pressed={consoleSidebarOpen}
-                      onClick={onConsoleSidebarToggle}
-                    >
-                      {consoleSidebarOpen ? "Hide Console" : "Show Console"}
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className={`ghost-btn settings-action-btn${showNodeDetail ? " settings-action-btn-active" : ""}`}
-                    aria-pressed={showNodeDetail}
-                    onClick={onNodeDetailToggle}
-                  >
-                    {showNodeDetail ? "Hide Details" : "Show Details"}
-                  </button>
-                  <button
-                    type="button"
-                    className={`ghost-btn settings-action-btn${hideNodeBorders ? " settings-action-btn-active" : ""}`}
-                    aria-pressed={hideNodeBorders}
-                    onClick={onNodeBordersToggle}
-                  >
-                    {hideNodeBorders ? "Show Borders" : "Hide Borders"}
-                  </button>
-                  <button
-                    type="button"
-                    className={`ghost-btn settings-action-btn${alignNodeWidthsToMax ? " settings-action-btn-active" : ""}`}
-                    aria-pressed={alignNodeWidthsToMax}
-                    onClick={onNodeWidthAlignToggle}
-                  >
-                    {alignNodeWidthsToMax ? "Auto Width" : "Max Width"}
-                  </button>
-                </div>
-              </section>
-              <section className="settings-section" aria-labelledby="import-options-title">
-                <p id="import-options-title" className="control-label">Import</p>
-                <div className="import-action-row">
-                  <label htmlFor="fileInput" className="file-input-label">
-                    <span className="file-input-text">{truncateFileName(fileName)}</span>
-                    <input type="file" id="fileInput" accept=".json,application/json" multiple onClick={onFileInputClick} onChange={onFileInputChange} />
-                  </label>
-                  <label htmlFor="folderInput" className="file-input-label folder-input-label">
-                    <span className="file-input-text">Open Folder</span>
-                    <input
-                      type="file"
-                      id="folderInput"
-                      accept=".json,application/json"
-                      multiple
-                      onClick={onFolderInputClick}
-                      onChange={onFolderInputChange}
-                      {...DIRECTORY_INPUT_PROPS}
-                    />
-                  </label>
-                </div>
-              </section>
-              <p id="graph-summary" className="graph-summary">{status}</p>
-            </div>
+            <SettingsModal
+              open={settingsOpen}
+              mode={mode}
+              layoutMode={layoutMode}
+              theme={theme}
+              showNodeDetail={showNodeDetail}
+              hideNodeBorders={hideNodeBorders}
+              alignNodeWidthsToMax={alignNodeWidthsToMax}
+              status={status}
+              fileName={fileName}
+              hasGraph={hasGraph}
+              consoleSidebarOpen={consoleSidebarOpen}
+              aiSettings={aiSettings}
+              aiBusy={aiBusy}
+              onClose={onSettingsToggle}
+              onModeChange={onModeChange}
+              onLayoutModeChange={onLayoutModeChange}
+              onThemeChange={onThemeChange}
+              onThemeReset={onThemeReset}
+              onNodeDetailToggle={onNodeDetailToggle}
+              onNodeBordersToggle={onNodeBordersToggle}
+              onNodeWidthAlignToggle={onNodeWidthAlignToggle}
+              onConsoleSidebarToggle={onConsoleSidebarToggle}
+              onFileInputClick={onFileInputClick}
+              onFileInputChange={onFileInputChange}
+              onFolderInputClick={onFolderInputClick}
+              onFolderInputChange={onFolderInputChange}
+              onInitializeCanvas={onInitializeCanvas}
+              onExport={onExport}
+              onFieldMappingOpen={onFieldMappingOpen}
+              onAiSettingsChange={onAiSettingsChange}
+              onAiConnectionTest={onAiConnectionTest}
+            />
           </div>
         </div>
       </div>
     </header>
+  );
+}
+
+interface SettingsModalProps {
+  open: boolean;
+  mode: GraphMode;
+  layoutMode: GraphLayoutMode;
+  theme: GraphTheme;
+  showNodeDetail: boolean;
+  hideNodeBorders: boolean;
+  alignNodeWidthsToMax: boolean;
+  status: string;
+  fileName: string;
+  hasGraph: boolean;
+  consoleSidebarOpen: boolean;
+  aiSettings: AiSettings;
+  aiBusy: boolean;
+  onClose: () => void;
+  onModeChange: (mode: GraphMode) => void;
+  onLayoutModeChange: (mode: GraphLayoutMode) => void;
+  onThemeChange: <K extends keyof GraphTheme>(key: K, value: GraphTheme[K]) => void;
+  onThemeReset: () => void;
+  onNodeDetailToggle: () => void;
+  onNodeBordersToggle: () => void;
+  onNodeWidthAlignToggle: () => void;
+  onConsoleSidebarToggle: () => void;
+  onFileInputClick: (event: React.MouseEvent<HTMLInputElement>) => void;
+  onFileInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onFolderInputClick: (event: React.MouseEvent<HTMLInputElement>) => void;
+  onFolderInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onInitializeCanvas: () => void;
+  onExport: () => void;
+  onFieldMappingOpen: () => void;
+  onAiSettingsChange: (settings: AiSettings) => void;
+  onAiConnectionTest: () => void;
+}
+
+function SettingsModal({
+  open,
+  mode,
+  layoutMode,
+  theme,
+  showNodeDetail,
+  hideNodeBorders,
+  alignNodeWidthsToMax,
+  status,
+  fileName,
+  hasGraph,
+  consoleSidebarOpen,
+  aiSettings,
+  aiBusy,
+  onClose,
+  onModeChange,
+  onLayoutModeChange,
+  onThemeChange,
+  onThemeReset,
+  onNodeDetailToggle,
+  onNodeBordersToggle,
+  onNodeWidthAlignToggle,
+  onConsoleSidebarToggle,
+  onFileInputClick,
+  onFileInputChange,
+  onFolderInputClick,
+  onFolderInputChange,
+  onInitializeCanvas,
+  onExport,
+  onFieldMappingOpen,
+  onAiSettingsChange,
+  onAiConnectionTest,
+}: SettingsModalProps) {
+  const [activeChapter, setActiveChapter] = useState<SettingsChapter>("general");
+  const [providerMenuOpen, setProviderMenuOpen] = useState(false);
+  const updateAiSetting = <K extends keyof AiSettings>(key: K, value: AiSettings[K]) => {
+    onAiSettingsChange({ ...aiSettings, [key]: value });
+  };
+  const handleAiProviderChange = (provider: AiProvider) => {
+    const preset = AI_PROVIDER_PRESETS[provider];
+    onAiSettingsChange({
+      ...aiSettings,
+      provider,
+      baseUrl: preset.baseUrl,
+      model: preset.model,
+      apiKey: provider === "ollama" ? "" : aiSettings.apiKey,
+    });
+    setProviderMenuOpen(false);
+  };
+  const selectedProvider = AI_PROVIDER_PRESETS[aiSettings.provider];
+
+  if (!open) {
+    return null;
+  }
+
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      className="settings-modal-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.currentTarget === event.target) {
+          onClose();
+        }
+      }}
+    >
+      <section id="settings-modal" className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+        <div className="settings-modal-header">
+          <div>
+            <p className="control-label">Controls</p>
+            <h2 id="settings-modal-title">Settings</h2>
+          </div>
+          <button type="button" className="ghost-btn topbar-icon-btn" title="Close settings" aria-label="Close settings" onClick={onClose}>
+            <span className="topbar-icon" aria-hidden="true"><CloseIcon /></span>
+          </button>
+        </div>
+
+        <div className="settings-modal-body">
+          <nav className="settings-tabs" aria-label="Settings sections">
+            {SETTINGS_CHAPTERS.map((chapter) => (
+              <button
+                key={chapter.key}
+                type="button"
+                className={`settings-tab${activeChapter === chapter.key ? " is-active" : ""}`}
+                aria-pressed={activeChapter === chapter.key}
+                onClick={() => setActiveChapter(chapter.key)}
+              >
+                {chapter.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="settings-page">
+            {activeChapter === "general" ? (
+              <>
+                <section className="settings-section" aria-labelledby="mode-options-title">
+                  <p id="mode-options-title" className="control-label">Mode</p>
+                  <div className="mode-toggle" role="group" aria-label="Graph mode">
+                    <button id="mode-preview-btn" className={`mode-toggle-btn${mode === "preview" ? " is-active" : ""}`} type="button" data-mode="preview" aria-pressed={mode === "preview"} onClick={() => onModeChange("preview")}>Preview</button>
+                    <button id="mode-edit-btn" className={`mode-toggle-btn${mode === "edit" ? " is-active" : ""}`} type="button" data-mode="edit" aria-pressed={mode === "edit"} onClick={() => onModeChange("edit")}>Edit</button>
+                  </div>
+                </section>
+
+                <section className="settings-section" aria-labelledby="layout-mode-title">
+                  <label className="layout-select-label" htmlFor="layout-mode-select">
+                    <span id="layout-mode-title" className="control-label">Layout</span>
+                    <select
+                      id="layout-mode-select"
+                      className="layout-select"
+                      value={layoutMode}
+                      onChange={(event) => onLayoutModeChange(event.currentTarget.value as GraphLayoutMode)}
+                    >
+                      <option value="sugiyama">Sugiyama layered</option>
+                      <option value="level">Level layout</option>
+                      <option value="dagre">Dagre layered</option>
+                    </select>
+                  </label>
+                </section>
+
+                <section className="settings-section" aria-labelledby="general-workspace-title">
+                  <p id="general-workspace-title" className="control-label">Workspace</p>
+                  <div className="workspace-action-row">
+                    {mode === "edit" ? (
+                      <button
+                        id="console-sidebar-toggle-btn"
+                        className={`ghost-btn settings-action-btn${consoleSidebarOpen ? " settings-action-btn-active" : ""}`}
+                        type="button"
+                        aria-pressed={consoleSidebarOpen}
+                        onClick={onConsoleSidebarToggle}
+                      >
+                        {consoleSidebarOpen ? "Hide Console" : "Show Console"}
+                      </button>
+                    ) : null}
+                    <button type="button" className="ghost-btn settings-action-btn" onClick={onInitializeCanvas}>Initialize</button>
+                  </div>
+                </section>
+
+                <p id="graph-summary" className="graph-summary">{status}</p>
+              </>
+            ) : null}
+
+            {activeChapter === "appearance" ? (
+              <>
+                <section className="settings-section settings-section-emphasis" aria-labelledby="layout-tuning-title">
+                  <div className="settings-section-header">
+                    <p id="layout-tuning-title" className="control-label">Layout Tuning</p>
+                    <button type="button" className="settings-link-btn" onClick={onThemeReset}>Reset</button>
+                  </div>
+                  <div className="settings-slider-grid">
+                    {LAYOUT_CONTROLS.map((control) => (
+                      <LayoutSliderControl
+                        key={control.key}
+                        control={control}
+                        value={theme[control.key]}
+                        onChange={(value) => onThemeChange(control.key, value)}
+                      />
+                    ))}
+                  </div>
+                </section>
+
+                <section className="settings-section title-style-section" aria-labelledby="title-style-title">
+                  <p id="title-style-title" className="control-label">Title</p>
+                  <div className="title-style-row">
+                    <select
+                      className="title-font-select"
+                      value={theme.titleFontFamily}
+                      aria-label="Title font"
+                      onChange={(event) => onThemeChange("titleFontFamily", event.currentTarget.value as GraphTheme["titleFontFamily"])}
+                    >
+                      {GRAPH_TITLE_FONT_OPTIONS.map((font) => (
+                        <option key={font.value} value={font.value}>{font.label}</option>
+                      ))}
+                    </select>
+                    <label className="title-size-control" htmlFor="title-font-size-input">
+                      <input
+                        id="title-font-size-input"
+                        className="title-size-input"
+                        type="number"
+                        min={10}
+                        max={28}
+                        step={1}
+                        value={theme.titleFontSize}
+                        aria-label="Title font size"
+                        onChange={(event) => onThemeChange("titleFontSize", clampNumberInput(event.currentTarget.value, 10, 28, theme.titleFontSize))}
+                        onBlur={(event) => onThemeChange("titleFontSize", clampNumberInput(event.currentTarget.value, 10, 28, theme.titleFontSize))}
+                      />
+                      <span className="title-size-unit">px</span>
+                    </label>
+                    <div className="title-format-buttons" role="group" aria-label="Title format">
+                      <button
+                        type="button"
+                        className={`title-format-btn${theme.titleFontWeight === 700 ? " is-active" : ""}`}
+                        title="Bold"
+                        aria-label="Bold title"
+                        aria-pressed={theme.titleFontWeight === 700}
+                        onClick={() => onThemeChange("titleFontWeight", theme.titleFontWeight === 700 ? 400 : 700)}
+                      >
+                        B
+                      </button>
+                      <button
+                        type="button"
+                        className={`title-format-btn title-format-btn-italic${theme.titleFontStyle === "italic" ? " is-active" : ""}`}
+                        title="Italic"
+                        aria-label="Italic title"
+                        aria-pressed={theme.titleFontStyle === "italic"}
+                        onClick={() => onThemeChange("titleFontStyle", theme.titleFontStyle === "italic" ? "normal" : "italic")}
+                      >
+                        I
+                      </button>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="settings-section" aria-labelledby="view-options-title">
+                  <p id="view-options-title" className="control-label">View</p>
+                  <div className="workspace-action-row">
+                    <button type="button" className={`ghost-btn settings-action-btn${showNodeDetail ? " settings-action-btn-active" : ""}`} aria-pressed={showNodeDetail} onClick={onNodeDetailToggle}>
+                      {showNodeDetail ? "Hide Details" : "Show Details"}
+                    </button>
+                    <button type="button" className={`ghost-btn settings-action-btn${hideNodeBorders ? " settings-action-btn-active" : ""}`} aria-pressed={hideNodeBorders} onClick={onNodeBordersToggle}>
+                      {hideNodeBorders ? "Show Borders" : "Hide Borders"}
+                    </button>
+                    <button type="button" className={`ghost-btn settings-action-btn${alignNodeWidthsToMax ? " settings-action-btn-active" : ""}`} aria-pressed={alignNodeWidthsToMax} onClick={onNodeWidthAlignToggle}>
+                      {alignNodeWidthsToMax ? "Auto Width" : "Max Width"}
+                    </button>
+                  </div>
+                </section>
+              </>
+            ) : null}
+
+            {activeChapter === "data" ? (
+              <>
+                <section className="settings-section" aria-labelledby="data-actions-title">
+                  <p id="data-actions-title" className="control-label">Graph Data</p>
+                  <div className="workspace-action-row">
+                    <button
+                      id="field-mapping-btn"
+                      className="ghost-btn settings-action-btn"
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onFieldMappingOpen();
+                      }}
+                    >
+                      Field Mapping
+                    </button>
+                    <button id="export-btn" className="ghost-btn settings-action-btn" type="button" disabled={!hasGraph} onClick={onExport}>Export SVG</button>
+                  </div>
+                </section>
+
+                <section className="settings-section" aria-labelledby="import-options-title">
+                  <p id="import-options-title" className="control-label">Import</p>
+                  <div className="import-action-row">
+                    <label htmlFor="fileInput" className="file-input-label">
+                      <span className="file-input-text">{truncateFileName(fileName)}</span>
+                      <input type="file" id="fileInput" accept=".json,application/json" multiple onClick={onFileInputClick} onChange={onFileInputChange} />
+                    </label>
+                    <label htmlFor="folderInput" className="file-input-label folder-input-label">
+                      <span className="file-input-text">Open Folder</span>
+                      <input
+                        type="file"
+                        id="folderInput"
+                        accept=".json,application/json"
+                        multiple
+                        onClick={onFolderInputClick}
+                        onChange={onFolderInputChange}
+                        {...DIRECTORY_INPUT_PROPS}
+                      />
+                    </label>
+                  </div>
+                </section>
+              </>
+            ) : null}
+
+            {activeChapter === "ai" ? (
+              <section className="settings-section ai-settings-section" aria-labelledby="ai-options-title">
+                <div className="settings-section-header">
+                  <p id="ai-options-title" className="control-label">AI</p>
+                  <label className="settings-checkbox-label">
+                    <input type="checkbox" checked={aiSettings.enabled} onChange={(event) => updateAiSetting("enabled", event.currentTarget.checked)} />
+                    <span>Enable</span>
+                  </label>
+                </div>
+                <div className="ai-settings-grid">
+                  <label className="settings-field-label" htmlFor="ai-provider-select">
+                    <span>Provider</span>
+                    <div className="provider-picker">
+                      <button
+                        id="ai-provider-select"
+                        className="provider-select-button"
+                        type="button"
+                        aria-haspopup="listbox"
+                        aria-expanded={providerMenuOpen}
+                        onClick={() => setProviderMenuOpen((current) => !current)}
+                      >
+                        <ProviderIcon provider={aiSettings.provider} />
+                        <span>{selectedProvider.label}</span>
+                        <span className="provider-select-chevron" aria-hidden="true"><ChevronDownIcon /></span>
+                      </button>
+                      {providerMenuOpen ? (
+                        <div className="provider-options" role="listbox" aria-label="AI provider">
+                          {AI_PROVIDER_ENTRIES.map(([provider, preset]) => (
+                            <button
+                              key={provider}
+                              type="button"
+                              className={`provider-option${provider === aiSettings.provider ? " is-active" : ""}`}
+                              role="option"
+                              aria-selected={provider === aiSettings.provider}
+                              onClick={() => handleAiProviderChange(provider)}
+                            >
+                              <ProviderIcon provider={provider} />
+                              <span>{preset.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </label>
+                  <label className="settings-field-label" htmlFor="ai-execution-mode-select">
+                    <span>Execution</span>
+                    <select id="ai-execution-mode-select" className="settings-select-input" value={aiSettings.executionMode} onChange={(event) => updateAiSetting("executionMode", event.currentTarget.value as AiExecutionMode)}>
+                      <option value="ask">Ask</option>
+                      <option value="auto-readonly">Auto Readonly</option>
+                      <option value="auto-edit">Auto Edit</option>
+                    </select>
+                  </label>
+                  <label className="settings-field-label ai-settings-wide" htmlFor="ai-base-url-input">
+                    <span>Base URL</span>
+                    <input id="ai-base-url-input" className="settings-text-input" type="text" value={aiSettings.baseUrl} onChange={(event) => updateAiSetting("baseUrl", event.currentTarget.value)} />
+                  </label>
+                  <label className="settings-field-label" htmlFor="ai-model-input">
+                    <span>Model</span>
+                    <input id="ai-model-input" className="settings-text-input" type="text" value={aiSettings.model} onChange={(event) => updateAiSetting("model", event.currentTarget.value)} />
+                  </label>
+                  <label className="settings-field-label" htmlFor="ai-api-key-input">
+                    <span>API Key</span>
+                    <input id="ai-api-key-input" className="settings-text-input" type="password" value={aiSettings.apiKey} placeholder={aiSettings.provider === "ollama" ? "not required" : "sk-..."} onChange={(event) => updateAiSetting("apiKey", event.currentTarget.value)} />
+                  </label>
+                  <label className="settings-field-label" htmlFor="ai-temperature-input">
+                    <span>Temp</span>
+                    <input id="ai-temperature-input" className="settings-text-input" type="number" min={0} max={2} step={0.1} value={aiSettings.temperature} onChange={(event) => updateAiSetting("temperature", clampFloatInput(event.currentTarget.value, 0, 2, aiSettings.temperature))} />
+                  </label>
+                  <label className="settings-field-label" htmlFor="ai-max-tokens-input">
+                    <span>Tokens</span>
+                    <input id="ai-max-tokens-input" className="settings-text-input" type="number" min={128} max={8000} step={128} value={aiSettings.maxTokens} onChange={(event) => updateAiSetting("maxTokens", clampNumberInput(event.currentTarget.value, 128, 8000, aiSettings.maxTokens))} />
+                  </label>
+                </div>
+                <button type="button" className="ghost-btn settings-action-btn" disabled={aiBusy || !aiSettings.enabled} onClick={onAiConnectionTest}>
+                  {aiBusy ? "Testing..." : "Test Connection"}
+                </button>
+              </section>
+            ) : null}
+          </div>
+        </div>
+      </section>
+    </div>,
+    document.body,
   );
 }
 
@@ -473,6 +755,32 @@ function SlidersIcon() {
   );
 }
 
+function CloseIcon() {
+  return (
+    <IconShell>
+      <path d="M6 6L18 18" />
+      <path d="M18 6L6 18" />
+    </IconShell>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <IconShell>
+      <path d="M7 10L12 15L17 10" />
+    </IconShell>
+  );
+}
+
+function ProviderIcon({ provider }: { provider: AiProvider }) {
+  const preset = AI_PROVIDER_PRESETS[provider];
+  return (
+    <span className={`provider-icon provider-icon-${provider}`} aria-hidden="true">
+      {preset.icon}
+    </span>
+  );
+}
+
 function truncateFileName(fileName: string): string {
   return fileName.length > 26 ? `${fileName.slice(0, 23)}...` : fileName;
 }
@@ -488,6 +796,14 @@ function clampNumberInput(value: string, min: number, max: number, fallback: num
     return fallback;
   }
   return Math.max(min, Math.min(max, Math.round(parsed)));
+}
+
+function clampFloatInput(value: string, min: number, max: number, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, parsed));
 }
 
 type LayoutControlKey = "columnGap" | "rowGap" | "edgeLaneGap" | "nodeHeight" | "maxNodeWidth";
@@ -507,6 +823,23 @@ const LAYOUT_CONTROLS: LayoutControlDefinition[] = [
   { key: "edgeLaneGap", label: "Line spacing", min: 4, max: 96, step: 2, unit: "px" },
   { key: "nodeHeight", label: "Node height", min: 44, max: 160, step: 2, unit: "px" },
   { key: "maxNodeWidth", label: "Node max width", min: 188, max: 480, step: 4, unit: "px" },
+];
+
+const AI_PROVIDER_PRESETS: Record<AiProvider, { label: string; icon: string; baseUrl: string; model: string }> = {
+  "openai-compatible": { label: "OpenAI compatible", icon: "OA", baseUrl: "https://api.openai.com/v1", model: "gpt-4.1-mini" },
+  deepseek: { label: "DeepSeek", icon: "DS", baseUrl: "https://api.deepseek.com", model: "deepseek-v4-flash" },
+  anthropic: { label: "Anthropic", icon: "A", baseUrl: "https://api.anthropic.com", model: "claude-3-5-sonnet-latest" },
+  gemini: { label: "Gemini", icon: "G", baseUrl: "https://generativelanguage.googleapis.com", model: "gemini-1.5-flash" },
+  ollama: { label: "Ollama", icon: "OL", baseUrl: "http://localhost:11434", model: "llama3.1" },
+};
+
+const AI_PROVIDER_ENTRIES = Object.entries(AI_PROVIDER_PRESETS) as Array<[AiProvider, typeof AI_PROVIDER_PRESETS[AiProvider]]>;
+
+const SETTINGS_CHAPTERS: Array<{ key: SettingsChapter; label: string }> = [
+  { key: "general", label: "General" },
+  { key: "appearance", label: "Appearance" },
+  { key: "data", label: "Data" },
+  { key: "ai", label: "AI" },
 ];
 
 function LayoutSliderControl({
