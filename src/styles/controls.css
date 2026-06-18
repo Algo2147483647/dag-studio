@@ -555,32 +555,64 @@
   flex: 0 0 auto;
   width: 20px;
   height: 20px;
-  border-radius: 6px;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: 0;
+  border: 1px solid rgba(96, 118, 151, 0.14);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.86);
+  overflow: hidden;
+}
+
+.provider-icon-img {
+  display: block;
+  width: 17px;
+  height: 17px;
+  object-fit: contain;
+}
+
+.provider-icon-openai-compatible .provider-icon-img,
+.provider-icon-ollama .provider-icon-img {
+  width: 16px;
+  height: 16px;
+}
+
+.provider-icon-deepseek .provider-icon-img {
+  width: 18px;
+  height: 18px;
+}
+
+.provider-icon-gemini .provider-icon-img {
+  width: 16px;
+  height: 16px;
+}
+
+.provider-icon-anthropic .provider-icon-img {
+  width: 18px;
+  height: 18px;
+  display: block;
 }
 
 .provider-icon-openai-compatible {
-  background: #111827;
+  background: #fff;
 }
 
 .provider-icon-deepseek {
-  background: #2563eb;
+  background: rgba(232, 240, 255, 0.96);
+  border-color: rgba(47, 111, 236, 0.2);
 }
 
 .provider-icon-anthropic {
-  background: #6f5b4a;
+  background: rgba(250, 247, 242, 0.96);
+  border-color: rgba(111, 91, 74, 0.18);
 }
 
 .provider-icon-gemini {
-  background: #7c3aed;
+  background: rgba(248, 250, 255, 0.96);
+  border-color: rgba(124, 58, 237, 0.18);
 }
 
 .provider-icon-ollama {
-  background: #0f766e;
+  color: #1f2937;
+  background: rgba(248, 250, 252, 0.96);
+  border-color: rgba(31, 41, 55, 0.15);
 }
 
 .ai-settings-section {

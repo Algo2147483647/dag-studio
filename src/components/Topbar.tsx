@@ -776,7 +776,7 @@ function ProviderIcon({ provider }: { provider: AiProvider }) {
   const preset = AI_PROVIDER_PRESETS[provider];
   return (
     <span className={`provider-icon provider-icon-${provider}`} aria-hidden="true">
-      {preset.icon}
+      <img src={preset.logoSrc} alt="" className="provider-icon-img" />
     </span>
   );
 }
@@ -825,12 +825,12 @@ const LAYOUT_CONTROLS: LayoutControlDefinition[] = [
   { key: "maxNodeWidth", label: "Node max width", min: 188, max: 480, step: 4, unit: "px" },
 ];
 
-const AI_PROVIDER_PRESETS: Record<AiProvider, { label: string; icon: string; baseUrl: string; model: string }> = {
-  "openai-compatible": { label: "OpenAI compatible", icon: "OA", baseUrl: "https://api.openai.com/v1", model: "gpt-4.1-mini" },
-  deepseek: { label: "DeepSeek", icon: "DS", baseUrl: "https://api.deepseek.com", model: "deepseek-v4-flash" },
-  anthropic: { label: "Anthropic", icon: "A", baseUrl: "https://api.anthropic.com", model: "claude-3-5-sonnet-latest" },
-  gemini: { label: "Gemini", icon: "G", baseUrl: "https://generativelanguage.googleapis.com", model: "gemini-1.5-flash" },
-  ollama: { label: "Ollama", icon: "OL", baseUrl: "http://localhost:11434", model: "llama3.1" },
+const AI_PROVIDER_PRESETS: Record<AiProvider, { label: string; logoSrc: string; baseUrl: string; model: string }> = {
+  "openai-compatible": { label: "OpenAI compatible", logoSrc: "/assets/providers/openai.png", baseUrl: "https://api.openai.com/v1", model: "gpt-4.1-mini" },
+  deepseek: { label: "DeepSeek", logoSrc: "/assets/providers/deepseek-icon.png", baseUrl: "https://api.deepseek.com", model: "deepseek-v4-flash" },
+  anthropic: { label: "Anthropic", logoSrc: "/assets/providers/anthropic.png", baseUrl: "https://api.anthropic.com", model: "claude-3-5-sonnet-latest" },
+  gemini: { label: "Gemini", logoSrc: "/assets/providers/gemini.svg", baseUrl: "https://generativelanguage.googleapis.com", model: "gemini-1.5-flash" },
+  ollama: { label: "Ollama", logoSrc: "/assets/providers/ollama.png", baseUrl: "http://localhost:11434", model: "llama3.1" },
 };
 
 const AI_PROVIDER_ENTRIES = Object.entries(AI_PROVIDER_PRESETS) as Array<[AiProvider, typeof AI_PROVIDER_PRESETS[AiProvider]]>;
