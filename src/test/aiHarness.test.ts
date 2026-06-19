@@ -7,6 +7,7 @@ import {
   referencesPreviousWork,
   validateCommandBatch,
 } from "../ai/harness";
+import { buildAiHarnessStorageKey, parsePersistedAiHarnessState } from "../ai/persistence";
 import { getDefaultFieldMapping } from "../graph/fieldMapping";
 import { createSampleDag } from "./fixtures";
 import { defineSuite, defineTest } from "./harness";
@@ -87,5 +88,33 @@ export const aiHarnessSuite = defineSuite("ai harness", [
     const diffPreview = validation.results.flatMap((result) => result.expectedDiff || []);
     assert.ok(diffPreview.some((line) => line === "+ Node: Subgroup"));
     assert.ok(diffPreview.some((line) => line === "+ Edge: A -> Subgroup"));
+  }),
+
+  defineTest("parses persisted harness state with active plan and pending batch", () => {
+    const harness = createInitialAiHarnessState("review");
+    const turnId = createTurnId();
+    const plan = createPlanFromAiResponse({
+      harness,
+      turnId,
+      userMessage: "Add a subgroup concept.",
+      response: {
+        kind: "run_console",
+        answer: "Adding Subgroup under Group.",
+        commandBatch: {
+          commands: ["/add Subgroup -p A"],
+        },
+      },
+    });
+    const next = installPlan(harness, plan, turnId);
+    const parsed = parsePersistedAiHarnessState(JSON.stringify(next), "ask");
+    assert.ok(parsed);
+    assert.equal(parsed.mode, "review");
+    assert.equal(parsed.activePlan?.title, plan.title);
+    assert.deepEqual(parsed.pendingCommandBatch?.commands, ["/add Subgroup -p A"]);
+  }),
+
+  defineTest("builds stable per-graph persistence keys", () => {
+    assert.equal(buildAiHarnessStorageKey("example.json"), "dag-studio:ai-harness:example.json");
+    assert.equal(buildAiHarnessStorageKey("math graph.json"), "dag-studio:ai-harness:math%20graph.json");
   }),
 ]);

@@ -61,6 +61,7 @@ import {
   syncHarnessRuntime,
   validateCommandBatch,
 } from "./ai/harness";
+import { loadPersistedAiHarnessState, savePersistedAiHarnessState } from "./ai/persistence";
 
 export default function App() {
   const [state, dispatch] = useReducer(graphReducer, initialGraphAppState);
@@ -87,6 +88,8 @@ export default function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const topbarRef = useRef<HTMLElement>(null);
+  const restoredAiHarnessGraphRef = useRef<string | null>(null);
+  const restoredReviewCardRef = useRef<string | null>(null);
 
   useDefaultGraph(dispatch, suppressDefaultGraphRef, setFieldMapping);
 
@@ -108,12 +111,40 @@ export default function App() {
   useEffect(() => {
     const graphId = state.source.fileName || "local-graph";
     const graphRevision = String(state.editHistory.revision);
-    setAiHarness((current) => syncHarnessRuntime(current, {
-      graphId,
-      graphRevision,
-      mode: aiSettings.executionMode,
-    }));
+    setAiHarness((current) => {
+      const graphChanged = restoredAiHarnessGraphRef.current !== graphId;
+      const restored = graphChanged ? loadPersistedAiHarnessState(graphId, aiSettings.executionMode) : null;
+      const base = restored || (graphChanged ? createInitialAiHarnessState(aiSettings.executionMode) : current);
+      restoredAiHarnessGraphRef.current = graphId;
+      return syncHarnessRuntime(base, {
+        graphId,
+        graphRevision,
+        mode: aiSettings.executionMode,
+      });
+    });
   }, [aiSettings.executionMode, state.editHistory.revision, state.source.fileName]);
+
+  useEffect(() => {
+    savePersistedAiHarnessState(aiHarness);
+  }, [aiHarness]);
+
+  useEffect(() => {
+    const plan = aiHarness.activePlan;
+    if (!plan || restoredReviewCardRef.current === `${aiHarness.graphId}:${plan.id}:${plan.status}`) {
+      return;
+    }
+    if (consoleEntries.some((entry) => entry.tone === "ai-review" && entry.review.planId === plan.id)) {
+      restoredReviewCardRef.current = `${aiHarness.graphId}:${plan.id}:${plan.status}`;
+      return;
+    }
+    if ((plan.status === "ready" || plan.status === "failed" || plan.status === "superseded") && plan.commandBatch?.validation) {
+      appendConsoleReviewEntry(
+        setConsoleEntries,
+        buildConsoleReviewCard(plan, plan.commandBatch.validation, plan.status === "superseded" ? "stale" : undefined),
+      );
+      restoredReviewCardRef.current = `${aiHarness.graphId}:${plan.id}:${plan.status}`;
+    }
+  }, [aiHarness.activePlan, aiHarness.graphId, consoleEntries]);
 
   useEffect(() => {
     if (consoleContextNodeKey && state.dag && !state.dag[consoleContextNodeKey]) {
@@ -1000,6 +1031,7 @@ export default function App() {
             contextNodeKey={consoleContextNodeKey}
             aiEnabled={aiSettings.enabled}
             aiBusy={aiBusy}
+            aiHarness={aiHarness}
             suggestions={consoleSuggestions}
             activeSuggestionIndex={activeSuggestionIndex}
             onReviewApply={handleAiReviewApply}
@@ -1219,7 +1251,7 @@ function buildConsoleReviewCard(
     commands,
     diffPreview,
     validationSummary: validation.summary,
-    canApply: validation.allPassed && commands.length > 0 && statusOverride !== "applied",
+    canApply: validation.allPassed && commands.length > 0 && !statusOverride,
   };
 }
 
