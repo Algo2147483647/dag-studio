@@ -1,43 +1,47 @@
-import type { AiPlan, AiRequest, AiSettings } from "./types";
+import type { AiContextPacket, AiRequest, AiResponse, AiSettings, LegacyAiPlan, ProposedChange } from "./types";
 
 const SYSTEM_PROMPT = [
   "You are DAG Studio's AI control assistant.",
-  "You can answer questions about the current graph and can operate the graph only by returning console commands.",
+  "You are running inside a structured graph editing agent harness.",
+  "Use the Context Packet as the source of truth. Do not rely on hidden memory.",
+  "The harness remembers active plans, pending command batches, recent events, graph revisions, and validation results.",
   "Every console command must start with / and must be one of the available commands in the command reference.",
-  "Never invent hidden APIs. Never mutate graph data directly.",
-  "When the user asks about a specific node, a bare node name, graph structure, paths, or data details that are not fully visible in context, return read-only console commands such as /find, /ls, /neighbors, /path, or /graph.",
-  "Interpret bare words like \"Set node\" or \"Set 节点\" as a possible node lookup first; do not treat them as edit requests unless the user explicitly asks to change data or uses /set.",
-  "Return only JSON with one of these shapes:",
-  '{"type":"answer","text":"..."}',
-  '{"type":"run_console","explanation":"...","commands":["/keys"]}',
-  "Use run_console only when the user asks you to inspect or change the graph through commands.",
+  "Never mutate graph data directly. Use commands only.",
+  "Resolve references in this priority order: activePlan, pendingCommandBatch, recentEvents, focused graph context, inspection commands, clarification.",
+  "If the user says just now, above, as you said, based on your analysis, complete the changes, continue, or do it: first use activePlan or pendingCommandBatch when present.",
+  "Do not ask the user to specify nodes when activePlan or recent artifacts already identify them.",
+  "If graph facts are missing but inspectable, return inspect or read-only run_console commands such as /find, /ls, /neighbors, /path, or /graph.",
+  "Return only JSON using response protocol v2:",
+  '{"kind":"answer","answer":"..."}',
+  '{"kind":"propose_changes","answer":"...","plan":{"title":"...","goal":"...","assumptions":[],"affectedNodes":[],"changes":[{"kind":"add_node","target":{"nodeId":"..."},"rationale":"...","draftCommands":["/add ..."],"risk":"low"}]},"draftCommands":[{"command":"/add ...","rationale":"...","risk":"low"}],"nextAction":{"type":"await_user_confirmation","message":"..."}}',
+  '{"kind":"run_console","answer":"...","commandBatch":{"title":"...","commands":["/keys"],"expectedGraphEffects":[],"riskLevel":"low"},"preflightRequired":true}',
+  '{"kind":"inspect","answer":"...","commands":["/find Group"]}',
+  '{"kind":"clarify","answer":"...","missingInformation":[{"field":"...","reason":"..."}]}',
+  "For analysis that implies edits, prefer propose_changes with draftCommands instead of plain answer.",
 ].join("\n");
 
-export async function requestAiPlan({ settings, context, message }: AiRequest): Promise<AiPlan> {
-  const prompt = buildUserPrompt(context.summary, context.commandReference, message);
+export async function requestAiPlan({ settings, context, message }: AiRequest): Promise<AiResponse> {
+  const prompt = buildUserPrompt(context, message);
   const raw = await requestProviderText(settings, SYSTEM_PROMPT, prompt);
-  return parseAiPlan(raw);
+  return parseAiResponse(raw);
 }
 
 export async function testAiConnection(settings: AiSettings): Promise<string> {
   const raw = await requestProviderText(
     settings,
-    "Return only a short JSON object: {\"type\":\"answer\",\"text\":\"ok\"}.",
+    "Return only a short JSON object: {\"kind\":\"answer\",\"answer\":\"ok\"}.",
     "Reply with ok.",
   );
-  const plan = parseAiPlan(raw);
-  return plan.type === "answer" ? plan.text : "ok";
+  const plan = parseAiResponse(raw);
+  return plan.kind === "answer" ? plan.answer : "ok";
 }
 
-function buildUserPrompt(summary: string, commandReference: string, message: string): string {
+function buildUserPrompt(context: AiContextPacket, message: string): string {
   return [
-    "Current graph context:",
-    summary,
+    "Context Packet:",
+    JSON.stringify(context, null, 2),
     "",
-    "Available console commands:",
-    commandReference,
-    "",
-    "User request:",
+    "Latest user request:",
     message,
   ].join("\n");
 }
@@ -153,12 +157,118 @@ async function requestOllama(settings: AiSettings, systemPrompt: string, userPro
   return text;
 }
 
-function parseAiPlan(raw: string): AiPlan {
+function parseAiResponse(raw: string): AiResponse {
   const parsed = JSON.parse(extractJsonObject(raw)) as unknown;
   if (!parsed || typeof parsed !== "object") {
     throw new Error("AI response was not a JSON object.");
   }
   const record = parsed as Record<string, unknown>;
+
+  if (record.kind === "answer" && typeof record.answer === "string") {
+    return { kind: "answer", answer: record.answer };
+  }
+
+  if (record.kind === "clarify" && typeof record.answer === "string") {
+    const missingInformation = Array.isArray(record.missingInformation)
+      ? record.missingInformation
+        .map((item) => normalizeMissingInformation(item))
+        .filter((item): item is { field: string; reason: string; candidates?: string[] } => Boolean(item))
+      : undefined;
+    return { kind: "clarify", answer: record.answer, missingInformation };
+  }
+
+  if (record.kind === "inspect" && typeof record.answer === "string" && Array.isArray(record.commands)) {
+    return {
+      kind: "inspect",
+      answer: record.answer,
+      commands: record.commands.map((command) => String(command).trim()).filter((command) => command.startsWith("/")),
+    };
+  }
+
+  if (record.kind === "run_console" && typeof record.answer === "string" && isRecord(record.commandBatch)) {
+    const commands = Array.isArray(record.commandBatch.commands)
+      ? record.commandBatch.commands.map((command) => String(command).trim()).filter((command) => command.startsWith("/"))
+      : [];
+    if (!commands.length) {
+      throw new Error("AI run_console response did not include commands.");
+    }
+    return {
+      kind: "run_console",
+      answer: record.answer,
+      commandBatch: {
+        title: typeof record.commandBatch.title === "string" ? record.commandBatch.title : undefined,
+        commands,
+        expectedGraphEffects: Array.isArray(record.commandBatch.expectedGraphEffects)
+          ? record.commandBatch.expectedGraphEffects.map((effect) => String(effect))
+          : undefined,
+        riskLevel: normalizeRisk(record.commandBatch.riskLevel),
+      },
+      preflightRequired: record.preflightRequired !== false,
+    };
+  }
+
+  if (
+    record.kind === "propose_changes"
+    && typeof record.answer === "string"
+    && isRecord(record.plan)
+    && typeof record.plan.title === "string"
+    && typeof record.plan.goal === "string"
+    && Array.isArray(record.plan.changes)
+  ) {
+    return {
+      kind: "propose_changes",
+      answer: record.answer,
+      plan: {
+        title: record.plan.title,
+        goal: record.plan.goal,
+        assumptions: Array.isArray(record.plan.assumptions) ? record.plan.assumptions.map((item) => String(item)) : [],
+        affectedNodes: Array.isArray(record.plan.affectedNodes) ? record.plan.affectedNodes.map((item) => String(item)) : [],
+        changes: record.plan.changes.map((item) => normalizeProposedChange(item)).filter((item): item is ProposedChange => Boolean(item)),
+      },
+      draftCommands: normalizeDraftCommands(record.draftCommands),
+      nextAction: isRecord(record.nextAction) && typeof record.nextAction.type === "string" && typeof record.nextAction.message === "string"
+        ? {
+          type: normalizeNextAction(record.nextAction.type),
+          message: record.nextAction.message,
+        }
+        : undefined,
+    };
+  }
+
+  const legacy = parseLegacyAiPlan(record);
+  if (legacy.type === "answer") {
+    return { kind: "answer", answer: legacy.text };
+  }
+  return {
+    kind: "run_console",
+    answer: legacy.explanation,
+    commandBatch: {
+      commands: legacy.commands,
+      riskLevel: "medium",
+    },
+    preflightRequired: true,
+  };
+}
+
+function normalizeDraftCommands(value: unknown): Array<{ command: string; rationale?: string; risk?: "low" | "medium" | "high" }> | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const commands: Array<{ command: string; rationale?: string; risk?: "low" | "medium" | "high" }> = [];
+  value.forEach((item) => {
+    if (!isRecord(item) || typeof item.command !== "string") {
+      return;
+    }
+    commands.push({
+      command: item.command,
+      rationale: typeof item.rationale === "string" ? item.rationale : undefined,
+      risk: normalizeRisk(item.risk),
+    });
+  });
+  return commands;
+}
+
+function parseLegacyAiPlan(record: Record<string, unknown>): LegacyAiPlan {
   if (record.type === "answer" && typeof record.text === "string") {
     return { type: "answer", text: record.text };
   }
@@ -174,7 +284,68 @@ function parseAiPlan(raw: string): AiPlan {
       commands: record.commands.map((command) => command.trim()).filter(Boolean),
     };
   }
-  throw new Error("AI response did not match the expected plan schema.");
+  throw new Error("AI response did not match the expected response protocol.");
+}
+
+function normalizeProposedChange(value: unknown): ProposedChange | null {
+  if (!isRecord(value) || typeof value.kind !== "string" || typeof value.rationale !== "string" || !Array.isArray(value.draftCommands)) {
+    return null;
+  }
+  const allowedKinds = new Set([
+    "add_node",
+    "set_property",
+    "add_edge",
+    "remove_edge",
+    "merge_node",
+    "rename_node",
+    "restructure_subgraph",
+  ]);
+  if (!allowedKinds.has(value.kind)) {
+    return null;
+  }
+  return {
+    id: typeof value.id === "string" ? value.id : undefined,
+    kind: value.kind as ProposedChange["kind"],
+    target: normalizeTarget(value.target),
+    rationale: value.rationale,
+    draftCommands: value.draftCommands.map((command) => String(command).trim()).filter((command) => command.startsWith("/")),
+    dependencies: Array.isArray(value.dependencies) ? value.dependencies.map((item) => String(item)) : undefined,
+    risk: normalizeRisk(value.risk),
+  };
+}
+
+function normalizeTarget(value: unknown): ProposedChange["target"] | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  return {
+    nodeId: typeof value.nodeId === "string" ? value.nodeId : undefined,
+    edgeId: typeof value.edgeId === "string" ? value.edgeId : undefined,
+    property: typeof value.property === "string" ? value.property : undefined,
+  };
+}
+
+function normalizeMissingInformation(value: unknown): { field: string; reason: string; candidates?: string[] } | null {
+  if (!isRecord(value) || typeof value.field !== "string" || typeof value.reason !== "string") {
+    return null;
+  }
+  return {
+    field: value.field,
+    reason: value.reason,
+    candidates: Array.isArray(value.candidates) ? value.candidates.map((item) => String(item)) : undefined,
+  };
+}
+
+function normalizeRisk(value: unknown): "low" | "medium" | "high" | undefined {
+  return value === "low" || value === "medium" || value === "high" ? value : undefined;
+}
+
+function normalizeNextAction(value: string): "await_user_confirmation" | "validate_then_execute" | "needs_inspection" {
+  return value === "validate_then_execute" || value === "needs_inspection" ? value : "await_user_confirmation";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function extractJsonObject(raw: string): string {

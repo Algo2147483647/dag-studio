@@ -210,7 +210,7 @@ function sanitizeAiProvider(value: unknown): AiProvider {
 }
 
 function sanitizeAiExecutionMode(value: unknown): AiExecutionMode {
-  return value === "ask" || value === "auto-readonly" || value === "auto-edit"
+  return value === "ask" || value === "review" || value === "auto-readonly" || value === "auto-edit"
     ? value
     : DEFAULT_AI_SETTINGS.executionMode;
 }

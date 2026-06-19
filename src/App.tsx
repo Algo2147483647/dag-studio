@@ -25,7 +25,7 @@ import { repairSelectionAfterCommand } from "./state/derived";
 import { graphReducer, repairHistoryAfterCommand } from "./state/graphReducer";
 import { initialGraphAppState } from "./state/initialState";
 import { loadGraphPagePreferences, saveGraphPagePreferences } from "./state/preferences";
-import ConsoleSidebar from "./components/ConsoleSidebar";
+import ConsoleSidebar, { type ConsoleEntry, type ConsoleReviewCard } from "./components/ConsoleSidebar";
 import ContextMenu, { type ContextMenuAction } from "./components/ContextMenu";
 import FieldMappingModal from "./components/FieldMappingModal";
 import NodeDetailModal from "./components/NodeDetailModal";
@@ -40,12 +40,27 @@ import type { EditTransaction } from "./state/initialState";
 import { collectBatchEffects, buildConsoleMutationLabel, executeConsoleInstructions } from "./console/executor";
 import { parseConsoleSource } from "./console/dsl";
 import { CONSOLE_COMMAND_REFERENCE } from "./console/reference";
-import { buildAiGraphContext } from "./ai/context";
 import { requestAiPlan, testAiConnection } from "./ai/providers";
 import type { AiSettings } from "./ai/types";
-
-type ConsoleEntryTone = "input" | "success" | "error" | "info" | "ai" | "ai-action";
-type ConsoleEntry = { id: number; tone: ConsoleEntryTone; text: string };
+import type { ActionPlan, ValidationReport } from "./ai/types";
+import {
+  appendAiEvents,
+  attachValidationToHarness,
+  buildAiContextPacket,
+  createAiEvent,
+  createInitialAiHarnessState,
+  createPlanFromAiResponse,
+  createTurnId,
+  formatReviewInstruction,
+  formatValidationReport,
+  installPlan,
+  isReadOnlyCommand,
+  markPendingBatchExecuted,
+  referencesPreviousWork,
+  shouldExecuteValidatedBatch,
+  syncHarnessRuntime,
+  validateCommandBatch,
+} from "./ai/harness";
 
 export default function App() {
   const [state, dispatch] = useReducer(graphReducer, initialGraphAppState);
@@ -55,6 +70,7 @@ export default function App() {
   const [hideNodeBorders, setHideNodeBorders] = useState<boolean>(() => loadGraphPagePreferences().hideNodeBorders ?? false);
   const [alignNodeWidthsToMax, setAlignNodeWidthsToMax] = useState<boolean>(() => loadGraphPagePreferences().alignNodeWidthsToMax ?? false);
   const [aiSettings, setAiSettings] = useState<AiSettings>(() => loadGraphPagePreferences().aiSettings);
+  const [aiHarness, setAiHarness] = useState(() => createInitialAiHarnessState(aiSettings.executionMode));
   const [aiBusy, setAiBusy] = useState(false);
   const [fieldMappingOpen, setFieldMappingOpen] = useState(false);
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
@@ -88,6 +104,16 @@ export default function App() {
       aiSettings,
     });
   }, [aiSettings, alignNodeWidthsToMax, fieldMapping, hideNodeBorders, showNodeDetail, state.layout.mode, state.mode, state.ui.consoleSidebarOpen, state.ui.consoleSidebarWidth, theme]);
+
+  useEffect(() => {
+    const graphId = state.source.fileName || "local-graph";
+    const graphRevision = String(state.editHistory.revision);
+    setAiHarness((current) => syncHarnessRuntime(current, {
+      graphId,
+      graphRevision,
+      mode: aiSettings.executionMode,
+    }));
+  }, [aiSettings.executionMode, state.editHistory.revision, state.source.fileName]);
 
   useEffect(() => {
     if (consoleContextNodeKey && state.dag && !state.dag[consoleContextNodeKey]) {
@@ -294,6 +320,15 @@ export default function App() {
     if (!message || aiBusy) {
       return;
     }
+    const turnId = createTurnId();
+    const runtimeHarness = syncHarnessRuntime(aiHarness, {
+      graphId: state.source.fileName || "local-graph",
+      graphRevision: String(state.editHistory.revision),
+      mode: aiSettings.executionMode,
+    });
+    let nextHarness = appendAiEvents(runtimeHarness, [
+      createAiEvent(runtimeHarness, turnId, "user.message", { message }),
+    ]);
 
     appendConsoleInputEntries(setConsoleEntries, "ask>", message);
     setConsoleHistory((current) => (current[current.length - 1] === message ? current : [...current, message]));
@@ -301,50 +336,220 @@ export default function App() {
 
     if (!aiSettings.enabled) {
       appendConsoleEntry(setConsoleEntries, "error", "AI is disabled. Enable AI in the controls panel first.");
+      setAiHarness(appendAiEvents(nextHarness, [
+        createAiEvent(nextHarness, turnId, "error", { message: "AI is disabled." }),
+      ]));
       return;
     }
     if (!aiSettings.baseUrl.trim() || !aiSettings.model.trim()) {
       appendConsoleEntry(setConsoleEntries, "error", "AI requires a base URL and model in the controls panel.");
+      setAiHarness(appendAiEvents(nextHarness, [
+        createAiEvent(nextHarness, turnId, "error", { message: "AI requires a base URL and model." }),
+      ]));
+      return;
+    }
+
+    if (referencesPreviousWork(message) && nextHarness.pendingCommandBatch) {
+      const validation = validateCommandBatch({
+        batch: nextHarness.pendingCommandBatch,
+        dag: state.dag,
+        contextNodeKey: consoleContextNodeKey,
+        mapping: fieldMapping,
+        graphRevision: String(state.editHistory.revision),
+      });
+      nextHarness = attachValidationToHarness(nextHarness, validation, turnId);
+      appendConsoleEntry(setConsoleEntries, validation.allPassed ? "info" : "error", formatValidationReport(validation));
+      if (nextHarness.activePlan) {
+        appendConsoleReviewEntry(setConsoleEntries, buildConsoleReviewCard(nextHarness.activePlan, validation));
+      }
+      if (!validation.allPassed) {
+        setAiHarness(nextHarness);
+        return;
+      }
+
+      const commands = nextHarness.pendingCommandBatch?.commands || [];
+      const shouldExecute = commands.every(isReadOnlyCommand)
+        || shouldExecuteValidatedBatch(aiSettings.executionMode, validation)
+        || (aiSettings.executionMode === "review" && isExecutionApproval(message));
+      if (!shouldExecute) {
+        appendConsoleEntry(setConsoleEntries, "info", formatReviewInstruction(aiSettings.executionMode));
+        setAiHarness(nextHarness);
+        return;
+      }
+
+      runConsoleSource(commands.join("\n"));
+      nextHarness = markPendingBatchExecuted(nextHarness, turnId);
+      if (nextHarness.activePlan?.commandBatch?.validation) {
+        updateConsoleReviewEntry(setConsoleEntries, buildConsoleReviewCard(nextHarness.activePlan, nextHarness.activePlan.commandBatch.validation, "applied"));
+      }
+      setAiHarness(nextHarness);
       return;
     }
 
     setAiBusy(true);
     try {
-      const context = buildAiGraphContext({
+      const context = buildAiContextPacket({
+        harness: nextHarness,
         dag: state.dag,
         mode: state.mode,
         layoutMode: state.layout.mode,
         selection: state.selection,
         contextNodeKey: consoleContextNodeKey,
         mapping: fieldMapping,
+        consoleEntries,
       });
-      const plan = await requestAiPlan({ settings: aiSettings, context, message });
-      if (plan.type === "answer") {
-        appendConsoleEntry(setConsoleEntries, "ai", plan.text);
+      const response = await requestAiPlan({ settings: aiSettings, context, message });
+      if (response.kind === "answer") {
+        appendConsoleEntry(setConsoleEntries, "ai", response.answer);
+        setAiHarness(appendAiEvents(nextHarness, [
+          createAiEvent(nextHarness, turnId, "assistant.answer", { answer: response.answer }),
+        ]));
+        return;
+      }
+      if (response.kind === "clarify") {
+        const missing = response.missingInformation?.length
+          ? `\nMissing information:\n${response.missingInformation.map((item) => `- ${item.field}: ${item.reason}`).join("\n")}`
+          : "";
+        appendConsoleEntry(setConsoleEntries, "ai", `${response.answer}${missing}`);
+        setAiHarness(appendAiEvents(nextHarness, [
+          createAiEvent(nextHarness, turnId, "assistant.answer", { answer: response.answer, missingInformation: response.missingInformation || [] }),
+        ]));
         return;
       }
 
-      const commandBatch = plan.commands.join("\n");
-      appendConsoleEntry(setConsoleEntries, "ai", plan.explanation || "AI prepared console commands.");
-      appendConsoleEntry(setConsoleEntries, "ai-action", commandBatch);
+      const plan = createPlanFromAiResponse({
+        response,
+        harness: nextHarness,
+        turnId,
+        userMessage: message,
+      });
+      nextHarness = installPlan(nextHarness, plan, turnId);
+      appendConsoleEntry(setConsoleEntries, "ai", response.answer);
 
-      const commandsAreReadOnly = plan.commands.every(isReadOnlyConsoleCommand);
-      if (aiSettings.executionMode === "ask" && !commandsAreReadOnly) {
-        appendConsoleEntry(setConsoleEntries, "info", "AI execution mode is Ask. Review the edit commands above, then switch to Auto Edit to allow automatic mutations.");
+      const batch = nextHarness.pendingCommandBatch;
+      if (!batch) {
+        appendConsoleEntry(setConsoleEntries, "ai-action", plan.ui.displaySummary);
+        setAiHarness(nextHarness);
         return;
       }
-      if (aiSettings.executionMode === "auto-readonly" && !commandsAreReadOnly) {
-        appendConsoleEntry(setConsoleEntries, "error", "AI prepared edit commands, but execution mode is Auto Readonly.");
+
+      const validation = validateCommandBatch({
+        batch,
+        dag: state.dag,
+        contextNodeKey: consoleContextNodeKey,
+        mapping: fieldMapping,
+        graphRevision: String(state.editHistory.revision),
+      });
+      nextHarness = attachValidationToHarness(nextHarness, validation, turnId);
+      if (nextHarness.activePlan) {
+        appendConsoleReviewEntry(setConsoleEntries, buildConsoleReviewCard(nextHarness.activePlan, validation));
+      }
+      if (!validation.allPassed) {
+        setAiHarness(nextHarness);
         return;
       }
-      runConsoleSource(commandBatch);
+
+      const commands = batch.commands;
+      if (commands.every(isReadOnlyCommand) || shouldExecuteValidatedBatch(aiSettings.executionMode, validation)) {
+        runConsoleSource(commands.join("\n"));
+        nextHarness = markPendingBatchExecuted(nextHarness, turnId);
+        if (nextHarness.activePlan?.commandBatch?.validation) {
+          updateConsoleReviewEntry(setConsoleEntries, buildConsoleReviewCard(nextHarness.activePlan, nextHarness.activePlan.commandBatch.validation, "applied"));
+        }
+        setAiHarness(nextHarness);
+        return;
+      }
+
+      appendConsoleEntry(setConsoleEntries, "info", formatReviewInstruction(aiSettings.executionMode));
+      setAiHarness(nextHarness);
     } catch (error) {
       const messageText = error instanceof Error ? error.message : "AI request failed.";
       appendConsoleEntry(setConsoleEntries, "error", messageText);
+      setAiHarness(appendAiEvents(nextHarness, [
+        createAiEvent(nextHarness, turnId, "error", { message: messageText }),
+      ]));
     } finally {
       setAiBusy(false);
     }
-  }, [aiBusy, aiSettings, consoleContextNodeKey, fieldMapping, runConsoleSource, state.dag, state.layout.mode, state.mode, state.selection]);
+  }, [aiBusy, aiHarness, aiSettings, consoleContextNodeKey, consoleEntries, fieldMapping, runConsoleSource, state.dag, state.editHistory.revision, state.layout.mode, state.mode, state.selection, state.source.fileName]);
+
+  const handleAiReviewApply = useCallback((planId: string) => {
+    const turnId = createTurnId();
+    const runtimeHarness = syncHarnessRuntime(aiHarness, {
+      graphId: state.source.fileName || "local-graph",
+      graphRevision: String(state.editHistory.revision),
+      mode: aiSettings.executionMode,
+    });
+    if (!runtimeHarness.activePlan || runtimeHarness.activePlan.id !== planId || !runtimeHarness.pendingCommandBatch) {
+      appendConsoleEntry(setConsoleEntries, "error", "No matching pending AI plan is available.");
+      return;
+    }
+
+    let nextHarness = appendAiEvents(runtimeHarness, [
+      createAiEvent(runtimeHarness, turnId, "user.approved", { planId }),
+    ]);
+    const validation = validateCommandBatch({
+      batch: runtimeHarness.pendingCommandBatch,
+      dag: state.dag,
+      contextNodeKey: consoleContextNodeKey,
+      mapping: fieldMapping,
+      graphRevision: String(state.editHistory.revision),
+    });
+    nextHarness = attachValidationToHarness(nextHarness, validation, turnId);
+    if (nextHarness.activePlan) {
+      updateConsoleReviewEntry(setConsoleEntries, buildConsoleReviewCard(nextHarness.activePlan, validation));
+    }
+    if (!validation.allPassed) {
+      appendConsoleEntry(setConsoleEntries, "error", formatValidationReport(validation));
+      setAiHarness(nextHarness);
+      return;
+    }
+
+    const commands = nextHarness.pendingCommandBatch?.commands || [];
+    runConsoleSource(commands.join("\n"));
+    nextHarness = markPendingBatchExecuted(nextHarness, turnId);
+    if (nextHarness.activePlan?.commandBatch?.validation) {
+      updateConsoleReviewEntry(setConsoleEntries, buildConsoleReviewCard(nextHarness.activePlan, nextHarness.activePlan.commandBatch.validation, "applied"));
+    }
+    setAiHarness(nextHarness);
+  }, [aiHarness, aiSettings.executionMode, consoleContextNodeKey, fieldMapping, runConsoleSource, state.dag, state.editHistory.revision, state.source.fileName]);
+
+  const handleAiReviewDismiss = useCallback((planId: string) => {
+    const turnId = createTurnId();
+    setAiHarness((current) => {
+      if (!current.activePlan || current.activePlan.id !== planId) {
+        return current;
+      }
+      const dismissedPlan: ActionPlan = {
+        ...current.activePlan,
+        status: "cancelled",
+        timestamps: { ...current.activePlan.timestamps, updatedAt: Date.now() },
+      };
+      return appendAiEvents({
+        ...current,
+        activePlan: dismissedPlan,
+        pendingCommandBatch: undefined,
+        workingMemory: {
+          ...current.workingMemory,
+          activePlanId: dismissedPlan.id,
+          pendingCommandBatchId: undefined,
+        },
+      }, [
+        createAiEvent(current, turnId, "user.rejected", { planId }),
+      ]);
+    });
+    updateConsoleReviewCardStatus(setConsoleEntries, planId, "dismissed");
+    appendConsoleEntry(setConsoleEntries, "info", "AI plan dismissed.");
+  }, []);
+
+  const handleAiReviewCopy = useCallback((commands: string[]) => {
+    void copyTextToClipboard(commands.join("\n"))
+      .then(() => appendConsoleEntry(setConsoleEntries, "success", "Copied AI commands."))
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : "Copy failed.";
+        appendConsoleEntry(setConsoleEntries, "error", message);
+      });
+  }, []);
 
   const handleConsoleRun = useCallback(() => {
     if (!consoleInput.trim()) {
@@ -797,6 +1002,9 @@ export default function App() {
             aiBusy={aiBusy}
             suggestions={consoleSuggestions}
             activeSuggestionIndex={activeSuggestionIndex}
+            onReviewApply={handleAiReviewApply}
+            onReviewDismiss={handleAiReviewDismiss}
+            onReviewCopy={handleAiReviewCopy}
             onInputChange={(value) => {
               setConsoleInput(value);
               setConsoleHistoryIndex(null);
@@ -943,10 +1151,76 @@ function buildConsoleSuccessMessage(
 
 function appendConsoleEntry(
   setEntries: React.Dispatch<React.SetStateAction<ConsoleEntry[]>>,
-  tone: ConsoleEntryTone,
+  tone: Exclude<ConsoleEntry["tone"], "ai-review">,
   text: string,
 ): void {
   setEntries((current) => [...current, { id: Date.now() + current.length, tone, text }]);
+}
+
+function appendConsoleReviewEntry(
+  setEntries: React.Dispatch<React.SetStateAction<ConsoleEntry[]>>,
+  review: ConsoleReviewCard,
+): void {
+  setEntries((current) => [...current, { id: Date.now() + current.length, tone: "ai-review", text: review.title, review }]);
+}
+
+function updateConsoleReviewEntry(
+  setEntries: React.Dispatch<React.SetStateAction<ConsoleEntry[]>>,
+  review: ConsoleReviewCard,
+): void {
+  setEntries((current) => {
+    let updated = false;
+    const next = current.map((entry) => {
+      if (entry.tone !== "ai-review" || entry.review.planId !== review.planId) {
+        return entry;
+      }
+      updated = true;
+      return { ...entry, text: review.title, review };
+    });
+    return updated ? next : [...current, { id: Date.now() + current.length, tone: "ai-review", text: review.title, review }];
+  });
+}
+
+function updateConsoleReviewCardStatus(
+  setEntries: React.Dispatch<React.SetStateAction<ConsoleEntry[]>>,
+  planId: string,
+  status: ConsoleReviewCard["status"],
+): void {
+  setEntries((current) => current.map((entry) => {
+    if (entry.tone !== "ai-review" || entry.review.planId !== planId) {
+      return entry;
+    }
+    return {
+      ...entry,
+      review: {
+        ...entry.review,
+        status,
+        canApply: false,
+      },
+    };
+  }));
+}
+
+function buildConsoleReviewCard(
+  plan: ActionPlan,
+  validation: ValidationReport,
+  statusOverride?: ConsoleReviewCard["status"],
+): ConsoleReviewCard {
+  const commands = plan.commandBatch?.commands || [];
+  const diffPreview = validation.results.flatMap((result) => result.expectedDiff || []);
+  return {
+    planId: plan.id,
+    title: plan.title,
+    goal: plan.goal,
+    riskLevel: validation.riskLevel,
+    status: statusOverride || (validation.allPassed ? "ready" : "failed"),
+    commandCount: commands.length,
+    changeCount: plan.changes.length,
+    commands,
+    diffPreview,
+    validationSummary: validation.summary,
+    canApply: validation.allPassed && commands.length > 0 && statusOverride !== "applied",
+  };
 }
 
 function appendConsoleInputEntries(
@@ -965,22 +1239,20 @@ function buildConsolePrompt(contextNodeKey: NodeKey | null): string {
   return contextNodeKey ? `${contextNodeKey}>` : "graph>";
 }
 
-function isReadOnlyConsoleCommand(command: string): boolean {
-  const normalized = command.trim().toLowerCase();
-  return (
-    normalized === "/help"
-    || normalized === "/keys"
-    || normalized === "/graph"
-    || normalized === "/clear"
-    || normalized === "/cls"
-    || normalized.startsWith("/find ")
-    || normalized.startsWith("/ls ")
-    || normalized.startsWith("/neighbors ")
-    || normalized.startsWith("/path ")
-    || normalized.startsWith("/use ")
-    || normalized.startsWith("/show ")
-    || normalized.startsWith("/json ")
-  );
+function isExecutionApproval(message: string): boolean {
+  const normalized = message.trim().toLocaleLowerCase();
+  return [
+    "apply",
+    "approve",
+    "execute",
+    "run it",
+    "do it",
+    "complete",
+    "执行",
+    "应用",
+    "完成",
+    "确认",
+  ].some((phrase) => normalized.includes(phrase));
 }
 
 function isJsonFileName(fileName: string): boolean {
