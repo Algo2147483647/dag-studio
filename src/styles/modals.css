@@ -280,9 +280,8 @@
   gap: 16px;
 }
 
-.save-json-eyebrow,
-.save-json-review__label {
-  margin: 0 0 4px;
+.save-json-eyebrow {
+  margin: 0;
   color: var(--text-soft);
   font-size: 10px;
   font-weight: 800;
@@ -309,7 +308,7 @@
 
 .save-json-review {
   overflow: hidden;
-  margin-top: 16px;
+  margin-top: 8px;
   border: 1px solid rgba(96, 118, 151, 0.16);
   border-radius: 8px;
   background: #fff;
@@ -663,7 +662,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 24px 24px 18px;
+  padding: 16px 24px;
   border-bottom: 1px solid rgba(96, 118, 151, 0.12);
 }
 
@@ -694,35 +693,19 @@
   display: none;
 }
 
-.node-detail-eyebrow {
-  margin: 0 0 6px;
-  color: var(--text-soft);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
 .node-detail-header h3 {
   margin: 0;
-  font-size: 30px;
-  line-height: 1.05;
+  font-size: 28px;
+  line-height: 1.1;
   font-family: "Cormorant Garamond", "Georgia", serif;
   font-weight: 600;
-}
-
-.node-detail-subtitle {
-  margin: 8px 0 0;
-  color: var(--text-muted);
-  font-size: 14px;
-  line-height: 1.6;
 }
 
 .node-detail-body {
   overflow: auto;
   display: grid;
-  gap: 18px;
-  padding: 20px 24px 24px;
+  gap: 12px;
+  padding: 14px 24px 24px;
 }
 
 .node-detail-section {
@@ -802,7 +785,7 @@
 
 .node-detail-editor-wrap {
   display: grid;
-  gap: 8px;
+  gap: 0;
   width: 100%;
 }
 

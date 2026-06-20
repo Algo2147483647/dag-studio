@@ -49,7 +49,6 @@ export default function SaveJsonModal({
         <section className="save-json-review" aria-label="JSON changes review">
           <div className="save-json-review__header">
             <div>
-              <p className="save-json-review__label">Changed File</p>
               <h4>{normalizedFileName}</h4>
             </div>
             <div className="save-json-review__stats" aria-label="Diff summary">

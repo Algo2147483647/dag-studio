@@ -481,10 +481,7 @@ function SettingsModal({
             ) : null}
 
             {activeChapter === "ai" ? (
-              <section className="settings-section ai-settings-section" aria-labelledby="ai-options-title">
-                <div className="settings-section-header">
-                  <p id="ai-options-title" className="control-label">AI</p>
-                </div>
+              <section className="settings-section ai-settings-section" aria-label="AI settings">
                 <div className="ai-settings-grid">
                   <label className="settings-field-label" htmlFor="ai-provider-select">
                     <span>Provider</span>

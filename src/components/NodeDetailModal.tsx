@@ -58,11 +58,7 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
         <div className="node-detail-header">
           <div className="node-detail-header-main">
             <div>
-              <p className="node-detail-eyebrow">Node Viewer</p>
               <h3 id="node-detail-title">{draftKey}</h3>
-              <p id="node-detail-subtitle" className="node-detail-subtitle">
-                Editing {Math.max(fields.length - 1, 0)} key-value pairs in this node. Raw JSON edits can also add or remove fields.
-              </p>
             </div>
           </div>
           <div className="node-detail-actions">
@@ -113,7 +109,6 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
                 value={rawJsonValue}
                 onChange={(event) => handleRawJsonChange(event.currentTarget.value)}
               />
-              <p className="node-detail-editor-hint">Edit a wrapped single-node JSON object here. Save uses this raw payload when it is the latest thing you changed.</p>
             </div>
           </section>
         </div>
