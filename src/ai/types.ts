@@ -3,7 +3,6 @@ export type AiProvider = "openai-compatible" | "deepseek" | "anthropic" | "gemin
 export type AiExecutionMode = "ask" | "review" | "auto-readonly" | "auto-edit";
 
 export interface AiSettings {
-  enabled: boolean;
   provider: AiProvider;
   baseUrl: string;
   apiKey: string;

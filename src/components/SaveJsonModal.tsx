@@ -40,14 +40,12 @@ export default function SaveJsonModal({
       <div className="save-json-dialog" role="dialog" aria-modal="true" aria-labelledby="save-json-title">
         <div className="save-json-header">
           <div>
-            <p className="save-json-eyebrow">Code Review</p>
-            <h3 id="save-json-title">Save Graph JSON</h3>
+            <p id="save-json-title" className="save-json-eyebrow">Save Graph JSON</p>
           </div>
-          <button id="save-json-cancel-top" className="ghost-btn save-json-close-btn" type="button" onClick={onClose}>Close</button>
+          <button id="save-json-cancel-top" className="ghost-btn modal-icon-close-btn" type="button" title="Close" aria-label="Close" onClick={onClose}>
+            <CloseIcon />
+          </button>
         </div>
-        <p id="save-json-description" className="save-json-description">
-          Review the pending JSON changes before writing "{normalizedFileName}" or saving a new copy named "{newFileName}".
-        </p>
         <section className="save-json-review" aria-label="JSON changes review">
           <div className="save-json-review__header">
             <div>
@@ -74,13 +72,17 @@ export default function SaveJsonModal({
           <button id="save-json-new" className="ghost-btn" type="button" onClick={onSaveNew}>Save New Copy</button>
           <button id="save-json-cancel" className="ghost-btn" type="button" onClick={onClose}>Cancel</button>
         </div>
-        {!canOverwrite ? (
-          <p className="save-json-description save-json-description--footnote">
-            Direct overwrite is unavailable until this JSON is opened with file access.
-          </p>
-        ) : null}
       </div>
     </div>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="modal-icon-close-svg" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 6L18 18" />
+      <path d="M18 6L6 18" />
+    </svg>
   );
 }
 

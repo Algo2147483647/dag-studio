@@ -27,7 +27,6 @@ interface TopbarProps {
   consoleSidebarOpen: boolean;
   aiSettings: AiSettings;
   aiBusy: boolean;
-  recentImportLabel: string;
   onBack: () => void;
   onUp: () => void;
   onAll: () => void;
@@ -78,7 +77,6 @@ export default function Topbar({
   consoleSidebarOpen,
   aiSettings,
   aiBusy,
-  recentImportLabel,
   onBack,
   onUp,
   onAll,
@@ -153,7 +151,6 @@ export default function Topbar({
               consoleSidebarOpen={consoleSidebarOpen}
               aiSettings={aiSettings}
               aiBusy={aiBusy}
-              recentImportLabel={recentImportLabel}
               onClose={onSettingsToggle}
               onLayoutModeChange={onLayoutModeChange}
               onThemeChange={onThemeChange}
@@ -192,7 +189,6 @@ interface SettingsModalProps {
   consoleSidebarOpen: boolean;
   aiSettings: AiSettings;
   aiBusy: boolean;
-  recentImportLabel: string;
   onClose: () => void;
   onLayoutModeChange: (mode: GraphLayoutMode) => void;
   onThemeChange: <K extends keyof GraphTheme>(key: K, value: GraphTheme[K]) => void;
@@ -225,7 +221,6 @@ function SettingsModal({
   consoleSidebarOpen,
   aiSettings,
   aiBusy,
-  recentImportLabel,
   onClose,
   onLayoutModeChange,
   onThemeChange,
@@ -266,7 +261,7 @@ function SettingsModal({
 
   useEffect(() => {
     setAiConnectionStatus("idle");
-  }, [aiSettings.enabled, aiSettings.provider, aiSettings.baseUrl, aiSettings.model, aiSettings.apiKey]);
+  }, [aiSettings.provider, aiSettings.baseUrl, aiSettings.model, aiSettings.apiKey]);
 
   const handleAiConnectionTestClick = async () => {
     setAiConnectionStatus("testing");
@@ -295,8 +290,7 @@ function SettingsModal({
       <section id="settings-modal" className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
         <div className="settings-modal-header">
           <div>
-            <p className="control-label">Controls</p>
-            <h2 id="settings-modal-title">Settings</h2>
+            <p id="settings-modal-title" className="control-label">Settings</p>
           </div>
           <button type="button" className="ghost-btn topbar-icon-btn" title="Close settings" aria-label="Close settings" onClick={onClose}>
             <span className="topbar-icon" aria-hidden="true"><CloseIcon /></span>
@@ -342,9 +336,6 @@ function SettingsModal({
                     </label>
                     <button id="export-btn" className="ghost-btn settings-action-btn" type="button" disabled={!hasGraph} onClick={onExport}>Export SVG</button>
                   </div>
-                  {recentImportLabel ? (
-                    <p className="recent-import-path" title={recentImportLabel}>Recent: {truncateFileName(recentImportLabel, 48)}</p>
-                  ) : null}
                 </section>
 
                 <section className="settings-section" aria-labelledby="data-actions-title">
@@ -361,9 +352,31 @@ function SettingsModal({
                     >
                       Field Mapping
                     </button>
+                    <button type="button" className="ghost-btn settings-action-btn" onClick={onInitializeCanvas}>Initialize</button>
                   </div>
                 </section>
 
+                <section className="settings-section" aria-labelledby="general-workspace-title">
+                  <p id="general-workspace-title" className="control-label">Workspace</p>
+                  <div className="workspace-action-row">
+                    <button
+                      id="console-sidebar-toggle-btn"
+                      className={`ghost-btn settings-action-btn${consoleSidebarOpen ? " settings-action-btn-active" : ""}`}
+                      type="button"
+                      aria-pressed={consoleSidebarOpen}
+                      onClick={onConsoleSidebarToggle}
+                    >
+                      {consoleSidebarOpen ? "Hide Console" : "Show Console"}
+                    </button>
+                  </div>
+                </section>
+
+                <p id="graph-summary" className="graph-summary">{status}</p>
+              </>
+            ) : null}
+
+            {activeChapter === "appearance" ? (
+              <>
                 <section className="settings-section" aria-labelledby="layout-mode-title">
                   <label className="layout-select-label" htmlFor="layout-mode-select">
                     <span id="layout-mode-title" className="control-label">Layout</span>
@@ -380,28 +393,6 @@ function SettingsModal({
                   </label>
                 </section>
 
-                <section className="settings-section" aria-labelledby="general-workspace-title">
-                  <p id="general-workspace-title" className="control-label">Workspace</p>
-                  <div className="workspace-action-row">
-                    <button
-                      id="console-sidebar-toggle-btn"
-                      className={`ghost-btn settings-action-btn${consoleSidebarOpen ? " settings-action-btn-active" : ""}`}
-                      type="button"
-                      aria-pressed={consoleSidebarOpen}
-                      onClick={onConsoleSidebarToggle}
-                    >
-                      {consoleSidebarOpen ? "Hide Console" : "Show Console"}
-                    </button>
-                    <button type="button" className="ghost-btn settings-action-btn" onClick={onInitializeCanvas}>Initialize</button>
-                  </div>
-                </section>
-
-                <p id="graph-summary" className="graph-summary">{status}</p>
-              </>
-            ) : null}
-
-            {activeChapter === "appearance" ? (
-              <>
                 <section className="settings-section settings-section-emphasis" aria-labelledby="layout-tuning-title">
                   <div className="settings-section-header">
                     <p id="layout-tuning-title" className="control-label">Layout Tuning</p>
@@ -493,10 +484,6 @@ function SettingsModal({
               <section className="settings-section ai-settings-section" aria-labelledby="ai-options-title">
                 <div className="settings-section-header">
                   <p id="ai-options-title" className="control-label">AI</p>
-                  <label className="settings-checkbox-label">
-                    <input type="checkbox" checked={aiSettings.enabled} onChange={(event) => updateAiSetting("enabled", event.currentTarget.checked)} />
-                    <span>Enable</span>
-                  </label>
                 </div>
                 <div className="ai-settings-grid">
                   <label className="settings-field-label" htmlFor="ai-provider-select">

@@ -19,7 +19,6 @@ export interface GraphPagePreferences {
 }
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {
-  enabled: false,
   provider: "openai-compatible",
   baseUrl: "https://api.openai.com/v1",
   apiKey: "",
@@ -192,7 +191,6 @@ function sanitizeTitleFontFamily(value: unknown): GraphTheme["titleFontFamily"] 
 function sanitizeAiSettings(input: object): AiSettings {
   const record = input as Record<string, unknown>;
   return {
-    enabled: typeof record.enabled === "boolean" ? record.enabled : DEFAULT_AI_SETTINGS.enabled,
     provider: sanitizeAiProvider(record.provider),
     baseUrl: sanitizeString(record.baseUrl, DEFAULT_AI_SETTINGS.baseUrl),
     apiKey: sanitizeString(record.apiKey, DEFAULT_AI_SETTINGS.apiKey),

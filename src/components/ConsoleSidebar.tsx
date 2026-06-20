@@ -32,7 +32,6 @@ interface ConsoleSidebarProps {
   entries: ConsoleEntry[];
   inputValue: string;
   contextNodeKey: NodeKey | null;
-  aiEnabled: boolean;
   aiBusy: boolean;
   aiHarness: AiHarnessState;
   suggestions: ConsoleSuggestion[];
@@ -51,7 +50,6 @@ export default function ConsoleSidebar({
   entries,
   inputValue,
   contextNodeKey,
-  aiEnabled,
   aiBusy,
   aiHarness,
   suggestions,
@@ -117,7 +115,6 @@ export default function ConsoleSidebar({
       ) : (
         <AiActivityPanel
           harness={aiHarness}
-          aiEnabled={aiEnabled}
           onApply={onReviewApply}
           onDismiss={onReviewDismiss}
           onCopy={onReviewCopy}
@@ -136,7 +133,7 @@ export default function ConsoleSidebar({
           autoComplete="off"
           value={inputValue}
           disabled={aiBusy}
-          placeholder={aiEnabled ? "type /help or ask AI" : "type /help"}
+          placeholder="type /help or ask AI"
           onChange={(event) => onInputChange(event.currentTarget.value)}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
@@ -166,13 +163,11 @@ export default function ConsoleSidebar({
 
 function AiActivityPanel({
   harness,
-  aiEnabled,
   onApply,
   onDismiss,
   onCopy,
 }: {
   harness: AiHarnessState;
-  aiEnabled: boolean;
   onApply: (planId: string) => void;
   onDismiss: (planId: string) => void;
   onCopy: (commands: string[]) => void;
@@ -185,7 +180,7 @@ function AiActivityPanel({
   return (
     <div className="console-activity" aria-label="AI activity records">
       <div className="console-activity__summary" aria-label="AI harness summary">
-        <span>{aiEnabled ? "AI enabled" : "AI disabled"}</span>
+        <span>AI enabled</span>
         <span>{harness.mode}</span>
         <span>rev {harness.graphRevision}</span>
         <span>{events.length} events</span>

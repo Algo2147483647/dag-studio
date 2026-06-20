@@ -13,7 +13,7 @@ import { serializeDag } from "./graph/serialize";
 import { copyTextToClipboard } from "./adapters/clipboard";
 import { buildTimestampFileName, downloadJsonFile, ensureJsonExtension } from "./adapters/download";
 import { canOverwrite, openJsonDirectoryWithAccess, openJsonFilesWithAccess, readJsonFile, requestWritablePermission, writeJsonToHandle, type PickedJsonCollection } from "./adapters/fileAccess";
-import { loadRecentImportMetadata, loadRecentJsonCollection, saveRecentDirectoryImport, saveRecentFileImport, type RecentImportMetadata } from "./adapters/recentImport";
+import { loadRecentImportMetadata, loadRecentJsonCollection, saveRecentDirectoryImport, saveRecentFileImport } from "./adapters/recentImport";
 import { downloadSvg } from "./rendering/export-svg";
 import { buildImportedDag, type ImportGraphDocument, type ImportWarning } from "./graph/importMerge";
 import { useDefaultGraph } from "./hooks/useDefaultGraph";
@@ -72,7 +72,6 @@ export default function App() {
   const [hideNodeBorders, setHideNodeBorders] = useState<boolean>(() => loadGraphPagePreferences().hideNodeBorders ?? false);
   const [alignNodeWidthsToMax, setAlignNodeWidthsToMax] = useState<boolean>(() => loadGraphPagePreferences().alignNodeWidthsToMax ?? false);
   const [aiSettings, setAiSettings] = useState<AiSettings>(() => loadGraphPagePreferences().aiSettings);
-  const [recentImportLabel, setRecentImportLabel] = useState(() => formatRecentImportLabel(loadRecentImportMetadata()));
   const [defaultGraphAutoLoadEnabled, setDefaultGraphAutoLoadEnabled] = useState(false);
   const [aiHarness, setAiHarness] = useState(() => createInitialAiHarnessState(aiSettings.executionMode));
   const [aiBusy, setAiBusy] = useState(false);
@@ -101,7 +100,6 @@ export default function App() {
 
     async function restoreRecentImport() {
       const metadata = loadRecentImportMetadata();
-      setRecentImportLabel(formatRecentImportLabel(metadata));
       if (!metadata?.canAutoLoad) {
         if (!cancelled) {
           suppressDefaultGraphRef.current = false;
@@ -409,13 +407,6 @@ export default function App() {
     setConsoleHistory((current) => (current[current.length - 1] === message ? current : [...current, message]));
     setConsoleHistoryIndex(null);
 
-    if (!aiSettings.enabled) {
-      appendConsoleEntry(setConsoleEntries, "error", "AI is disabled. Enable AI in the controls panel first.");
-      setAiHarness(appendAiEvents(nextHarness, [
-        createAiEvent(nextHarness, turnId, "error", { message: "AI is disabled." }),
-      ]));
-      return;
-    }
     if (!aiSettings.baseUrl.trim() || !aiSettings.model.trim()) {
       appendConsoleEntry(setConsoleEntries, "error", "AI requires a base URL and model in the controls panel.");
       setAiHarness(appendAiEvents(nextHarness, [
@@ -824,7 +815,6 @@ export default function App() {
           } else {
             await saveRecentFileImport(collection);
           }
-          setRecentImportLabel(formatRecentImportLabel(loadRecentImportMetadata()));
         } catch (error) {
           console.warn("Unable to save recent import source", error);
         }
@@ -843,7 +833,7 @@ export default function App() {
       dag,
       fileName: INITIAL_CANVAS_FILE_NAME,
       selection: getInitialSelection(dag, fieldMapping),
-      status: "Initialized a new canvas with one starting node. Edit mode enabled.",
+      status: "Initialized a new canvas with one starting node.",
     });
   }
 
@@ -954,10 +944,6 @@ export default function App() {
   }
 
   async function handleAiConnectionTest() {
-    if (!aiSettings.enabled) {
-      dispatch({ type: "statusChanged", status: "Enable AI before testing the connection." });
-      return false;
-    }
     if (!aiSettings.baseUrl.trim() || !aiSettings.model.trim()) {
       dispatch({ type: "statusChanged", status: "AI requires a base URL and model before testing." });
       return false;
@@ -1045,7 +1031,6 @@ export default function App() {
         consoleSidebarOpen={consoleSidebarVisible}
         aiSettings={aiSettings}
         aiBusy={aiBusy}
-        recentImportLabel={recentImportLabel}
         onBack={() => dispatch({ type: "navigateBack" })}
         onUp={() => parentSelection && dispatch({ type: "selectionChanged", selection: parentSelection, pushHistory: true })}
         onAll={() => dispatch({ type: "selectionChanged", selection: getFullGraphSelection(), pushHistory: true })}
@@ -1086,7 +1071,6 @@ export default function App() {
             entries={consoleEntries}
             inputValue={consoleInput}
             contextNodeKey={consoleContextNodeKey}
-            aiEnabled={aiSettings.enabled}
             aiBusy={aiBusy}
             aiHarness={aiHarness}
             suggestions={consoleSuggestions}
@@ -1378,15 +1362,6 @@ function getSavedRevisionDag(
 
   const nextTransaction = editHistory.undoStack.find((transaction) => transaction.revisionBefore === editHistory.savedRevision);
   return nextTransaction?.beforeDag || currentDag;
-}
-
-function formatRecentImportLabel(metadata: RecentImportMetadata | null): string {
-  if (!metadata) {
-    return "";
-  }
-  const firstPath = metadata.paths[0] || metadata.name;
-  const suffix = metadata.paths.length > 1 ? ` +${metadata.paths.length - 1}` : "";
-  return `${firstPath}${suffix}`;
 }
 
 function buildImportStatus({

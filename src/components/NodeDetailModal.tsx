@@ -67,7 +67,9 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
           </div>
           <div className="node-detail-actions">
             <button id="node-detail-save" className="primary-btn node-detail-save-btn" type="button" onClick={handleSave}>Save</button>
-            <button id="node-detail-close" className="ghost-btn" type="button" onClick={onClose}>Close</button>
+            <button id="node-detail-close" className="ghost-btn modal-icon-close-btn" type="button" title="Close" aria-label="Close" onClick={onClose}>
+              <CloseIcon />
+            </button>
           </div>
         </div>
         <div className="node-detail-body">
@@ -234,6 +236,15 @@ function validateNodeRelations(nextKey: NodeKey, fields: Record<string, unknown>
   const parentKeys = getRelationKeys(fields[getMappedFieldName(fieldMapping, "parents")]);
   const childKeys = getRelationKeys(fields[getMappedFieldName(fieldMapping, "children")]);
   return !parentKeys.includes(nextKey) && !childKeys.includes(nextKey);
+}
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="modal-icon-close-svg" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 6L18 18" />
+      <path d="M18 6L6 18" />
+    </svg>
+  );
 }
 
 function buildDefaultMarkdownFieldState(fields: EditableField[]): Record<string, boolean> {
