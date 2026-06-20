@@ -22,6 +22,7 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
   const [lastEdited, setLastEdited] = useState<"fields" | "raw">("fields");
   const [markdownFields, setMarkdownFields] = useState<Record<string, boolean>>({});
   const [isEditing, setIsEditing] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -33,6 +34,7 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
       setLastEdited("fields");
       setMarkdownFields(buildDefaultMarkdownFieldState(nextFields));
       setIsEditing(false);
+      setIsFullscreen(false);
       setError("");
     }
   }, [fieldMapping, node, nodeKey, open]);
@@ -55,7 +57,7 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
   const draftKey = String(values.key || currentNodeKey).trim() || currentNodeKey;
 
   return (
-    <div id="node-detail-modal" className="node-detail-modal is-visible" aria-hidden="false">
+    <div id="node-detail-modal" className={`node-detail-modal is-visible${isFullscreen ? " is-fullscreen" : ""}`} aria-hidden="false">
       <div className="node-detail-page" role="dialog" aria-modal="true" aria-labelledby="node-detail-title">
         <div className="node-detail-header">
           <div className="node-detail-header-main">
@@ -73,6 +75,17 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
                 <EditIcon />
               </button>
             )}
+            <button
+              id="node-detail-fullscreen"
+              className="ghost-btn node-detail-fullscreen-btn"
+              type="button"
+              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              aria-pressed={isFullscreen ? "true" : "false"}
+              onClick={() => setIsFullscreen((current) => !current)}
+            >
+              <FullscreenIcon active={isFullscreen} />
+            </button>
             <button id="node-detail-close" className="ghost-btn modal-icon-close-btn" type="button" title="Close" aria-label="Close" onClick={onClose}>
               <CloseIcon />
             </button>
@@ -86,7 +99,7 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
                 <article key={field.name} className="node-detail-field">
                   <div className="node-detail-field__header">
                     <p className="node-detail-field__label">{field.displayName}</p>
-                    {isEditing && supportsMarkdown(field) ? (
+                    {supportsMarkdown(field) ? (
                       <button
                         className={`node-detail-markdown-toggle${markdownFields[field.name] ? " is-active" : ""}`}
                         type="button"
@@ -105,7 +118,7 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
                       onChange={(value) => handleFieldChange(field.name, value)}
                     />
                   ) : (
-                    <NodeFieldPreview field={field} value={values[field.name] ?? ""} />
+                    <NodeFieldPreview field={field} value={values[field.name] ?? ""} showMarkdown={Boolean(markdownFields[field.name])} />
                   )}
                 </article>
               )) : <p className="node-detail-empty">No fields are available for this node.</p>}
@@ -281,11 +294,33 @@ function SaveIcon() {
   );
 }
 
-function NodeFieldPreview({ field, value }: { field: EditableField; value: string }) {
+function FullscreenIcon({ active }: { active: boolean }) {
+  if (active) {
+    return (
+      <svg viewBox="0 0 24 24" className="modal-icon-close-svg" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M8 3v5H3" />
+        <path d="M21 8h-5V3" />
+        <path d="M16 21v-5h5" />
+        <path d="M3 16h5v5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" className="modal-icon-close-svg" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 8V3h5" />
+      <path d="M16 3h5v5" />
+      <path d="M21 16v5h-5" />
+      <path d="M8 21H3v-5" />
+    </svg>
+  );
+}
+
+function NodeFieldPreview({ field, value, showMarkdown }: { field: EditableField; value: string; showMarkdown: boolean }) {
   if (!value.trim()) {
     return <p className="node-detail-empty">(empty string)</p>;
   }
-  if (supportsMarkdown(field)) {
+  if (showMarkdown && supportsMarkdown(field)) {
     return <MarkdownValue value={value} previewSurface />;
   }
   if (field.name === "key" || field.editorKind === "plainText" || field.editorKind === "multilineText") {
