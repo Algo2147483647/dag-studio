@@ -19,6 +19,8 @@ interface Window {
 interface FileSystemHandle {
   kind: "file" | "directory";
   name: string;
+  queryPermission?: (options?: { mode?: "read" | "readwrite" }) => Promise<PermissionState>;
+  requestPermission?: (options?: { mode?: "read" | "readwrite" }) => Promise<PermissionState>;
 }
 
 interface FileSystemFileHandle {
@@ -34,6 +36,8 @@ interface FileSystemDirectoryHandle {
   kind?: "directory";
   name: string;
   entries?: () => AsyncIterableIterator<[string, FileSystemFileHandle | FileSystemDirectoryHandle]>;
+  queryPermission?: (options?: { mode?: "read" | "readwrite" }) => Promise<PermissionState>;
+  requestPermission?: (options?: { mode?: "read" | "readwrite" }) => Promise<PermissionState>;
 }
 
 interface FileSystemWritableFileStream {

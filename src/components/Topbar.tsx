@@ -4,7 +4,7 @@ import type { GraphLayoutMode, GraphMode, GraphTheme } from "../graph/types";
 import { GRAPH_TITLE_FONT_OPTIONS } from "../graph/types";
 import type { AiExecutionMode, AiProvider, AiSettings } from "../ai/types";
 
-type SettingsChapter = "general" | "appearance" | "data" | "ai";
+type SettingsChapter = "general" | "appearance" | "ai";
 
 interface TopbarProps {
   topbarRef: React.RefObject<HTMLElement>;
@@ -28,6 +28,7 @@ interface TopbarProps {
   consoleSidebarOpen: boolean;
   aiSettings: AiSettings;
   aiBusy: boolean;
+  recentImportLabel: string;
   onBack: () => void;
   onUp: () => void;
   onAll: () => void;
@@ -80,6 +81,7 @@ export default function Topbar({
   consoleSidebarOpen,
   aiSettings,
   aiBusy,
+  recentImportLabel,
   onBack,
   onUp,
   onAll,
@@ -158,6 +160,7 @@ export default function Topbar({
               consoleSidebarOpen={consoleSidebarOpen}
               aiSettings={aiSettings}
               aiBusy={aiBusy}
+              recentImportLabel={recentImportLabel}
               onClose={onSettingsToggle}
               onModeChange={onModeChange}
               onLayoutModeChange={onLayoutModeChange}
@@ -198,6 +201,7 @@ interface SettingsModalProps {
   consoleSidebarOpen: boolean;
   aiSettings: AiSettings;
   aiBusy: boolean;
+  recentImportLabel: string;
   onClose: () => void;
   onModeChange: (mode: GraphMode) => void;
   onLayoutModeChange: (mode: GraphLayoutMode) => void;
@@ -232,6 +236,7 @@ function SettingsModal({
   consoleSidebarOpen,
   aiSettings,
   aiBusy,
+  recentImportLabel,
   onClose,
   onModeChange,
   onLayoutModeChange,
@@ -328,6 +333,49 @@ function SettingsModal({
           <div className="settings-page">
             {activeChapter === "general" ? (
               <>
+                <section className="settings-section" aria-labelledby="file-actions-title">
+                  <p id="file-actions-title" className="control-label">Files</p>
+                  <div className="import-action-row">
+                    <label htmlFor="fileInput" className="file-input-label">
+                      <span className="file-input-text">{truncateFileName(fileName)}</span>
+                      <input type="file" id="fileInput" accept=".json,application/json" multiple onClick={onFileInputClick} onChange={onFileInputChange} />
+                    </label>
+                    <label htmlFor="folderInput" className="file-input-label folder-input-label">
+                      <span className="file-input-text">Open Folder</span>
+                      <input
+                        type="file"
+                        id="folderInput"
+                        accept=".json,application/json"
+                        multiple
+                        onClick={onFolderInputClick}
+                        onChange={onFolderInputChange}
+                        {...DIRECTORY_INPUT_PROPS}
+                      />
+                    </label>
+                    <button id="export-btn" className="ghost-btn settings-action-btn" type="button" disabled={!hasGraph} onClick={onExport}>Export SVG</button>
+                  </div>
+                  {recentImportLabel ? (
+                    <p className="recent-import-path" title={recentImportLabel}>Recent: {truncateFileName(recentImportLabel, 48)}</p>
+                  ) : null}
+                </section>
+
+                <section className="settings-section" aria-labelledby="data-actions-title">
+                  <p id="data-actions-title" className="control-label">Graph Data</p>
+                  <div className="workspace-action-row">
+                    <button
+                      id="field-mapping-btn"
+                      className="ghost-btn settings-action-btn"
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onFieldMappingOpen();
+                      }}
+                    >
+                      Field Mapping
+                    </button>
+                  </div>
+                </section>
+
                 <section className="settings-section" aria-labelledby="mode-options-title">
                   <p id="mode-options-title" className="control-label">Mode</p>
                   <div className="mode-toggle" role="group" aria-label="Graph mode">
@@ -458,50 +506,6 @@ function SettingsModal({
                     <button type="button" className={`ghost-btn settings-action-btn${alignNodeWidthsToMax ? " settings-action-btn-active" : ""}`} aria-pressed={alignNodeWidthsToMax} onClick={onNodeWidthAlignToggle}>
                       {alignNodeWidthsToMax ? "Auto Width" : "Max Width"}
                     </button>
-                  </div>
-                </section>
-              </>
-            ) : null}
-
-            {activeChapter === "data" ? (
-              <>
-                <section className="settings-section" aria-labelledby="data-actions-title">
-                  <p id="data-actions-title" className="control-label">Graph Data</p>
-                  <div className="workspace-action-row">
-                    <button
-                      id="field-mapping-btn"
-                      className="ghost-btn settings-action-btn"
-                      type="button"
-                      onClick={() => {
-                        onClose();
-                        onFieldMappingOpen();
-                      }}
-                    >
-                      Field Mapping
-                    </button>
-                    <button id="export-btn" className="ghost-btn settings-action-btn" type="button" disabled={!hasGraph} onClick={onExport}>Export SVG</button>
-                  </div>
-                </section>
-
-                <section className="settings-section" aria-labelledby="import-options-title">
-                  <p id="import-options-title" className="control-label">Import</p>
-                  <div className="import-action-row">
-                    <label htmlFor="fileInput" className="file-input-label">
-                      <span className="file-input-text">{truncateFileName(fileName)}</span>
-                      <input type="file" id="fileInput" accept=".json,application/json" multiple onClick={onFileInputClick} onChange={onFileInputChange} />
-                    </label>
-                    <label htmlFor="folderInput" className="file-input-label folder-input-label">
-                      <span className="file-input-text">Open Folder</span>
-                      <input
-                        type="file"
-                        id="folderInput"
-                        accept=".json,application/json"
-                        multiple
-                        onClick={onFolderInputClick}
-                        onChange={onFolderInputChange}
-                        {...DIRECTORY_INPUT_PROPS}
-                      />
-                    </label>
                   </div>
                 </section>
               </>
@@ -814,8 +818,8 @@ function ProviderIcon({ provider }: { provider: AiProvider }) {
   );
 }
 
-function truncateFileName(fileName: string): string {
-  return fileName.length > 26 ? `${fileName.slice(0, 23)}...` : fileName;
+function truncateFileName(fileName: string, maxLength = 26): string {
+  return fileName.length > maxLength ? `${fileName.slice(0, Math.max(0, maxLength - 3))}...` : fileName;
 }
 
 const DIRECTORY_INPUT_PROPS = {
@@ -871,7 +875,6 @@ const AI_PROVIDER_ENTRIES = Object.entries(AI_PROVIDER_PRESETS) as Array<[AiProv
 const SETTINGS_CHAPTERS: Array<{ key: SettingsChapter; label: string }> = [
   { key: "general", label: "General" },
   { key: "appearance", label: "Appearance" },
-  { key: "data", label: "Data" },
   { key: "ai", label: "AI" },
 ];
 

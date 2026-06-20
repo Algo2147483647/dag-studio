@@ -10,8 +10,13 @@ export function useDefaultGraph(
   dispatch: React.Dispatch<GraphAction>,
   suppressAutoLoadRef: React.MutableRefObject<boolean>,
   setFieldMapping: (mapping: FieldMapping) => void,
+  enabled = true,
 ): void {
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     let cancelled = false;
 
     async function load() {
@@ -45,5 +50,5 @@ export function useDefaultGraph(
     return () => {
       cancelled = true;
     };
-  }, [dispatch, setFieldMapping, suppressAutoLoadRef]);
+  }, [dispatch, enabled, setFieldMapping, suppressAutoLoadRef]);
 }

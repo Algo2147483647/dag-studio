@@ -12,7 +12,8 @@ import { getFullGraphSelection, getInitialSelection, getParentLevelSelection, sa
 import { serializeDag } from "./graph/serialize";
 import { copyTextToClipboard } from "./adapters/clipboard";
 import { buildTimestampFileName, downloadJsonFile, ensureJsonExtension } from "./adapters/download";
-import { canOverwrite, openJsonDirectoryWithAccess, openJsonFilesWithAccess, readJsonFile, requestWritablePermission, writeJsonToHandle, type PickedJsonFile } from "./adapters/fileAccess";
+import { canOverwrite, openJsonDirectoryWithAccess, openJsonFilesWithAccess, readJsonFile, requestWritablePermission, writeJsonToHandle, type PickedJsonCollection } from "./adapters/fileAccess";
+import { loadRecentImportMetadata, loadRecentJsonCollection, saveRecentDirectoryImport, saveRecentFileImport, type RecentImportMetadata } from "./adapters/recentImport";
 import { downloadSvg } from "./rendering/export-svg";
 import { buildImportedDag, type ImportGraphDocument, type ImportWarning } from "./graph/importMerge";
 import { useDefaultGraph } from "./hooks/useDefaultGraph";
@@ -71,6 +72,8 @@ export default function App() {
   const [hideNodeBorders, setHideNodeBorders] = useState<boolean>(() => loadGraphPagePreferences().hideNodeBorders ?? false);
   const [alignNodeWidthsToMax, setAlignNodeWidthsToMax] = useState<boolean>(() => loadGraphPagePreferences().alignNodeWidthsToMax ?? false);
   const [aiSettings, setAiSettings] = useState<AiSettings>(() => loadGraphPagePreferences().aiSettings);
+  const [recentImportLabel, setRecentImportLabel] = useState(() => formatRecentImportLabel(loadRecentImportMetadata()));
+  const [defaultGraphAutoLoadEnabled, setDefaultGraphAutoLoadEnabled] = useState(false);
   const [aiHarness, setAiHarness] = useState(() => createInitialAiHarnessState(aiSettings.executionMode));
   const [aiBusy, setAiBusy] = useState(false);
   const [fieldMappingOpen, setFieldMappingOpen] = useState(false);
@@ -91,7 +94,47 @@ export default function App() {
   const restoredAiHarnessGraphRef = useRef<string | null>(null);
   const restoredReviewCardRef = useRef<string | null>(null);
 
-  useDefaultGraph(dispatch, suppressDefaultGraphRef, setFieldMapping);
+  useDefaultGraph(dispatch, suppressDefaultGraphRef, setFieldMapping, defaultGraphAutoLoadEnabled);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function restoreRecentImport() {
+      const metadata = loadRecentImportMetadata();
+      setRecentImportLabel(formatRecentImportLabel(metadata));
+      if (!metadata?.canAutoLoad) {
+        if (!cancelled) {
+          suppressDefaultGraphRef.current = false;
+          setDefaultGraphAutoLoadEnabled(true);
+        }
+        return;
+      }
+
+      try {
+        const recentCollection = await loadRecentJsonCollection();
+        if (cancelled) {
+          return;
+        }
+        if (!recentCollection || recentCollection.files.length === 0) {
+          suppressDefaultGraphRef.current = false;
+          setDefaultGraphAutoLoadEnabled(true);
+          return;
+        }
+        await loadPickedJsonFiles(recentCollection, Boolean(recentCollection.directoryHandle), false);
+      } catch (error) {
+        console.warn("Unable to restore recent import", error);
+        if (!cancelled) {
+          suppressDefaultGraphRef.current = false;
+          setDefaultGraphAutoLoadEnabled(true);
+        }
+      }
+    }
+
+    restoreRecentImport();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     saveGraphPagePreferences({
@@ -639,7 +682,7 @@ export default function App() {
     try {
       const pickedFiles = await openJsonFilesWithAccess();
       if (pickedFiles.files.length > 0) {
-        await loadPickedJsonFiles(pickedFiles.files, pickedFiles.name);
+        await loadPickedJsonFiles(pickedFiles);
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
@@ -659,7 +702,10 @@ export default function App() {
     if (!files.length) {
       return;
     }
-    await loadPickedJsonFiles(files, files.length === 1 ? files[0].file.name : "selected-json-files.json");
+    await loadPickedJsonFiles({
+      files,
+      name: files.length === 1 ? files[0].file.name : "selected-json-files.json",
+    });
     event.target.value = "";
   }
 
@@ -672,7 +718,7 @@ export default function App() {
     try {
       const pickedDirectory = await openJsonDirectoryWithAccess();
       if (pickedDirectory) {
-        await loadPickedJsonFiles(pickedDirectory.files, pickedDirectory.name, true);
+        await loadPickedJsonFiles(pickedDirectory, true);
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
@@ -694,12 +740,16 @@ export default function App() {
     }
 
     const firstPathPart = files[0].path.split(/[\\/]/)[0] || "folder";
-    await loadPickedJsonFiles(files, `${firstPathPart}-merged.json`, true);
+    await loadPickedJsonFiles({
+      files,
+      name: `${firstPathPart}-merged.json`,
+    }, true);
     event.target.value = "";
   }
 
-  async function loadPickedJsonFiles(pickedFiles: PickedJsonFile[], sourceName: string, fromFolder = false) {
+  async function loadPickedJsonFiles(collection: PickedJsonCollection, fromFolder = false, cacheRecentImport = true) {
     suppressDefaultGraphRef.current = true;
+    const { files: pickedFiles, name: sourceName } = collection;
     const jsonFiles = pickedFiles.filter((item) => isJsonFileName(item.path || item.file.name));
     const skippedNonJsonCount = pickedFiles.length - jsonFiles.length;
     if (jsonFiles.length === 0) {
@@ -766,6 +816,18 @@ export default function App() {
           warnings: imported.warnings,
         }),
       });
+      if (cacheRecentImport) {
+        try {
+          if (fromFolder) {
+            await saveRecentDirectoryImport(collection);
+          } else {
+            await saveRecentFileImport(collection);
+          }
+          setRecentImportLabel(formatRecentImportLabel(loadRecentImportMetadata()));
+        } catch (error) {
+          console.warn("Unable to save recent import source", error);
+        }
+      }
     } catch (error) {
       console.error(error);
       dispatch({ type: "statusChanged", status: "The selected JSON files could not be loaded into a graph." });
@@ -987,6 +1049,7 @@ export default function App() {
         consoleSidebarOpen={consoleSidebarVisible}
         aiSettings={aiSettings}
         aiBusy={aiBusy}
+        recentImportLabel={recentImportLabel}
         onBack={() => dispatch({ type: "navigateBack" })}
         onUp={() => parentSelection && dispatch({ type: "selectionChanged", selection: parentSelection, pushHistory: true })}
         onAll={() => dispatch({ type: "selectionChanged", selection: getFullGraphSelection(), pushHistory: true })}
@@ -1289,6 +1352,15 @@ function isExecutionApproval(message: string): boolean {
 
 function isJsonFileName(fileName: string): boolean {
   return /\.json$/i.test(fileName);
+}
+
+function formatRecentImportLabel(metadata: RecentImportMetadata | null): string {
+  if (!metadata) {
+    return "";
+  }
+  const firstPath = metadata.paths[0] || metadata.name;
+  const suffix = metadata.paths.length > 1 ? ` +${metadata.paths.length - 1}` : "";
+  return `${firstPath}${suffix}`;
 }
 
 function buildImportStatus({

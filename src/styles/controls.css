@@ -311,12 +311,27 @@
 
 .import-action-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(116px, 0.72fr);
+  grid-template-columns: minmax(0, 1fr) minmax(116px, 0.72fr) minmax(104px, 0.62fr);
   gap: 8px;
 }
 
-.import-action-row .file-input-label {
+.import-action-row .file-input-label,
+.import-action-row .settings-action-btn {
   min-width: 0;
+}
+
+.import-action-row .settings-action-btn {
+  min-height: 50px;
+}
+
+.recent-import-path {
+  overflow: hidden;
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .folder-input-label {

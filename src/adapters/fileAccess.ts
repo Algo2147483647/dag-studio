@@ -7,6 +7,7 @@ export interface PickedJsonFile {
 export interface PickedJsonCollection {
   files: PickedJsonFile[];
   name: string;
+  directoryHandle?: FileSystemDirectoryHandle | null;
 }
 
 export async function openJsonFileWithAccess(): Promise<PickedJsonFile | null> {
@@ -54,6 +55,39 @@ export async function openJsonDirectoryWithAccess(): Promise<PickedJsonCollectio
   return {
     files,
     name: `${directoryHandle.name || "folder"}-merged.json`,
+    directoryHandle,
+  };
+}
+
+export async function createJsonCollectionFromFileHandles(
+  handles: FileSystemFileHandle[],
+  paths: string[] = [],
+  name = "selected-json-files.json",
+): Promise<PickedJsonCollection> {
+  const files = await Promise.all(
+    handles.map(async (handle, index) => ({
+      file: await handle.getFile(),
+      handle,
+      path: paths[index] || handle.name,
+    })),
+  );
+
+  return {
+    files,
+    name: files.length === 1 ? files[0].file.name : name,
+  };
+}
+
+export async function createJsonCollectionFromDirectoryHandle(
+  directoryHandle: FileSystemDirectoryHandle,
+): Promise<PickedJsonCollection> {
+  const files: PickedJsonFile[] = [];
+  await collectJsonFilesFromDirectory(directoryHandle, "", files);
+
+  return {
+    files,
+    name: `${directoryHandle.name || "folder"}-merged.json`,
+    directoryHandle,
   };
 }
 
@@ -88,6 +122,15 @@ export async function writeJsonToHandle(fileHandle: FileSystemFileHandle, conten
   const writable = await fileHandle.createWritable();
   await writable.write(content);
   await writable.close();
+}
+
+export async function hasReadPermission(handle: { queryPermission?: (options?: { mode?: "read" | "readwrite" }) => Promise<PermissionState> }): Promise<boolean> {
+  if (typeof handle.queryPermission !== "function") {
+    return true;
+  }
+
+  const permission = await handle.queryPermission({ mode: "read" });
+  return permission === "granted";
 }
 
 async function collectJsonFilesFromDirectory(
