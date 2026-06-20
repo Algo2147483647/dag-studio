@@ -45,7 +45,7 @@ export default function NodeFieldEditor({ field, value, showMarkdown, onChange }
   );
 }
 
-function MarkdownValue({ value, emphasize = false, previewSurface = false }: { value: string; emphasize?: boolean; previewSurface?: boolean }) {
+export function MarkdownValue({ value, emphasize = false, previewSurface = false }: { value: string; emphasize?: boolean; previewSurface?: boolean }) {
   if (!value.trim()) {
     return <p className="node-detail-empty">(empty string)</p>;
   }

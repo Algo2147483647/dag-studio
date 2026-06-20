@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { DagNode, NodeKey } from "../graph/types";
 import { getMappedFieldName, type FieldMapping } from "../graph/fieldMapping";
 import { getRelationKeys } from "../graph/relations";
-import NodeFieldEditor, { buildEditableFields, formatEditorValue, parseNodeFieldValue, supportsMarkdown, type EditableField } from "./NodeFieldEditor";
+import NodeFieldEditor, { MarkdownValue, buildEditableFields, formatEditorValue, parseNodeFieldValue, supportsMarkdown, type EditableField } from "./NodeFieldEditor";
 import { buildRawNodeEditorValue, parseRawNodeEditorValue } from "./nodeDetailRawJson";
 
 interface NodeDetailModalProps {
@@ -284,6 +284,9 @@ function SaveIcon() {
 function NodeFieldPreview({ field, value }: { field: EditableField; value: string }) {
   if (!value.trim()) {
     return <p className="node-detail-empty">(empty string)</p>;
+  }
+  if (supportsMarkdown(field)) {
+    return <MarkdownValue value={value} previewSurface />;
   }
   if (field.name === "key" || field.editorKind === "plainText" || field.editorKind === "multilineText") {
     return <p className="node-detail-text">{value}</p>;
