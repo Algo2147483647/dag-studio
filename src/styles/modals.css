@@ -1011,10 +1011,10 @@
   margin: 0;
   overflow: auto;
   padding: 14px;
-  border-radius: 14px;
-  background: rgba(20, 31, 48, 0.96);
-  color: rgba(237, 243, 255, 0.92);
-  font: 12px/1.7 "IBM Plex Sans", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  border-radius: 10px;
+  background: rgba(246, 249, 253, 0.86);
+  color: var(--text-strong);
+  font: 12px/1.7 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
   white-space: pre-wrap;
   word-break: break-word;
 }
