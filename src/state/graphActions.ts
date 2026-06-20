@@ -1,5 +1,5 @@
 import type { CommandResult } from "../graph/commands";
-import type { GraphLayoutMode, GraphMode, GraphSelection, NormalizedDag, NodeKey } from "../graph/types";
+import type { GraphLayoutMode, GraphSelection, NormalizedDag, NodeKey } from "../graph/types";
 import type { EditTransaction } from "./initialState";
 
 export type GraphAction =
@@ -13,7 +13,6 @@ export type GraphAction =
   | { type: "redoRequested" }
   | { type: "selectionChanged"; selection: GraphSelection; pushHistory?: boolean }
   | { type: "navigateBack" }
-  | { type: "modeChanged"; mode: GraphMode }
   | { type: "layoutModeChanged"; mode: GraphLayoutMode }
   | { type: "zoomChanged"; scale: number; minScale?: number }
   | { type: "settingsToggled"; open?: boolean }

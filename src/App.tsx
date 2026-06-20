@@ -35,7 +35,7 @@ import SaveJsonModal from "./components/SaveJsonModal";
 import Topbar from "./components/Topbar";
 import Workspace from "./components/Workspace";
 import { DEFAULT_GRAPH_THEME } from "./graph/types";
-import type { GraphLayoutMode, GraphMode, GraphTheme, NodeKey } from "./graph/types";
+import type { GraphLayoutMode, GraphTheme, NodeKey, NormalizedDag } from "./graph/types";
 import { getGraphLayoutLabel } from "./graph/types";
 import type { EditTransaction } from "./state/initialState";
 import { collectBatchEffects, buildConsoleMutationLabel, executeConsoleInstructions } from "./console/executor";
@@ -201,7 +201,7 @@ export default function App() {
 
   const stage = useMemo(() => state.dag ? buildStageData({ dag: state.dag, mapping: fieldMapping, selection: state.selection, layoutMode: state.layout.mode, theme, showNodeDetail, alignNodeWidthsToMax }) : null, [alignNodeWidthsToMax, fieldMapping, showNodeDetail, state.dag, state.layout.mode, state.selection, theme]);
   const parentSelection = useMemo(() => state.dag && stage ? getParentLevelSelection(state.dag, stage.topLevelKeys, fieldMapping) : null, [fieldMapping, stage, state.dag]);
-  const consoleSidebarVisible = state.mode === "edit" && state.ui.consoleSidebarOpen;
+  const consoleSidebarVisible = state.ui.consoleSidebarOpen;
   const consoleSuggestions = useMemo(() => getConsoleSuggestions(consoleInput), [consoleInput]);
   const status = useMemo(() => {
     if (!state.dag || !stage) {
@@ -210,7 +210,6 @@ export default function App() {
     const focusNode = stage.dag[stage.root];
     const focusTitle = focusNode ? getNodeTitle(focusNode, fieldMapping) : "";
     const focusLabel = focusNode?.synthetic ? focusTitle || "Selected roots" : sanitizeNodeLabel(focusTitle || stage.root);
-    const modeLabel = state.mode === "edit" ? "Edit" : "Preview";
     const layoutLabel = getGraphLayoutLabel(state.layout.mode);
     const warningText = stage.warnings.length ? ` ${stage.warnings[0]}` : "";
     return state.ui.status
@@ -218,8 +217,13 @@ export default function App() {
       && !state.ui.status.startsWith("Mode:")
       && !state.ui.status.startsWith("Layout:")
       ? state.ui.status
-      : `${modeLabel} mode. ${layoutLabel} layout. Focused on ${focusLabel}. ${stage.nodes.length} nodes and ${stage.edges.length} links are visible.${warningText}`;
-  }, [stage, state.dag, state.layout.mode, state.mode, state.ui.status]);
+      : `${layoutLabel} layout. Focused on ${focusLabel}. ${stage.nodes.length} nodes and ${stage.edges.length} links are visible.${warningText}`;
+  }, [stage, state.dag, state.layout.mode, state.ui.status]);
+  const currentJsonContent = useMemo(() => serializeDagToJson(state.dag || {}, fieldMapping), [fieldMapping, state.dag]);
+  const savedJsonContent = useMemo(() => {
+    const savedDag = getSavedRevisionDag(state.editHistory, state.dag);
+    return serializeDagToJson(savedDag || {}, fieldMapping);
+  }, [fieldMapping, state.dag, state.editHistory]);
 
   const handleZoomChange = useCallback((scale: number, minScale?: number) => {
     dispatch({ type: "zoomChanged", scale, minScale });
@@ -248,19 +252,16 @@ export default function App() {
       dispatch({ type: "modalClosed" });
     },
     onUndo: () => {
-      if (state.mode === "edit" && state.editHistory.undoStack.length > 0) {
+      if (state.editHistory.undoStack.length > 0) {
         dispatch({ type: "undoRequested" });
       }
     },
     onRedo: () => {
-      if (state.mode === "edit" && state.editHistory.redoStack.length > 0) {
+      if (state.editHistory.redoStack.length > 0) {
         dispatch({ type: "redoRequested" });
       }
     },
     onSave: () => {
-      if (state.mode !== "edit") {
-        return;
-      }
       if (state.dag) {
         dispatch({ type: "saveDialogOpened" });
       } else {
@@ -940,10 +941,6 @@ export default function App() {
     commitCommand({ type: "copyNode", sourceKey: sourceNodeKey, key: newKey, parentKey: sourceNodeKey });
   }
 
-  function handleModeChange(mode: GraphMode) {
-    dispatch({ type: "modeChanged", mode });
-  }
-
   function handleLayoutModeChange(mode: GraphLayoutMode) {
     dispatch({ type: "layoutModeChanged", mode });
   }
@@ -993,7 +990,7 @@ export default function App() {
   }
 
   function getCurrentJsonContent(): string {
-    return JSON.stringify(serializeDag(state.dag || {}, fieldMapping), null, 2);
+    return currentJsonContent;
   }
 
   async function handleOverwriteJson() {
@@ -1029,7 +1026,6 @@ export default function App() {
     <div className="app-shell">
       <Topbar
         topbarRef={topbarRef}
-        mode={state.mode}
         layoutMode={state.layout.mode}
         theme={theme}
         showNodeDetail={showNodeDetail}
@@ -1040,8 +1036,8 @@ export default function App() {
         hasGraph={Boolean(stage)}
         canBack={state.history.length > 0}
         canUp={Boolean(parentSelection)}
-        canUndo={state.mode === "edit" && state.editHistory.undoStack.length > 0}
-        canRedo={state.mode === "edit" && state.editHistory.redoStack.length > 0}
+        canUndo={state.editHistory.undoStack.length > 0}
+        canRedo={state.editHistory.redoStack.length > 0}
         zoomPercent={Math.round(state.zoom.scale * 100)}
         canZoomOut={Boolean(stage) && state.zoom.scale > state.zoom.minScale + 0.001}
         canZoomIn={Boolean(stage) && state.zoom.scale < state.zoom.maxScale - 0.001}
@@ -1061,7 +1057,6 @@ export default function App() {
         onZoomPercentCommit={(percent) => zoom.setZoomPercent(percent)}
         onSettingsToggle={() => dispatch({ type: "settingsToggled" })}
         onConsoleSidebarToggle={() => dispatch({ type: "consoleSidebarToggled" })}
-        onModeChange={handleModeChange}
         onLayoutModeChange={handleLayoutModeChange}
         onThemeChange={handleThemeChange}
         onThemeReset={handleThemeReset}
@@ -1087,7 +1082,6 @@ export default function App() {
         status={status}
         sidebar={(
           <ConsoleSidebar
-            mode={state.mode}
             hasGraph={Boolean(state.dag)}
             entries={consoleEntries}
             inputValue={consoleInput}
@@ -1167,7 +1161,7 @@ export default function App() {
         onSidebarResizeStart={handleConsoleSidebarResizeStart}
       />
 
-      <ContextMenu menu={state.ui.contextMenu} mode={state.mode} onAction={handleContextMenuAction} />
+      <ContextMenu menu={state.ui.contextMenu} onAction={handleContextMenuAction} />
       <RelationEditorModal
         open={Boolean(relationEditor)}
         nodeKey={relationEditor?.nodeKey || null}
@@ -1188,7 +1182,6 @@ export default function App() {
         open={Boolean(detailNodeKey)}
         nodeKey={detailNodeKey}
         node={detailNodeKey && state.dag ? state.dag[detailNodeKey] || null : null}
-        mode={state.mode}
         fieldMapping={fieldMapping}
         initialFocus={nodeDetailInitialFocus}
         onSave={(nextKey, fields) => {
@@ -1202,6 +1195,8 @@ export default function App() {
         open={state.ui.saveDialogOpen}
         sourceFileName={state.source.fileName}
         canOverwrite={canOverwrite(state.source.fileHandle)}
+        previousContent={savedJsonContent}
+        currentContent={currentJsonContent}
         onOverwrite={handleOverwriteJson}
         onSaveNew={handleSaveJsonAsNew}
         onClose={() => dispatch({ type: "saveDialogClosed" })}
@@ -1352,6 +1347,37 @@ function isExecutionApproval(message: string): boolean {
 
 function isJsonFileName(fileName: string): boolean {
   return /\.json$/i.test(fileName);
+}
+
+function serializeDagToJson(dag: NormalizedDag, mapping: FieldMapping): string {
+  return JSON.stringify(serializeDag(dag, mapping), null, 2);
+}
+
+function getSavedRevisionDag(
+  editHistory: {
+    undoStack: EditTransaction[];
+    revision: number;
+    savedRevision: number;
+  },
+  currentDag: NormalizedDag | null,
+): NormalizedDag | null {
+  if (!currentDag) {
+    return null;
+  }
+  if (editHistory.savedRevision < 0) {
+    return {};
+  }
+  if (editHistory.savedRevision === editHistory.revision) {
+    return currentDag;
+  }
+
+  const savedTransaction = editHistory.undoStack.find((transaction) => transaction.revisionAfter === editHistory.savedRevision);
+  if (savedTransaction) {
+    return savedTransaction.afterDag;
+  }
+
+  const nextTransaction = editHistory.undoStack.find((transaction) => transaction.revisionBefore === editHistory.savedRevision);
+  return nextTransaction?.beforeDag || currentDag;
 }
 
 function formatRecentImportLabel(metadata: RecentImportMetadata | null): string {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { AiEvent, AiHarnessState, CommandBatch, ValidationReport } from "../ai/types";
-import type { GraphMode, NodeKey } from "../graph/types";
+import type { NodeKey } from "../graph/types";
 
 export interface ConsoleReviewCard {
   planId: string;
@@ -28,7 +28,6 @@ interface ConsoleSuggestion {
 }
 
 interface ConsoleSidebarProps {
-  mode: GraphMode;
   hasGraph: boolean;
   entries: ConsoleEntry[];
   inputValue: string;
@@ -48,7 +47,6 @@ interface ConsoleSidebarProps {
 }
 
 export default function ConsoleSidebar({
-  mode,
   hasGraph,
   entries,
   inputValue,
@@ -114,7 +112,6 @@ export default function ConsoleSidebar({
             </div>
           ))}
           {!hasGraph ? <div className="console-terminal__line console-terminal__line--info">Load or initialize a graph to enable mutations.</div> : null}
-          {mode !== "edit" ? <div className="console-terminal__line console-terminal__line--info">Switch to edit mode to run graph mutations.</div> : null}
           {aiBusy ? <div className="console-terminal__line console-terminal__line--ai">AI is thinking...</div> : null}
         </div>
       ) : (
@@ -138,8 +135,8 @@ export default function ConsoleSidebar({
           spellCheck={false}
           autoComplete="off"
           value={inputValue}
-          disabled={mode !== "edit" || aiBusy}
-          placeholder={mode === "edit" ? (aiEnabled ? "type /help or ask AI" : "type /help") : "console unavailable"}
+          disabled={aiBusy}
+          placeholder={aiEnabled ? "type /help or ask AI" : "type /help"}
           onChange={(event) => onInputChange(event.currentTarget.value)}
           onKeyDown={onKeyDown}
           onPaste={onPaste}

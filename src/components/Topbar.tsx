@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import type { GraphLayoutMode, GraphMode, GraphTheme } from "../graph/types";
+import type { GraphLayoutMode, GraphTheme } from "../graph/types";
 import { GRAPH_TITLE_FONT_OPTIONS } from "../graph/types";
 import type { AiExecutionMode, AiProvider, AiSettings } from "../ai/types";
 
@@ -8,7 +8,6 @@ type SettingsChapter = "general" | "appearance" | "ai";
 
 interface TopbarProps {
   topbarRef: React.RefObject<HTMLElement>;
-  mode: GraphMode;
   layoutMode: GraphLayoutMode;
   theme: GraphTheme;
   showNodeDetail: boolean;
@@ -40,7 +39,6 @@ interface TopbarProps {
   onZoomPercentCommit: (percent: number) => void;
   onSettingsToggle: () => void;
   onConsoleSidebarToggle: () => void;
-  onModeChange: (mode: GraphMode) => void;
   onLayoutModeChange: (mode: GraphLayoutMode) => void;
   onThemeChange: <K extends keyof GraphTheme>(key: K, value: GraphTheme[K]) => void;
   onThemeReset: () => void;
@@ -61,7 +59,6 @@ interface TopbarProps {
 
 export default function Topbar({
   topbarRef,
-  mode,
   layoutMode,
   theme,
   showNodeDetail,
@@ -93,7 +90,6 @@ export default function Topbar({
   onZoomPercentCommit,
   onSettingsToggle,
   onConsoleSidebarToggle,
-  onModeChange,
   onLayoutModeChange,
   onThemeChange,
   onThemeReset,
@@ -122,12 +118,10 @@ export default function Topbar({
           <IconButton id="up-btn" label="Up" disabled={!canUp} onClick={onUp} icon={<ArrowUpIcon />} />
           <IconButton id="all-btn" label="Show all roots" disabled={!hasGraph} onClick={onAll} icon={<GraphRootsIcon />} />
         </div>
-        {mode === "edit" ? (
-          <div className="topbar-group edit-controls" aria-label="Graph edit controls">
-            <IconButton id="undo-btn" label="Undo" disabled={!canUndo} onClick={onUndo} icon={<UndoIcon />} />
-            <IconButton id="redo-btn" label="Redo" disabled={!canRedo} onClick={onRedo} icon={<RedoIcon />} />
-          </div>
-        ) : null}
+        <div className="topbar-group edit-controls" aria-label="Graph edit controls">
+          <IconButton id="undo-btn" label="Undo" disabled={!canUndo} onClick={onUndo} icon={<UndoIcon />} />
+          <IconButton id="redo-btn" label="Redo" disabled={!canRedo} onClick={onRedo} icon={<RedoIcon />} />
+        </div>
         <div className="topbar-group zoom-controls" aria-label="Graph zoom controls">
           <IconButton id="zoom-out-btn" label="Zoom out" disabled={!canZoomOut} onClick={onZoomOut} icon={<MinusIcon />} />
           <IconButton id="zoom-in-btn" label="Zoom in" disabled={!canZoomIn} onClick={onZoomIn} icon={<PlusIcon />} />
@@ -148,7 +142,6 @@ export default function Topbar({
             />
             <SettingsModal
               open={settingsOpen}
-              mode={mode}
               layoutMode={layoutMode}
               theme={theme}
               showNodeDetail={showNodeDetail}
@@ -162,7 +155,6 @@ export default function Topbar({
               aiBusy={aiBusy}
               recentImportLabel={recentImportLabel}
               onClose={onSettingsToggle}
-              onModeChange={onModeChange}
               onLayoutModeChange={onLayoutModeChange}
               onThemeChange={onThemeChange}
               onThemeReset={onThemeReset}
@@ -189,7 +181,6 @@ export default function Topbar({
 
 interface SettingsModalProps {
   open: boolean;
-  mode: GraphMode;
   layoutMode: GraphLayoutMode;
   theme: GraphTheme;
   showNodeDetail: boolean;
@@ -203,7 +194,6 @@ interface SettingsModalProps {
   aiBusy: boolean;
   recentImportLabel: string;
   onClose: () => void;
-  onModeChange: (mode: GraphMode) => void;
   onLayoutModeChange: (mode: GraphLayoutMode) => void;
   onThemeChange: <K extends keyof GraphTheme>(key: K, value: GraphTheme[K]) => void;
   onThemeReset: () => void;
@@ -224,7 +214,6 @@ interface SettingsModalProps {
 
 function SettingsModal({
   open,
-  mode,
   layoutMode,
   theme,
   showNodeDetail,
@@ -238,7 +227,6 @@ function SettingsModal({
   aiBusy,
   recentImportLabel,
   onClose,
-  onModeChange,
   onLayoutModeChange,
   onThemeChange,
   onThemeReset,
@@ -376,14 +364,6 @@ function SettingsModal({
                   </div>
                 </section>
 
-                <section className="settings-section" aria-labelledby="mode-options-title">
-                  <p id="mode-options-title" className="control-label">Mode</p>
-                  <div className="mode-toggle" role="group" aria-label="Graph mode">
-                    <button id="mode-preview-btn" className={`mode-toggle-btn${mode === "preview" ? " is-active" : ""}`} type="button" data-mode="preview" aria-pressed={mode === "preview"} onClick={() => onModeChange("preview")}>Preview</button>
-                    <button id="mode-edit-btn" className={`mode-toggle-btn${mode === "edit" ? " is-active" : ""}`} type="button" data-mode="edit" aria-pressed={mode === "edit"} onClick={() => onModeChange("edit")}>Edit</button>
-                  </div>
-                </section>
-
                 <section className="settings-section" aria-labelledby="layout-mode-title">
                   <label className="layout-select-label" htmlFor="layout-mode-select">
                     <span id="layout-mode-title" className="control-label">Layout</span>
@@ -403,17 +383,15 @@ function SettingsModal({
                 <section className="settings-section" aria-labelledby="general-workspace-title">
                   <p id="general-workspace-title" className="control-label">Workspace</p>
                   <div className="workspace-action-row">
-                    {mode === "edit" ? (
-                      <button
-                        id="console-sidebar-toggle-btn"
-                        className={`ghost-btn settings-action-btn${consoleSidebarOpen ? " settings-action-btn-active" : ""}`}
-                        type="button"
-                        aria-pressed={consoleSidebarOpen}
-                        onClick={onConsoleSidebarToggle}
-                      >
-                        {consoleSidebarOpen ? "Hide Console" : "Show Console"}
-                      </button>
-                    ) : null}
+                    <button
+                      id="console-sidebar-toggle-btn"
+                      className={`ghost-btn settings-action-btn${consoleSidebarOpen ? " settings-action-btn-active" : ""}`}
+                      type="button"
+                      aria-pressed={consoleSidebarOpen}
+                      onClick={onConsoleSidebarToggle}
+                    >
+                      {consoleSidebarOpen ? "Hide Console" : "Show Console"}
+                    </button>
                     <button type="button" className="ghost-btn settings-action-btn" onClick={onInitializeCanvas}>Initialize</button>
                   </div>
                 </section>

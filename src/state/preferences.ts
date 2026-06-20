@@ -36,7 +36,7 @@ interface StorageLike {
 
 export function getInitialGraphPagePreferences(): GraphPagePreferences {
   return {
-    mode: "preview",
+    mode: "edit",
     layoutMode: "sugiyama",
     theme: DEFAULT_GRAPH_THEME,
     showNodeDetail: true,
@@ -105,7 +105,7 @@ export function parseGraphPagePreferences(raw: string | null): Partial<GraphPage
   }
 
   const next: Partial<GraphPagePreferences> = {};
-  if (parsed.mode === "preview" || parsed.mode === "edit") {
+  if (parsed.mode === "edit") {
     next.mode = parsed.mode;
   }
   if (parsed.layoutMode === "level" || parsed.layoutMode === "sugiyama" || parsed.layoutMode === "dagre") {

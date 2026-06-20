@@ -25,7 +25,7 @@ export function graphReducer(state: GraphAppState, action: GraphAction): GraphAp
           revision: 0,
           savedRevision: 0,
         },
-        mode: state.mode,
+        mode: "edit",
         layout: state.layout,
         ui: {
           ...initialGraphAppState.ui,
@@ -220,16 +220,6 @@ export function graphReducer(state: GraphAppState, action: GraphAction): GraphAp
         },
       };
     }
-    case "modeChanged":
-      return {
-        ...state,
-        mode: action.mode,
-        ui: {
-          ...state.ui,
-          contextMenu: null,
-          status: state.dag ? `Mode: ${action.mode === "edit" ? "Edit" : "Preview"}.` : state.ui.status,
-        },
-      };
     case "layoutModeChanged":
       return {
         ...state,

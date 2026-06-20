@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { DagNode, GraphMode, NodeKey } from "../graph/types";
+import type { DagNode, NodeKey } from "../graph/types";
 import { getMappedFieldName, type FieldMapping } from "../graph/fieldMapping";
 import { getRelationKeys } from "../graph/relations";
 import NodeFieldEditor, { buildEditableFields, formatEditorValue, parseNodeFieldValue, supportsMarkdown, type EditableField } from "./NodeFieldEditor";
@@ -9,14 +9,13 @@ interface NodeDetailModalProps {
   open: boolean;
   nodeKey: NodeKey | null;
   node: DagNode | null;
-  mode: GraphMode;
   fieldMapping: FieldMapping;
   initialFocus?: "fields" | "raw";
   onSave: (nextKey: NodeKey, fields: Record<string, unknown>) => void;
   onClose: () => void;
 }
 
-export default function NodeDetailModal({ open, nodeKey, node, mode, fieldMapping, initialFocus = "fields", onSave, onClose }: NodeDetailModalProps) {
+export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, initialFocus = "fields", onSave, onClose }: NodeDetailModalProps) {
   const [fields, setFields] = useState<EditableField[]>([]);
   const [values, setValues] = useState<Record<string, string>>({});
   const [rawJsonValue, setRawJsonValue] = useState("");
@@ -62,14 +61,12 @@ export default function NodeDetailModal({ open, nodeKey, node, mode, fieldMappin
               <p className="node-detail-eyebrow">Node Viewer</p>
               <h3 id="node-detail-title">{draftKey}</h3>
               <p id="node-detail-subtitle" className="node-detail-subtitle">
-                {mode === "edit"
-                  ? `Editing ${Math.max(fields.length - 1, 0)} key-value pairs in this node. Raw JSON edits can also add or remove fields.`
-                  : `Generic field view for ${Math.max(fields.length - 1, 0)} key-value pairs in this node.`}
+                Editing {Math.max(fields.length - 1, 0)} key-value pairs in this node. Raw JSON edits can also add or remove fields.
               </p>
             </div>
           </div>
           <div className="node-detail-actions">
-            {mode === "edit" ? <button id="node-detail-save" className="primary-btn node-detail-save-btn" type="button" onClick={handleSave}>Save</button> : null}
+            <button id="node-detail-save" className="primary-btn node-detail-save-btn" type="button" onClick={handleSave}>Save</button>
             <button id="node-detail-close" className="ghost-btn" type="button" onClick={onClose}>Close</button>
           </div>
         </div>
@@ -88,15 +85,12 @@ export default function NodeDetailModal({ open, nodeKey, node, mode, fieldMappin
                         aria-pressed={markdownFields[field.name] ? "true" : "false"}
                         onClick={() => toggleMarkdownField(field.name)}
                       >
-                        {mode === "edit"
-                          ? (markdownFields[field.name] ? "Hide Preview" : "Markdown Preview")
-                          : (markdownFields[field.name] ? "Plain Text" : "Markdown")}
+                        {markdownFields[field.name] ? "Hide Preview" : "Markdown Preview"}
                       </button>
                     ) : null}
                   </div>
                   <NodeFieldEditor
                     field={field}
-                    mode={mode}
                     value={values[field.name] ?? ""}
                     showMarkdown={Boolean(markdownFields[field.name])}
                     onChange={(value) => handleFieldChange(field.name, value)}
@@ -108,21 +102,17 @@ export default function NodeDetailModal({ open, nodeKey, node, mode, fieldMappin
           </section>
           <section className="node-detail-section">
             <h4>Raw JSON</h4>
-            {mode === "edit" ? (
-              <div className="node-detail-editor-wrap">
-                <textarea
-                  id="node-detail-json"
-                  className="node-detail-editor node-detail-editor--textarea node-detail-editor--json"
-                  rows={16}
-                  spellCheck={false}
-                  value={rawJsonValue}
-                  onChange={(event) => handleRawJsonChange(event.currentTarget.value)}
-                />
-                <p className="node-detail-editor-hint">Edit a wrapped single-node JSON object here. Save uses this raw payload when it is the latest thing you changed.</p>
-              </div>
-            ) : (
-              <pre id="node-detail-json" className="node-detail-json">{rawJsonValue}</pre>
-            )}
+            <div className="node-detail-editor-wrap">
+              <textarea
+                id="node-detail-json"
+                className="node-detail-editor node-detail-editor--textarea node-detail-editor--json"
+                rows={16}
+                spellCheck={false}
+                value={rawJsonValue}
+                onChange={(event) => handleRawJsonChange(event.currentTarget.value)}
+              />
+              <p className="node-detail-editor-hint">Edit a wrapped single-node JSON object here. Save uses this raw payload when it is the latest thing you changed.</p>
+            </div>
           </section>
         </div>
       </div>

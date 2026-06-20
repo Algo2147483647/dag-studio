@@ -25,7 +25,7 @@ export type GraphSelection =
   | { type: "full" }
   | { type: "forest"; keys: NodeKey[]; label: string };
 
-export type GraphMode = "preview" | "edit";
+export type GraphMode = "edit";
 
 export type GraphLayoutMode = "level" | "sugiyama" | "dagre";
 

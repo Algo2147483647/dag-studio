@@ -1,6 +1,6 @@
 import type { NodeKey } from "../graph/types";
 import { formatMappedFieldLabel, getSemanticFieldName, type FieldMapping, type MappableSystemFieldKey } from "../graph/fieldMapping";
-import { getRelationKeys, normalizeRelationField } from "../graph/relations";
+import { normalizeRelationField } from "../graph/relations";
 import { parseRelationInput } from "./RelationEditorModal";
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
@@ -20,17 +20,12 @@ export interface EditableField {
 
 interface NodeFieldEditorProps {
   field: EditableField;
-  mode: "preview" | "edit";
   value: string;
   showMarkdown: boolean;
   onChange: (value: string) => void;
 }
 
-export default function NodeFieldEditor({ field, mode, value, showMarkdown, onChange }: NodeFieldEditorProps) {
-  if (mode === "preview") {
-    return <FieldPreview field={field} showMarkdown={showMarkdown} />;
-  }
-
+export default function NodeFieldEditor({ field, value, showMarkdown, onChange }: NodeFieldEditorProps) {
   if (field.name === "key") {
     return <input className="node-detail-editor node-detail-editor--input" type="text" spellCheck={false} value={value} onChange={(event) => onChange(event.target.value)} />;
   }
@@ -48,50 +43,6 @@ export default function NodeFieldEditor({ field, mode, value, showMarkdown, onCh
       {getEditorHint(field) ? <p className="node-detail-editor-hint">{getEditorHint(field)}</p> : null}
     </div>
   );
-}
-
-function FieldPreview({ field, showMarkdown }: { field: EditableField; showMarkdown: boolean }) {
-  if (field.editorKind === "relation") {
-    const relationKeys = getRelationKeys(field.value);
-    if (!relationKeys.length) {
-      return <p className="node-detail-empty">No {field.displayName} linked.</p>;
-    }
-    return (
-      <div className="node-detail-chip-list">
-        {relationKeys.map((relationKey) => <span key={relationKey} className="node-detail-chip">{relationKey}</span>)}
-      </div>
-    );
-  }
-
-  if (showMarkdown && typeof field.value === "string") {
-    return <MarkdownValue value={field.value} emphasize={field.semanticFieldName === "define"} />;
-  }
-
-  if (field.semanticFieldName === "define") {
-    return <p className="node-detail-text node-detail-text--define">{String(field.value || "").trim() || "(empty string)"}</p>;
-  }
-
-  if (field.value === null || field.value === undefined) {
-    return <p className="node-detail-empty">(empty)</p>;
-  }
-
-  if (typeof field.value === "string") {
-    return <p className="node-detail-text">{field.value.trim() || "(empty string)"}</p>;
-  }
-
-  if (typeof field.value === "number" || typeof field.value === "boolean") {
-    return <p className="node-detail-text">{String(field.value)}</p>;
-  }
-
-  if (Array.isArray(field.value) && field.value.every((item) => ["string", "number", "boolean"].includes(typeof item))) {
-    return (
-      <div className="node-detail-chip-list">
-        {field.value.length ? field.value.map((item, index) => <span key={`${String(item)}-${index}`} className="node-detail-chip">{String(item)}</span>) : <span className="node-detail-chip">(empty)</span>}
-      </div>
-    );
-  }
-
-  return <pre className="node-detail-pre">{JSON.stringify(field.value, null, 2)}</pre>;
 }
 
 function MarkdownValue({ value, emphasize = false, previewSurface = false }: { value: string; emphasize?: boolean; previewSurface?: boolean }) {
