@@ -21,6 +21,7 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
   const [rawJsonValue, setRawJsonValue] = useState("");
   const [lastEdited, setLastEdited] = useState<"fields" | "raw">("fields");
   const [markdownFields, setMarkdownFields] = useState<Record<string, boolean>>({});
+  const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -31,19 +32,20 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
       setRawJsonValue(buildRawNodeEditorValue(nodeKey, node, fieldMapping));
       setLastEdited("fields");
       setMarkdownFields(buildDefaultMarkdownFieldState(nextFields));
+      setIsEditing(false);
       setError("");
     }
   }, [fieldMapping, node, nodeKey, open]);
 
   useEffect(() => {
-    if (!open || initialFocus !== "raw") {
+    if (!open || !isEditing || initialFocus !== "raw") {
       return;
     }
     const frame = window.requestAnimationFrame(() => {
       document.getElementById("node-detail-json")?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [initialFocus, open, nodeKey]);
+  }, [initialFocus, isEditing, open, nodeKey]);
 
   if (!open || !node || !nodeKey) {
     return null;
@@ -62,7 +64,15 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
             </div>
           </div>
           <div className="node-detail-actions">
-            <button id="node-detail-save" className="primary-btn node-detail-save-btn" type="button" onClick={handleSave}>Save</button>
+            {isEditing ? (
+              <button id="node-detail-save" className="primary-btn node-detail-save-btn" type="button" title="Save" aria-label="Save" onClick={handleSave}>
+                <SaveIcon />
+              </button>
+            ) : (
+              <button id="node-detail-edit" className="ghost-btn node-detail-edit-btn" type="button" title="Edit" aria-label="Edit" onClick={() => setIsEditing(true)}>
+                <EditIcon />
+              </button>
+            )}
             <button id="node-detail-close" className="ghost-btn modal-icon-close-btn" type="button" title="Close" aria-label="Close" onClick={onClose}>
               <CloseIcon />
             </button>
@@ -76,7 +86,7 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
                 <article key={field.name} className="node-detail-field">
                   <div className="node-detail-field__header">
                     <p className="node-detail-field__label">{field.displayName}</p>
-                    {supportsMarkdown(field) ? (
+                    {isEditing && supportsMarkdown(field) ? (
                       <button
                         className={`node-detail-markdown-toggle${markdownFields[field.name] ? " is-active" : ""}`}
                         type="button"
@@ -87,12 +97,16 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
                       </button>
                     ) : null}
                   </div>
-                  <NodeFieldEditor
-                    field={field}
-                    value={values[field.name] ?? ""}
-                    showMarkdown={Boolean(markdownFields[field.name])}
-                    onChange={(value) => handleFieldChange(field.name, value)}
-                  />
+                  {isEditing ? (
+                    <NodeFieldEditor
+                      field={field}
+                      value={values[field.name] ?? ""}
+                      showMarkdown={Boolean(markdownFields[field.name])}
+                      onChange={(value) => handleFieldChange(field.name, value)}
+                    />
+                  ) : (
+                    <NodeFieldPreview field={field} value={values[field.name] ?? ""} />
+                  )}
                 </article>
               )) : <p className="node-detail-empty">No fields are available for this node.</p>}
               {error ? <p className="node-detail-error">{error}</p> : null}
@@ -100,16 +114,20 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
           </section>
           <section className="node-detail-section">
             <h4>Raw JSON</h4>
-            <div className="node-detail-editor-wrap">
-              <textarea
-                id="node-detail-json"
-                className="node-detail-editor node-detail-editor--textarea node-detail-editor--json"
-                rows={16}
-                spellCheck={false}
-                value={rawJsonValue}
-                onChange={(event) => handleRawJsonChange(event.currentTarget.value)}
-              />
-            </div>
+            {isEditing ? (
+              <div className="node-detail-editor-wrap">
+                <textarea
+                  id="node-detail-json"
+                  className="node-detail-editor node-detail-editor--textarea node-detail-editor--json"
+                  rows={16}
+                  spellCheck={false}
+                  value={rawJsonValue}
+                  onChange={(event) => handleRawJsonChange(event.currentTarget.value)}
+                />
+              </div>
+            ) : (
+              <pre id="node-detail-json-preview" className="node-detail-json">{rawJsonValue}</pre>
+            )}
           </section>
         </div>
       </div>
@@ -159,6 +177,7 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
         return;
       }
       onSave(parsed.nextKey, parsed.fields);
+      setIsEditing(false);
       return;
     }
 
@@ -190,6 +209,7 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
       return;
     }
     onSave(nextKey, patch);
+    setIsEditing(false);
   }
 
   function toggleMarkdownField(fieldName: string) {
@@ -240,6 +260,35 @@ function CloseIcon() {
       <path d="M18 6L6 18" />
     </svg>
   );
+}
+
+function EditIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="modal-icon-close-svg" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
+function SaveIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="modal-icon-close-svg" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+      <path d="M17 21v-8H7v8" />
+      <path d="M7 3v5h8" />
+    </svg>
+  );
+}
+
+function NodeFieldPreview({ field, value }: { field: EditableField; value: string }) {
+  if (!value.trim()) {
+    return <p className="node-detail-empty">(empty string)</p>;
+  }
+  if (field.name === "key" || field.editorKind === "plainText" || field.editorKind === "multilineText") {
+    return <p className="node-detail-text">{value}</p>;
+  }
+  return <pre className="node-detail-pre">{value}</pre>;
 }
 
 function buildDefaultMarkdownFieldState(fields: EditableField[]): Record<string, boolean> {
