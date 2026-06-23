@@ -1,4 +1,6 @@
 import { applyGraphCommand, type CommandResult } from "../graph/commands";
+import { DEFAULT_GRAPH_APPEARANCE, type GraphAppearance } from "../graph/appearance";
+import { applyAppearanceCommand, type AppearanceCommandResult } from "../graph/appearanceCommands";
 import { getCustomFieldNames, getNodeChildren, getNodeDefine, getNodeParents, getNodeTitle, getNodeType } from "../graph/accessors";
 import { getDefaultFieldMapping, type FieldMapping } from "../graph/fieldMapping";
 import { getRelationKeys } from "../graph/relations";
@@ -19,10 +21,13 @@ export type ConsoleRunResult =
     dag: NormalizedDag;
     contextNodeKey: NodeKey | null;
     results: CommandResult[];
+    appearance: GraphAppearance;
+    appearanceResults: AppearanceCommandResult[];
     uiEffects: ConsoleUiEffect[];
     outputMessages: string[];
     instructionCount: number;
     mutationCount: number;
+    appearanceMutationCount: number;
   }
   | {
     ok: false;
@@ -36,10 +41,13 @@ export function executeConsoleInstructions(
   instructions: ConsoleInstruction[],
   initialContextNodeKey: NodeKey | null,
   mapping: FieldMapping = getDefaultFieldMapping(),
+  appearance: GraphAppearance = DEFAULT_GRAPH_APPEARANCE,
 ): ConsoleRunResult {
   let workingDag = structuredCloneValue(dag);
+  let workingAppearance = appearance;
   let contextNodeKey = initialContextNodeKey;
   const results: CommandResult[] = [];
+  const appearanceResults: AppearanceCommandResult[] = [];
   const uiEffects: ConsoleUiEffect[] = [];
   const outputMessages: string[] = [];
 
@@ -51,6 +59,17 @@ export function executeConsoleInstructions(
           break;
         }
         case "clear": {
+          break;
+        }
+        case "appearanceCssShow": {
+          outputMessages.push(workingAppearance.css || "(empty CSS)");
+          break;
+        }
+        case "appearance": {
+          const result = applyAppearanceCommand(workingAppearance, instruction.command);
+          workingAppearance = result.appearance;
+          appearanceResults.push(result);
+          outputMessages.push(result.message);
           break;
         }
         case "keys": {
@@ -248,12 +267,15 @@ export function executeConsoleInstructions(
   return {
     ok: true,
     dag: workingDag,
+    appearance: workingAppearance,
     contextNodeKey,
     results,
+    appearanceResults,
     uiEffects,
     outputMessages,
     instructionCount: instructions.length,
     mutationCount: results.length,
+    appearanceMutationCount: appearanceResults.length,
   };
 }
 

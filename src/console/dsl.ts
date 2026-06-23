@@ -1,3 +1,6 @@
+import type { AppearanceCommand, GraphAppearancePresetId } from "../graph/appearanceCommands";
+import type { GraphLayoutAppearance } from "../graph/appearance";
+
 export interface ConsoleLineError {
   line: number;
   message: string;
@@ -28,6 +31,8 @@ export type ConsoleInstruction =
   | { type: "setChildren"; key: ConsoleNodeOperand; keys: ConsoleNodeOperand[]; line: number }
   | { type: "setField"; key: ConsoleNodeOperand; field: string; value: unknown; line: number }
   | { type: "unsetField"; key: ConsoleNodeOperand; field: string; line: number }
+  | { type: "appearance"; command: AppearanceCommand; line: number }
+  | { type: "appearanceCssShow"; line: number }
   | { type: "json"; key: ConsoleNodeOperand; line: number };
 
 type ConsoleToken =
@@ -184,6 +189,16 @@ function parseInstruction(tokens: ConsoleToken[], line: number): { ok: true; ins
       return parseSetInstruction(tokens, line);
     case "unset":
       return parseUnsetInstruction(tokens, line);
+    case "layout":
+      return parseLayoutInstruction(tokens, line);
+    case "style-var":
+      return parseStyleVarInstruction(tokens, line);
+    case "style-css":
+      return parseStyleCssInstruction(tokens, line);
+    case "style-reset":
+      return parseStyleResetInstruction(tokens, line);
+    case "style-preset":
+      return parseStylePresetInstruction(tokens, line);
     default:
       return { ok: false, error: { line, message: `Unknown instruction "${mnemonic.value}".` } };
   }
@@ -428,6 +443,79 @@ function parseUnsetInstruction(tokens: ConsoleToken[], line: number) {
   return { ok: true, instruction: { type: "unsetField", key, field, line } } as const;
 }
 
+function parseLayoutInstruction(tokens: ConsoleToken[], line: number) {
+  if (tokens.length !== 3) {
+    return { ok: false, error: { line, message: "layout expects <layout-key> <number>." } } as const;
+  }
+  const key = parseLiteralToken(tokens[1]);
+  const value = Number(parseLiteralToken(tokens[2]));
+  if (!isLayoutKey(key) || !Number.isFinite(value)) {
+    return { ok: false, error: { line, message: "layout expects a valid layout key and finite number." } } as const;
+  }
+  return { ok: true, instruction: { type: "appearance", command: { type: "setLayout", key, value }, line } satisfies ConsoleInstruction } as const;
+}
+
+function parseStyleVarInstruction(tokens: ConsoleToken[], line: number) {
+  if (tokens.length !== 3) {
+    return { ok: false, error: { line, message: "style-var expects <var-name> <value>, or --unset <var-name>." } } as const;
+  }
+  if (tokens.length === 3 && expectWordToken(tokens[1])?.value === "--unset") {
+    const key = parseLiteralToken(tokens[2]);
+    if (!isDagCssVarName(key)) {
+      return { ok: false, error: { line, message: "style-var --unset expects a --dag-* variable name." } } as const;
+    }
+    return { ok: true, instruction: { type: "appearance", command: { type: "unsetCssVar", key }, line } satisfies ConsoleInstruction } as const;
+  }
+  const key = parseLiteralToken(tokens[1]);
+  const value = parseLiteralToken(tokens[2]);
+  if (!isDagCssVarName(key) || value === null) {
+    return { ok: false, error: { line, message: "style-var expects a --dag-* variable name and value." } } as const;
+  }
+  return { ok: true, instruction: { type: "appearance", command: { type: "setCssVar", key, value }, line } satisfies ConsoleInstruction } as const;
+}
+
+function parseStyleCssInstruction(tokens: ConsoleToken[], line: number) {
+  if (tokens.length === 1) {
+    return { ok: true, instruction: { type: "appearanceCssShow", line } satisfies ConsoleInstruction } as const;
+  }
+  if (tokens.length === 2 && expectWordToken(tokens[1])?.value === "show") {
+    return { ok: true, instruction: { type: "appearanceCssShow", line } satisfies ConsoleInstruction } as const;
+  }
+  if (tokens.length !== 3) {
+    return { ok: false, error: { line, message: "style-css expects append <css>, replace <css>, or show." } } as const;
+  }
+  const operation = expectWordToken(tokens[1])?.value;
+  const css = parseLiteralToken(tokens[2]);
+  if (css === null) {
+    return { ok: false, error: { line, message: "style-css expects CSS text." } } as const;
+  }
+  if (operation === "append") {
+    return { ok: true, instruction: { type: "appearance", command: { type: "appendCss", css }, line } satisfies ConsoleInstruction } as const;
+  }
+  if (operation === "replace") {
+    return { ok: true, instruction: { type: "appearance", command: { type: "replaceCss", css }, line } satisfies ConsoleInstruction } as const;
+  }
+  return { ok: false, error: { line, message: "style-css operation must be append, replace, or show." } } as const;
+}
+
+function parseStyleResetInstruction(tokens: ConsoleToken[], line: number) {
+  if (tokens.length !== 1) {
+    return { ok: false, error: { line, message: "style-reset does not accept arguments." } } as const;
+  }
+  return { ok: true, instruction: { type: "appearance", command: { type: "resetAppearance" }, line } satisfies ConsoleInstruction } as const;
+}
+
+function parseStylePresetInstruction(tokens: ConsoleToken[], line: number) {
+  if (tokens.length !== 2) {
+    return { ok: false, error: { line, message: "style-preset expects a preset id." } } as const;
+  }
+  const presetId = parseLiteralToken(tokens[1]);
+  if (!presetId || !["default", "slate", "blueprint", "contrast", "compact", "presentation"].includes(presetId)) {
+    return { ok: false, error: { line, message: "style-preset expects default, slate, blueprint, contrast, compact, or presentation." } } as const;
+  }
+  return { ok: true, instruction: { type: "appearance", command: { type: "applyPreset", presetId: presetId as GraphAppearancePresetId }, line } satisfies ConsoleInstruction } as const;
+}
+
 function parseNodeList(tokens: ConsoleToken[]): { ok: true; operands: ConsoleNodeOperand[] } | { ok: false; message: string } {
   if (!tokens.length) {
     return { ok: true, operands: [] };
@@ -553,4 +641,21 @@ function stringifyValueTokens(tokens: ConsoleToken[]): string {
 
 function expectWordToken(token: ConsoleToken | undefined): Extract<ConsoleToken, { type: "word" }> | null {
   return token?.type === "word" ? token : null;
+}
+
+function isDagCssVarName(value: string | null): value is `--dag-${string}` {
+  return typeof value === "string" && value.startsWith("--dag-");
+}
+
+function isLayoutKey(value: string | null): value is keyof GraphLayoutAppearance {
+  return value === "stagePaddingX"
+    || value === "stagePaddingY"
+    || value === "columnGap"
+    || value === "rowGap"
+    || value === "edgeLaneGap"
+    || value === "nodeHeight"
+    || value === "minNodeWidth"
+    || value === "maxNodeWidth"
+    || value === "stageMinWidth"
+    || value === "stageMinHeight";
 }

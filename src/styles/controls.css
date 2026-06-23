@@ -490,6 +490,16 @@
   padding: 0 10px;
 }
 
+.appearance-css-editor {
+  min-height: 170px;
+  padding: 10px;
+  resize: vertical;
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
 .provider-picker {
   position: relative;
   min-width: 0;

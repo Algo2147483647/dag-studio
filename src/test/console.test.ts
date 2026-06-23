@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { parseConsoleSource } from "../console/dsl";
 import { buildConsoleMutationLabel, collectBatchEffects, executeConsoleInstructions } from "../console/executor";
+import { DEFAULT_GRAPH_APPEARANCE } from "../graph/appearance";
 import { defineSuite, defineTest } from "./harness";
 import { createSampleDag } from "./fixtures";
 
@@ -126,6 +127,49 @@ export const consoleSuite = defineSuite("console", [
     assert.match(executed.outputMessages[1], /Matches/);
     assert.match(executed.outputMessages[2], /Neighbors up to depth 2/);
     assert.match(executed.outputMessages[3], /Path/);
+  }),
+
+  defineTest("appearance commands update layout variables and CSS without graph mutations", () => {
+    const parsed = parseConsoleSource([
+      "/layout rowGap 44",
+      "/style-var --dag-node-fill \"#101827\"",
+      "/style-css append \".dag-node__shape { stroke-width: 2; }\"",
+    ].join("\n"));
+
+    assert.equal(parsed.ok, true);
+    if (!parsed.ok) {
+      return;
+    }
+
+    const executed = executeConsoleInstructions(createSampleDag(), parsed.instructions, null, undefined, DEFAULT_GRAPH_APPEARANCE);
+    assert.equal(executed.ok, true);
+    if (!executed.ok) {
+      return;
+    }
+
+    assert.equal(executed.mutationCount, 0);
+    assert.equal(executed.appearanceMutationCount, 3);
+    assert.equal(executed.appearance.layout.rowGap, 44);
+    assert.equal(executed.appearance.cssVars["--dag-node-fill"], "#101827");
+    assert.match(executed.appearance.css, /stroke-width: 2/);
+  }),
+
+  defineTest("style-css show prints current appearance CSS", () => {
+    const parsed = parseConsoleSource("/style-css show");
+    assert.equal(parsed.ok, true);
+    if (!parsed.ok) {
+      return;
+    }
+
+    const executed = executeConsoleInstructions({}, parsed.instructions, null, undefined, DEFAULT_GRAPH_APPEARANCE);
+    assert.equal(executed.ok, true);
+    if (!executed.ok) {
+      return;
+    }
+
+    assert.equal(executed.mutationCount, 0);
+    assert.equal(executed.appearanceMutationCount, 0);
+    assert.match(executed.outputMessages[0], /\.dag-node__shape/);
   }),
 
   defineTest("executor applies batch mutations and tracks ui effects", () => {

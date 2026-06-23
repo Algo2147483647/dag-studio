@@ -2,6 +2,7 @@ import { getCustomFieldNames, getNodeChildren, getNodeDefine, getNodeParents, ge
 import type { FieldMapping } from "../graph/fieldMapping";
 import { getRelationKeys } from "../graph/relations";
 import type { GraphLayoutMode, GraphMode, GraphSelection, NodeKey, NormalizedDag } from "../graph/types";
+import type { GraphAppearance } from "../graph/appearance";
 import { CONSOLE_COMMAND_REFERENCE } from "../console/reference";
 import type { AiGraphContext } from "./types";
 
@@ -15,6 +16,7 @@ export function buildAiGraphContext({
   selection,
   contextNodeKey,
   mapping,
+  appearance,
 }: {
   dag: NormalizedDag | null;
   mode: GraphMode;
@@ -22,6 +24,7 @@ export function buildAiGraphContext({
   selection: GraphSelection | null;
   contextNodeKey: NodeKey | null;
   mapping: FieldMapping;
+  appearance: GraphAppearance;
 }): AiGraphContext {
   const commandReference = CONSOLE_COMMAND_REFERENCE
     .map((command) => `${command.label}: ${command.help}`)
@@ -33,8 +36,9 @@ export function buildAiGraphContext({
       summary: [
         "No graph is currently loaded.",
         `Application mode: ${mode}`,
-        `Layout mode: ${layoutMode}`,
-        "Console commands are available for help and graph mutation after a graph is loaded.",
+      `Layout mode: ${layoutMode}`,
+      formatAppearanceSummary(appearance),
+      "Console commands are available for help and graph mutation after a graph is loaded.",
       ].join("\n"),
     };
   }
@@ -55,6 +59,7 @@ export function buildAiGraphContext({
       `Graph has ${keys.length} node${keys.length === 1 ? "" : "s"} and ${edgeCount} directed edge${edgeCount === 1 ? "" : "s"}.`,
       `Application mode: ${mode}`,
       `Layout mode: ${layoutMode}`,
+      formatAppearanceSummary(appearance),
       `Current console context node: ${contextNodeKey || "(unset)"}`,
       `Current selection: ${selectionText}`,
       "Node lookup index:",
@@ -65,6 +70,21 @@ export function buildAiGraphContext({
       omittedCount > 0 ? `... ${omittedCount} additional detailed node summar${omittedCount === 1 ? "y" : "ies"} omitted from AI context. Use /find, /ls, /neighbors, /path, or /graph for more data.` : "",
     ].filter(Boolean).join("\n"),
   };
+}
+
+function formatAppearanceSummary(appearance: GraphAppearance): string {
+  const vars = Object.entries(appearance.cssVars)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `- ${key}: ${value}`)
+    .join("\n");
+  return [
+    "Appearance can be edited with /layout, /style-var, /style-css, /style-preset, and /style-reset.",
+    "Stable SVG selectors: .dag-graph, .dag-node, .dag-node__shape, .dag-node__title, .dag-node__detail, .dag-edge, .dag-edge__path, .dag-stage__lane.",
+    "Useful data selectors: .dag-node[data-type=\"service\"], .dag-node[data-root=\"true\"], .dag-edge[data-weight=\"2\"], .dag-edge[data-active=\"true\"].",
+    `Appearance layout: ${JSON.stringify(appearance.layout)}`,
+    "Appearance cssVars:",
+    vars,
+  ].join("\n");
 }
 
 function countEdges(dag: NormalizedDag, mapping: FieldMapping): number {

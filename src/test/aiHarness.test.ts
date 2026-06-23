@@ -9,6 +9,7 @@ import {
 } from "../ai/harness";
 import { buildAiHarnessStorageKey, parsePersistedAiHarnessState } from "../ai/persistence";
 import { getDefaultFieldMapping } from "../graph/fieldMapping";
+import { DEFAULT_GRAPH_APPEARANCE } from "../graph/appearance";
 import { createSampleDag } from "./fixtures";
 import { defineSuite, defineTest } from "./harness";
 
@@ -88,6 +89,42 @@ export const aiHarnessSuite = defineSuite("ai harness", [
     const diffPreview = validation.results.flatMap((result) => result.expectedDiff || []);
     assert.ok(diffPreview.some((line) => line === "+ Node: Subgroup"));
     assert.ok(diffPreview.some((line) => line === "+ Edge: A -> Subgroup"));
+  }),
+
+  defineTest("validates appearance command batches and reports CSS/layout diffs", () => {
+    const harness = createInitialAiHarnessState("review");
+    const turnId = createTurnId();
+    const plan = createPlanFromAiResponse({
+      harness,
+      turnId,
+      userMessage: "Change the graph UI.",
+      response: {
+        kind: "run_console",
+        answer: "Applying a slate UI style.",
+        commandBatch: {
+          commands: [
+            "/style-preset slate",
+            "/layout rowGap 36",
+            "/style-var --dag-edge \"rgba(120, 160, 255, 0.45)\"",
+          ],
+        },
+      },
+    });
+    assert.ok(plan.commandBatch);
+    const validation = validateCommandBatch({
+      batch: plan.commandBatch,
+      dag: createSampleDag(),
+      contextNodeKey: null,
+      mapping: getDefaultFieldMapping(),
+      appearance: DEFAULT_GRAPH_APPEARANCE,
+      graphRevision: "0",
+    });
+
+    assert.equal(validation.allPassed, true);
+    assert.equal(validation.riskLevel, "low");
+    const diffPreview = validation.results.flatMap((result) => result.expectedDiff || []);
+    assert.ok(diffPreview.some((line) => line.includes("layout.rowGap")));
+    assert.ok(diffPreview.some((line) => line.includes("cssVars.--dag-edge")));
   }),
 
   defineTest("parses persisted harness state with active plan and pending batch", () => {

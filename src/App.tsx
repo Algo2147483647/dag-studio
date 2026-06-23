@@ -37,6 +37,7 @@ import Workspace from "./components/Workspace";
 import type { GraphLayoutMode, NodeKey, NormalizedDag } from "./graph/types";
 import { getGraphLayoutLabel } from "./graph/types";
 import { DEFAULT_GRAPH_APPEARANCE, sanitizeGraphAppearance, type GraphAppearance, type GraphLayoutAppearance } from "./graph/appearance";
+import { applyAppearanceCommand, buildAppearanceMutationLabel, type GraphAppearancePresetId } from "./graph/appearanceCommands";
 import type { EditTransaction } from "./state/initialState";
 import { collectBatchEffects, buildConsoleMutationLabel, executeConsoleInstructions } from "./console/executor";
 import { parseConsoleSource } from "./console/dsl";
@@ -68,6 +69,8 @@ export default function App() {
   const [state, dispatch] = useReducer(graphReducer, initialGraphAppState);
   const [fieldMapping, setFieldMapping] = useState<FieldMapping>(() => loadGraphPagePreferences().fieldMapping || getDefaultFieldMapping());
   const [appearance, setAppearance] = useState<GraphAppearance>(() => loadGraphPagePreferences().appearance || DEFAULT_GRAPH_APPEARANCE);
+  const [appearanceUndoStack, setAppearanceUndoStack] = useState<Array<{ label: string; before: GraphAppearance; after: GraphAppearance }>>([]);
+  const [appearanceRedoStack, setAppearanceRedoStack] = useState<Array<{ label: string; before: GraphAppearance; after: GraphAppearance }>>([]);
   const [showNodeDetail, setShowNodeDetail] = useState<boolean>(() => loadGraphPagePreferences().showNodeDetail ?? true);
   const [hideNodeBorders, setHideNodeBorders] = useState<boolean>(() => loadGraphPagePreferences().hideNodeBorders ?? false);
   const [alignNodeWidthsToMax, setAlignNodeWidthsToMax] = useState<boolean>(() => loadGraphPagePreferences().alignNodeWidthsToMax ?? false);
@@ -227,6 +230,43 @@ export default function App() {
     dispatch({ type: "zoomChanged", scale, minScale });
   }, []);
 
+  const commitAppearance = useCallback((nextAppearance: GraphAppearance, label: string) => {
+    setAppearance((current) => {
+      if (JSON.stringify(current) === JSON.stringify(nextAppearance)) {
+        return current;
+      }
+      setAppearanceUndoStack((stack) => [...stack, { label, before: current, after: nextAppearance }].slice(-100));
+      setAppearanceRedoStack([]);
+      return nextAppearance;
+    });
+  }, []);
+
+  const undoAppearance = useCallback(() => {
+    setAppearanceUndoStack((undoStack) => {
+      const transaction = undoStack.at(-1);
+      if (!transaction) {
+        return undoStack;
+      }
+      setAppearance(transaction.before);
+      setAppearanceRedoStack((redoStack) => [...redoStack, transaction]);
+      dispatch({ type: "statusChanged", status: `Undid: ${transaction.label}` });
+      return undoStack.slice(0, -1);
+    });
+  }, []);
+
+  const redoAppearance = useCallback(() => {
+    setAppearanceRedoStack((redoStack) => {
+      const transaction = redoStack.at(-1);
+      if (!transaction) {
+        return redoStack;
+      }
+      setAppearance(transaction.after);
+      setAppearanceUndoStack((undoStack) => [...undoStack, transaction].slice(-100));
+      dispatch({ type: "statusChanged", status: `Redid: ${transaction.label}` });
+      return redoStack.slice(0, -1);
+    });
+  }, []);
+
   const zoom = useGraphZoom({
     containerRef,
     svgRef,
@@ -252,11 +292,15 @@ export default function App() {
     onUndo: () => {
       if (state.editHistory.undoStack.length > 0) {
         dispatch({ type: "undoRequested" });
+      } else if (appearanceUndoStack.length > 0) {
+        undoAppearance();
       }
     },
     onRedo: () => {
       if (state.editHistory.redoStack.length > 0) {
         dispatch({ type: "redoRequested" });
+      } else if (appearanceRedoStack.length > 0) {
+        redoAppearance();
       }
     },
     onSave: () => {
@@ -322,12 +366,12 @@ export default function App() {
     if (parsed.instructions.some((instruction) => instruction.type === "clear")) {
       setConsoleEntries([{ id: Date.now(), tone: "info", text: "Console cleared." }]);
     }
-    if (!state.dag && !parsed.instructions.every((instruction) => instruction.type === "help" || instruction.type === "clear")) {
+    if (!state.dag && parsed.instructions.some((instruction) => requiresGraphForConsoleInstruction(instruction.type))) {
       appendConsoleEntry(setConsoleEntries, "error", "No graph loaded. Load or initialize a graph before running console instructions.");
       return;
     }
 
-    const executed = executeConsoleInstructions(state.dag || {}, parsed.instructions, consoleContextNodeKey, fieldMapping);
+    const executed = executeConsoleInstructions(state.dag || {}, parsed.instructions, consoleContextNodeKey, fieldMapping, appearance);
     if (!executed.ok) {
       setConsoleContextNodeKey(executed.contextNodeKey);
       appendConsoleEntry(
@@ -340,6 +384,15 @@ export default function App() {
 
     setConsoleContextNodeKey(executed.contextNodeKey);
     executed.outputMessages.forEach((message) => appendConsoleEntry(setConsoleEntries, "info", message));
+
+    if (executed.appearanceMutationCount > 0) {
+      const label = buildAppearanceMutationLabel(
+        executed.appearanceMutationCount,
+        executed.appearanceResults[executed.appearanceResults.length - 1]?.message,
+      );
+      commitAppearance(executed.appearance, label);
+      appendConsoleEntry(setConsoleEntries, "success", label);
+    }
 
     if (executed.mutationCount > 0) {
       const beforeDag = state.dag;
@@ -384,9 +437,9 @@ export default function App() {
     appendConsoleEntry(
       setConsoleEntries,
       "success",
-      buildConsoleSuccessMessage(executed.instructionCount, executed.mutationCount, executed.contextNodeKey, finalUiEffect?.type),
+      buildConsoleSuccessMessage(executed.instructionCount, executed.mutationCount, executed.appearanceMutationCount, executed.contextNodeKey, finalUiEffect?.type),
     );
-  }, [consoleContextNodeKey, state]);
+  }, [appearance, commitAppearance, consoleContextNodeKey, fieldMapping, state]);
 
   const handleAiRequest = useCallback(async (rawMessage: string) => {
     const message = rawMessage.trim();
@@ -421,6 +474,7 @@ export default function App() {
         dag: state.dag,
         contextNodeKey: consoleContextNodeKey,
         mapping: fieldMapping,
+        appearance,
         graphRevision: String(state.editHistory.revision),
       });
       nextHarness = attachValidationToHarness(nextHarness, validation, turnId);
@@ -462,6 +516,7 @@ export default function App() {
         selection: state.selection,
         contextNodeKey: consoleContextNodeKey,
         mapping: fieldMapping,
+        appearance,
         consoleEntries,
       });
       const response = await requestAiPlan({ settings: aiSettings, context, message });
@@ -504,6 +559,7 @@ export default function App() {
         dag: state.dag,
         contextNodeKey: consoleContextNodeKey,
         mapping: fieldMapping,
+        appearance,
         graphRevision: String(state.editHistory.revision),
       });
       nextHarness = attachValidationToHarness(nextHarness, validation, turnId);
@@ -537,7 +593,7 @@ export default function App() {
     } finally {
       setAiBusy(false);
     }
-  }, [aiBusy, aiHarness, aiSettings, consoleContextNodeKey, consoleEntries, fieldMapping, runConsoleSource, state.dag, state.editHistory.revision, state.layout.mode, state.mode, state.selection, state.source.fileName]);
+  }, [aiBusy, aiHarness, aiSettings, appearance, consoleContextNodeKey, consoleEntries, fieldMapping, runConsoleSource, state.dag, state.editHistory.revision, state.layout.mode, state.mode, state.selection, state.source.fileName]);
 
   const handleAiReviewApply = useCallback((planId: string) => {
     const turnId = createTurnId();
@@ -559,6 +615,7 @@ export default function App() {
       dag: state.dag,
       contextNodeKey: consoleContextNodeKey,
       mapping: fieldMapping,
+      appearance,
       graphRevision: String(state.editHistory.revision),
     });
     nextHarness = attachValidationToHarness(nextHarness, validation, turnId);
@@ -578,7 +635,7 @@ export default function App() {
       updateConsoleReviewEntry(setConsoleEntries, buildConsoleReviewCard(nextHarness.activePlan, nextHarness.activePlan.commandBatch.validation, "applied"));
     }
     setAiHarness(nextHarness);
-  }, [aiHarness, aiSettings.executionMode, consoleContextNodeKey, fieldMapping, runConsoleSource, state.dag, state.editHistory.revision, state.source.fileName]);
+  }, [aiHarness, aiSettings.executionMode, appearance, consoleContextNodeKey, fieldMapping, runConsoleSource, state.dag, state.editHistory.revision, state.source.fileName]);
 
   const handleAiReviewDismiss = useCallback((planId: string) => {
     const turnId = createTurnId();
@@ -936,27 +993,37 @@ export default function App() {
   }
 
   function handleLayoutAppearanceChange<K extends keyof GraphLayoutAppearance>(key: K, value: GraphLayoutAppearance[K]) {
-    setAppearance((current) => sanitizeGraphAppearance({
-      ...current,
+    const nextAppearance = sanitizeGraphAppearance({
+      ...appearance,
       layout: {
-        ...current.layout,
+        ...appearance.layout,
         [key]: value,
       },
-    }));
+    });
+    commitAppearance(nextAppearance, `Set layout ${String(key)}.`);
   }
 
   function handleAppearanceCssVarChange(key: string, value: string) {
-    setAppearance((current) => sanitizeGraphAppearance({
-      ...current,
+    const nextAppearance = sanitizeGraphAppearance({
+      ...appearance,
       cssVars: {
-        ...current.cssVars,
+        ...appearance.cssVars,
         [key]: value,
       },
-    }));
+    });
+    commitAppearance(nextAppearance, `Set ${key}.`);
+  }
+
+  function handleAppearanceCssChange(css: string) {
+    commitAppearance(applyAppearanceCommand(appearance, { type: "replaceCss", css }).appearance, "Replaced graph CSS.");
+  }
+
+  function handleAppearancePresetChange(presetId: GraphAppearancePresetId) {
+    commitAppearance(applyAppearanceCommand(appearance, { type: "applyPreset", presetId }).appearance, `Applied ${presetId} appearance preset.`);
   }
 
   function handleAppearanceReset() {
-    setAppearance(DEFAULT_GRAPH_APPEARANCE);
+    commitAppearance(DEFAULT_GRAPH_APPEARANCE, "Reset graph appearance.");
   }
 
   async function handleAiConnectionTest() {
@@ -1038,8 +1105,8 @@ export default function App() {
         hasGraph={Boolean(stage)}
         canBack={state.history.length > 0}
         canUp={Boolean(parentSelection)}
-        canUndo={state.editHistory.undoStack.length > 0}
-        canRedo={state.editHistory.redoStack.length > 0}
+        canUndo={state.editHistory.undoStack.length > 0 || appearanceUndoStack.length > 0}
+        canRedo={state.editHistory.redoStack.length > 0 || appearanceRedoStack.length > 0}
         zoomPercent={Math.round(state.zoom.scale * 100)}
         canZoomOut={Boolean(stage) && state.zoom.scale > state.zoom.minScale + 0.001}
         canZoomIn={Boolean(stage) && state.zoom.scale < state.zoom.maxScale - 0.001}
@@ -1050,8 +1117,8 @@ export default function App() {
         onBack={() => dispatch({ type: "navigateBack" })}
         onUp={() => parentSelection && dispatch({ type: "selectionChanged", selection: parentSelection, pushHistory: true })}
         onAll={() => dispatch({ type: "selectionChanged", selection: getFullGraphSelection(), pushHistory: true })}
-        onUndo={() => dispatch({ type: "undoRequested" })}
-        onRedo={() => dispatch({ type: "redoRequested" })}
+        onUndo={() => state.editHistory.undoStack.length > 0 ? dispatch({ type: "undoRequested" }) : undoAppearance()}
+        onRedo={() => state.editHistory.redoStack.length > 0 ? dispatch({ type: "redoRequested" }) : redoAppearance()}
         onZoomOut={zoom.zoomOut}
         onZoomIn={zoom.zoomIn}
         onZoomFit={zoom.zoomFit}
@@ -1061,6 +1128,8 @@ export default function App() {
         onLayoutModeChange={handleLayoutModeChange}
         onLayoutAppearanceChange={handleLayoutAppearanceChange}
         onAppearanceCssVarChange={handleAppearanceCssVarChange}
+        onAppearanceCssChange={handleAppearanceCssChange}
+        onAppearancePresetChange={handleAppearancePresetChange}
         onAppearanceReset={handleAppearanceReset}
         onNodeDetailToggle={handleNodeDetailToggle}
         onNodeBordersToggle={() => setHideNodeBorders((current) => !current)}
@@ -1224,12 +1293,16 @@ export default function App() {
 function buildConsoleSuccessMessage(
   instructionCount: number,
   mutationCount: number,
+  appearanceMutationCount: number,
   contextNodeKey: NodeKey | null,
   uiEffectType: "show" | "json" | undefined,
 ): string {
   const parts = [`${instructionCount} instruction${instructionCount === 1 ? "" : "s"} executed`];
   if (mutationCount > 0) {
     parts.push(`${mutationCount} mutation${mutationCount === 1 ? "" : "s"} committed`);
+  }
+  if (appearanceMutationCount > 0) {
+    parts.push(`${appearanceMutationCount} appearance update${appearanceMutationCount === 1 ? "" : "s"} committed`);
   }
   if (uiEffectType === "show") {
     parts.push("node viewer opened");
@@ -1238,6 +1311,10 @@ function buildConsoleSuccessMessage(
   }
   parts.push(`context=${contextNodeKey || "unset"}`);
   return `${parts.join(", ")}.`;
+}
+
+function requiresGraphForConsoleInstruction(type: string): boolean {
+  return !["help", "clear", "appearance", "appearanceCssShow"].includes(type);
 }
 
 function appendConsoleEntry(

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GraphAppearance, GraphLayoutAppearance } from "../graph/appearance";
+import { GRAPH_APPEARANCE_PRESETS, type GraphAppearancePresetId } from "../graph/appearanceCommands";
 import type { GraphLayoutMode, GraphTitleFontFamily } from "../graph/types";
 import { GRAPH_TITLE_FONT_OPTIONS } from "../graph/types";
 import type { AiExecutionMode, AiProvider, AiSettings } from "../ai/types";
@@ -42,6 +43,8 @@ interface TopbarProps {
   onLayoutModeChange: (mode: GraphLayoutMode) => void;
   onLayoutAppearanceChange: <K extends keyof GraphLayoutAppearance>(key: K, value: GraphLayoutAppearance[K]) => void;
   onAppearanceCssVarChange: (key: string, value: string) => void;
+  onAppearanceCssChange: (css: string) => void;
+  onAppearancePresetChange: (presetId: GraphAppearancePresetId) => void;
   onAppearanceReset: () => void;
   onNodeDetailToggle: () => void;
   onNodeBordersToggle: () => void;
@@ -93,6 +96,8 @@ export default function Topbar({
   onLayoutModeChange,
   onLayoutAppearanceChange,
   onAppearanceCssVarChange,
+  onAppearanceCssChange,
+  onAppearancePresetChange,
   onAppearanceReset,
   onNodeDetailToggle,
   onNodeBordersToggle,
@@ -158,6 +163,8 @@ export default function Topbar({
               onLayoutModeChange={onLayoutModeChange}
               onLayoutAppearanceChange={onLayoutAppearanceChange}
               onAppearanceCssVarChange={onAppearanceCssVarChange}
+              onAppearanceCssChange={onAppearanceCssChange}
+              onAppearancePresetChange={onAppearancePresetChange}
               onAppearanceReset={onAppearanceReset}
               onNodeDetailToggle={onNodeDetailToggle}
               onNodeBordersToggle={onNodeBordersToggle}
@@ -197,6 +204,8 @@ interface SettingsModalProps {
   onLayoutModeChange: (mode: GraphLayoutMode) => void;
   onLayoutAppearanceChange: <K extends keyof GraphLayoutAppearance>(key: K, value: GraphLayoutAppearance[K]) => void;
   onAppearanceCssVarChange: (key: string, value: string) => void;
+  onAppearanceCssChange: (css: string) => void;
+  onAppearancePresetChange: (presetId: GraphAppearancePresetId) => void;
   onAppearanceReset: () => void;
   onNodeDetailToggle: () => void;
   onNodeBordersToggle: () => void;
@@ -230,6 +239,8 @@ function SettingsModal({
   onLayoutModeChange,
   onLayoutAppearanceChange,
   onAppearanceCssVarChange,
+  onAppearanceCssChange,
+  onAppearancePresetChange,
   onAppearanceReset,
   onNodeDetailToggle,
   onNodeBordersToggle,
@@ -418,6 +429,51 @@ function SettingsModal({
                       />
                     ))}
                   </div>
+                </section>
+
+                <section className="settings-section" aria-labelledby="appearance-presets-title">
+                  <p id="appearance-presets-title" className="control-label">Preset</p>
+                  <div className="workspace-action-row">
+                    {GRAPH_APPEARANCE_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        className="ghost-btn settings-action-btn"
+                        onClick={() => onAppearancePresetChange(preset.id)}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="settings-section" aria-labelledby="appearance-tokens-title">
+                  <p id="appearance-tokens-title" className="control-label">Tokens</p>
+                  <div className="ai-settings-grid">
+                    {APPEARANCE_TOKEN_CONTROLS.map((token) => (
+                      <label key={token.key} className="settings-field-label" htmlFor={`appearance-token-${token.key}`}>
+                        <span>{token.label}</span>
+                        <input
+                          id={`appearance-token-${token.key}`}
+                          className="settings-text-input"
+                          type="text"
+                          value={appearance.cssVars[token.key] || ""}
+                          onChange={(event) => onAppearanceCssVarChange(token.key, event.currentTarget.value)}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="settings-section" aria-labelledby="appearance-css-title">
+                  <p id="appearance-css-title" className="control-label">Custom CSS</p>
+                  <textarea
+                    className="settings-text-input appearance-css-editor"
+                    value={appearance.css}
+                    spellCheck={false}
+                    rows={10}
+                    onChange={(event) => onAppearanceCssChange(event.currentTarget.value)}
+                  />
                 </section>
 
                 <section className="settings-section title-style-section" aria-labelledby="title-style-title">
@@ -841,6 +897,17 @@ const LAYOUT_CONTROLS: LayoutControlDefinition[] = [
   { key: "nodeHeight", label: "Node height", min: 44, max: 160, step: 2, unit: "px" },
   { key: "maxNodeWidth", label: "Node max width", min: 188, max: 480, step: 4, unit: "px" },
 ];
+
+const APPEARANCE_TOKEN_CONTROLS = [
+  { key: "--dag-node-fill", label: "Node Fill" },
+  { key: "--dag-node-border", label: "Node Border" },
+  { key: "--dag-node-border-strong", label: "Root Border" },
+  { key: "--dag-edge", label: "Edge" },
+  { key: "--dag-edge-active", label: "Active Edge" },
+  { key: "--dag-text-strong", label: "Title Text" },
+  { key: "--dag-text-soft", label: "Soft Text" },
+  { key: "--dag-title-font-size", label: "Title Size" },
+] as const;
 
 const AI_PROVIDER_PRESETS: Record<AiProvider, { label: string; logoSrc: string; baseUrl: string; model: string }> = {
   "openai-compatible": { label: "OpenAI compatible", logoSrc: "/assets/providers/openai.png", baseUrl: "https://api.openai.com/v1", model: "gpt-4.1-mini" },

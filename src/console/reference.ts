@@ -31,6 +31,14 @@ export const CONSOLE_COMMAND_REFERENCE: ConsoleCommandReference[] = [
   { label: "/children <node> = A,B", insertText: "/children ", help: "Replace the child relation set for a node." },
   { label: "/set <node> <field> <value>", insertText: "/set ", help: "Set a non-relation field value as string, number, boolean, null, or JSON." },
   { label: "/unset <node> <field>", insertText: "/unset ", help: "Remove a non-relation field from a node." },
+  { label: "/layout <key> <number>", insertText: "/layout ", help: "Update graph layout appearance, such as rowGap, columnGap, nodeHeight, or stageMinWidth." },
+  { label: "/style-var <var> <value>", insertText: "/style-var --dag-", help: "Set a graph CSS variable. Variable names must start with --dag-." },
+  { label: "/style-var --unset <var>", insertText: "/style-var --unset --dag-", help: "Remove a graph CSS variable override." },
+  { label: "/style-css show", insertText: "/style-css show", help: "Print the current graph appearance CSS." },
+  { label: "/style-css append <css>", insertText: "/style-css append ", help: "Append scoped graph CSS using stable .dag-* selectors." },
+  { label: "/style-css replace <css>", insertText: "/style-css replace ", help: "Replace the full graph appearance CSS." },
+  { label: "/style-preset <id>", insertText: "/style-preset ", help: "Apply an appearance preset: default, slate, blueprint, contrast, compact, presentation." },
+  { label: "/style-reset", insertText: "/style-reset", help: "Reset graph appearance to the default CSS, variables, and layout." },
   { label: "/clear", insertText: "/clear", help: "Clear the console output." },
 ];
 
@@ -57,6 +65,12 @@ export function buildConsoleHelpText(): string {
     '- /children <node> = A,B,...: Replace the full child relation set for a node. Use an empty assignment to clear it.',
     '- /set <node> <field> <value>: Set a non-relation field value as string, number, boolean, null, or JSON.',
     '- /unset <node> <field>: Remove a non-relation field from a node.',
+    '- /layout <key> <number>: Update layout appearance. Keys include columnGap, rowGap, edgeLaneGap, nodeHeight, minNodeWidth, maxNodeWidth, stageMinWidth, and stageMinHeight.',
+    '- /style-var <var> <value>: Set a --dag-* CSS variable for graph appearance.',
+    '- /style-var --unset <var>: Remove a --dag-* CSS variable override.',
+    '- /style-css show|append|replace: Show, append to, or replace graph CSS using stable .dag-* selectors.',
+    '- /style-preset <default|slate|blueprint|contrast|compact|presentation>: Apply a graph UI preset.',
+    '- /style-reset: Reset graph appearance.',
     '- /clear | /cls: Clear the console output.',
   ].join("\n");
 }

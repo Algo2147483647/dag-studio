@@ -1,6 +1,7 @@
 import { executeConsoleInstructions } from "../console/executor";
 import { parseConsoleSource } from "../console/dsl";
 import { CONSOLE_COMMAND_REFERENCE } from "../console/reference";
+import { DEFAULT_GRAPH_APPEARANCE, type GraphAppearance } from "../graph/appearance";
 import { getNodeChildren, getNodeParents } from "../graph/accessors";
 import type { FieldMapping } from "../graph/fieldMapping";
 import { getRelationKeys } from "../graph/relations";
@@ -33,6 +34,7 @@ interface BuildContextInput {
   selection: GraphSelection | null;
   contextNodeKey: NodeKey | null;
   mapping: FieldMapping;
+  appearance?: GraphAppearance;
   consoleEntries: ConsoleHistoryEntry[];
 }
 
@@ -48,6 +50,7 @@ interface ValidateInput {
   dag: NormalizedDag | null;
   contextNodeKey: NodeKey | null;
   mapping: FieldMapping;
+  appearance?: GraphAppearance;
   graphRevision: string;
 }
 
@@ -154,6 +157,7 @@ export function buildAiContextPacket(input: BuildContextInput): AiContextPacket 
     selection: input.selection,
     contextNodeKey: input.contextNodeKey,
     mapping: input.mapping,
+    appearance: input.appearance || DEFAULT_GRAPH_APPEARANCE,
   });
   const recentConsoleEvents = input.consoleEntries
     .slice(-MAX_RECENT_CONSOLE_LINES)
@@ -184,6 +188,10 @@ export function buildAiContextPacket(input: BuildContextInput): AiContextPacket 
         "/add Subgroup -p Group",
         "/set Group define \"A group is a set with an associative binary operation, an identity element, and inverses.\"",
         "/edge Group Representation_Theory",
+        "/style-preset slate",
+        "/style-var --dag-node-fill \"rgba(18, 24, 38, 0.94)\"",
+        "/style-css append \".dag-node[data-type=\\\"service\\\"] .dag-node__shape { fill: #eef6ff; }\"",
+        "/layout rowGap 34",
       ],
       constraints: [
         "All commands must start with /.",
@@ -191,6 +199,8 @@ export function buildAiContextPacket(input: BuildContextInput): AiContextPacket 
         "Do not reference missing nodes unless the same command batch creates them first or uses /edge --create-missing.",
         "Use /set for title, type, define, and other non-relation fields.",
         "Use /parents, /children, /edge, or /rm-edge for relation fields.",
+        "Use /style-var, /style-css, /style-preset, /style-reset, and /layout for UI appearance changes.",
+        "Only use --dag-* CSS variables and stable .dag-* SVG selectors for appearance CSS.",
       ],
     },
     memory: {
@@ -344,7 +354,7 @@ export function validateCommandBatch(input: ValidateInput): ValidationReport {
     };
   }
 
-  if (!input.dag && !parsed.instructions.every((instruction) => instruction.type === "help" || instruction.type === "clear")) {
+  if (!input.dag && parsed.instructions.some((instruction) => !["help", "clear", "appearance", "appearanceCssShow"].includes(instruction.type))) {
     return {
       ...reportBase,
       results: input.batch.commands.map((command) => ({
@@ -359,7 +369,7 @@ export function validateCommandBatch(input: ValidateInput): ValidationReport {
     };
   }
 
-  const execution = executeConsoleInstructions(input.dag || {}, parsed.instructions, input.contextNodeKey, input.mapping);
+  const execution = executeConsoleInstructions(input.dag || {}, parsed.instructions, input.contextNodeKey, input.mapping, input.appearance || DEFAULT_GRAPH_APPEARANCE);
   const commandRisks = input.batch.commands.map(classifyCommandRisk);
   const riskLevel = maxRisk([input.batch.riskLevel, ...commandRisks]);
   const destructive = input.batch.commands.some(isDestructiveCommand);
@@ -380,7 +390,10 @@ export function validateCommandBatch(input: ValidateInput): ValidationReport {
     };
   }
 
-  const diffPreview = buildDiffPreview(input.dag || {}, execution.dag, input.mapping);
+  const diffPreview = [
+    ...buildDiffPreview(input.dag || {}, execution.dag, input.mapping),
+    ...execution.appearanceResults.flatMap((result) => result.diff),
+  ];
   const mutationSummary = diffPreview.length
     ? diffPreview
     : ["No graph mutations expected."];
@@ -545,6 +558,8 @@ export function isReadOnlyCommand(command: string): boolean {
     || normalized.startsWith("/use ")
     || normalized.startsWith("/show ")
     || normalized.startsWith("/json ")
+    || normalized === "/style-css"
+    || normalized === "/style-css show"
   );
 }
 
@@ -667,6 +682,7 @@ function inferChangeKind(command: string): ProposedChange["kind"] {
   if (normalized.startsWith("/rm-edge ")) return "remove_edge";
   if (normalized.startsWith("/mv ")) return "rename_node";
   if (normalized.startsWith("/rm ")) return "remove_edge";
+  if (normalized.startsWith("/style-") || normalized.startsWith("/layout ")) return "set_property";
   return "set_property";
 }
 
@@ -690,6 +706,9 @@ function buildCommandWarnings(command: string): string[] {
   }
   if (isDestructiveCommand(command)) {
     warnings.push("destructive command requires review");
+  }
+  if (normalized.startsWith("/style-css replace")) {
+    warnings.push("custom CSS will replace the current graph appearance stylesheet");
   }
   return warnings;
 }
@@ -756,6 +775,12 @@ function isRelationField(field: string, mapping: FieldMapping): boolean {
 
 function classifyCommandRisk(command: string): AiRiskLevel {
   const normalized = command.trim().toLowerCase();
+  if (normalized.startsWith("/style-reset") || normalized.startsWith("/style-css replace")) {
+    return "medium";
+  }
+  if (normalized.startsWith("/style-") || normalized.startsWith("/layout ")) {
+    return "low";
+  }
   if (isDestructiveCommand(normalized) || normalized.startsWith("/parents ") || normalized.startsWith("/children ")) {
     return "high";
   }
