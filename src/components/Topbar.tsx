@@ -46,6 +46,7 @@ interface TopbarProps {
   onAppearanceCssChange: (css: string) => void;
   onAppearancePresetChange: (presetId: GraphAppearancePresetId) => void;
   onAppearanceReset: () => void;
+  onAppearanceExport: () => void;
   onNodeDetailToggle: () => void;
   onNodeBordersToggle: () => void;
   onNodeWidthAlignToggle: () => void;
@@ -99,6 +100,7 @@ export default function Topbar({
   onAppearanceCssChange,
   onAppearancePresetChange,
   onAppearanceReset,
+  onAppearanceExport,
   onNodeDetailToggle,
   onNodeBordersToggle,
   onNodeWidthAlignToggle,
@@ -166,6 +168,7 @@ export default function Topbar({
               onAppearanceCssChange={onAppearanceCssChange}
               onAppearancePresetChange={onAppearancePresetChange}
               onAppearanceReset={onAppearanceReset}
+              onAppearanceExport={onAppearanceExport}
               onNodeDetailToggle={onNodeDetailToggle}
               onNodeBordersToggle={onNodeBordersToggle}
               onNodeWidthAlignToggle={onNodeWidthAlignToggle}
@@ -207,6 +210,7 @@ interface SettingsModalProps {
   onAppearanceCssChange: (css: string) => void;
   onAppearancePresetChange: (presetId: GraphAppearancePresetId) => void;
   onAppearanceReset: () => void;
+  onAppearanceExport: () => void;
   onNodeDetailToggle: () => void;
   onNodeBordersToggle: () => void;
   onNodeWidthAlignToggle: () => void;
@@ -242,6 +246,7 @@ function SettingsModal({
   onAppearanceCssChange,
   onAppearancePresetChange,
   onAppearanceReset,
+  onAppearanceExport,
   onNodeDetailToggle,
   onNodeBordersToggle,
   onNodeWidthAlignToggle,
@@ -398,6 +403,14 @@ function SettingsModal({
 
             {activeChapter === "appearance" ? (
               <>
+                <section className="settings-section appearance-actions-section" aria-labelledby="appearance-actions-title">
+                  <p id="appearance-actions-title" className="control-label">UI Configuration</p>
+                  <div className="workspace-action-row">
+                    <button type="button" className="ghost-btn settings-action-btn" onClick={onAppearanceExport}>Export</button>
+                    <button type="button" className="ghost-btn settings-action-btn" onClick={onAppearanceReset}>Reset</button>
+                  </div>
+                </section>
+
                 <section className="settings-section" aria-labelledby="layout-mode-title">
                   <label className="layout-select-label" htmlFor="layout-mode-select">
                     <span id="layout-mode-title" className="control-label">Layout</span>
@@ -417,7 +430,6 @@ function SettingsModal({
                 <section className="settings-section settings-section-emphasis" aria-labelledby="layout-tuning-title">
                   <div className="settings-section-header">
                     <p id="layout-tuning-title" className="control-label">Layout Tuning</p>
-                    <button type="button" className="settings-link-btn" onClick={onAppearanceReset}>Reset</button>
                   </div>
                   <div className="settings-slider-grid">
                     {LAYOUT_CONTROLS.map((control) => (

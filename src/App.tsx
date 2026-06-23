@@ -1026,6 +1026,12 @@ export default function App() {
     commitAppearance(DEFAULT_GRAPH_APPEARANCE, "Reset graph appearance.");
   }
 
+  function handleAppearanceExport() {
+    const outputFileName = buildTimestampFileName("dag-appearance.json");
+    downloadJsonFile(JSON.stringify(appearance, null, 2), outputFileName);
+    dispatch({ type: "statusChanged", status: `Exported current UI appearance as ${outputFileName}.` });
+  }
+
   async function handleAiConnectionTest() {
     if (!aiSettings.baseUrl.trim() || !aiSettings.model.trim()) {
       dispatch({ type: "statusChanged", status: "AI requires a base URL and model before testing." });
@@ -1131,6 +1137,7 @@ export default function App() {
         onAppearanceCssChange={handleAppearanceCssChange}
         onAppearancePresetChange={handleAppearancePresetChange}
         onAppearanceReset={handleAppearanceReset}
+        onAppearanceExport={handleAppearanceExport}
         onNodeDetailToggle={handleNodeDetailToggle}
         onNodeBordersToggle={() => setHideNodeBorders((current) => !current)}
         onNodeWidthAlignToggle={() => setAlignNodeWidthsToMax((current) => !current)}
