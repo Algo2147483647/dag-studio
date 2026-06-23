@@ -12,7 +12,7 @@ import { getFullGraphSelection, getInitialSelection, getParentLevelSelection, sa
 import { serializeDag } from "./graph/serialize";
 import { copyTextToClipboard } from "./adapters/clipboard";
 import { buildTimestampFileName, downloadJsonFile, ensureJsonExtension } from "./adapters/download";
-import { canOverwrite, openJsonDirectoryWithAccess, openJsonFilesWithAccess, readJsonFile, requestWritablePermission, writeJsonToHandle, type PickedJsonCollection } from "./adapters/fileAccess";
+import { canOverwrite, openJsonDirectoryWithAccess, openJsonFileWithAccess, openJsonFilesWithAccess, readJsonFile, requestWritablePermission, writeJsonToHandle, type PickedJsonCollection } from "./adapters/fileAccess";
 import { loadRecentImportMetadata, loadRecentJsonCollection, saveRecentDirectoryImport, saveRecentFileImport } from "./adapters/recentImport";
 import { downloadSvg } from "./rendering/export-svg";
 import { buildImportedDag, type ImportGraphDocument, type ImportWarning } from "./graph/importMerge";
@@ -1032,6 +1032,49 @@ export default function App() {
     dispatch({ type: "statusChanged", status: `Exported current UI appearance as ${outputFileName}.` });
   }
 
+  async function handleAppearanceImportClick(event: React.MouseEvent<HTMLInputElement>) {
+    if (typeof window.showOpenFilePicker !== "function") {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      const pickedFile = await openJsonFileWithAccess();
+      if (pickedFile) {
+        await importAppearanceFile(pickedFile.file);
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      console.error(error);
+      dispatch({ type: "statusChanged", status: "The selected UI appearance file could not be opened." });
+    }
+  }
+
+  async function handleAppearanceImportChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    await importAppearanceFile(file);
+    event.target.value = "";
+  }
+
+  async function importAppearanceFile(file: File) {
+    try {
+      const payload = await readJsonFile(file);
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+        throw new Error("Appearance JSON must be an object.");
+      }
+      commitAppearance(sanitizeGraphAppearance(payload), `Imported graph appearance from ${file.name}.`);
+      dispatch({ type: "statusChanged", status: `Imported UI appearance from ${file.name}.` });
+    } catch (error) {
+      console.error(error);
+      dispatch({ type: "statusChanged", status: `Unable to import UI appearance from ${file.name}.` });
+    }
+  }
+
   async function handleAiConnectionTest() {
     if (!aiSettings.baseUrl.trim() || !aiSettings.model.trim()) {
       dispatch({ type: "statusChanged", status: "AI requires a base URL and model before testing." });
@@ -1138,6 +1181,8 @@ export default function App() {
         onAppearancePresetChange={handleAppearancePresetChange}
         onAppearanceReset={handleAppearanceReset}
         onAppearanceExport={handleAppearanceExport}
+        onAppearanceImportClick={handleAppearanceImportClick}
+        onAppearanceImportChange={handleAppearanceImportChange}
         onNodeDetailToggle={handleNodeDetailToggle}
         onNodeBordersToggle={() => setHideNodeBorders((current) => !current)}
         onNodeWidthAlignToggle={() => setAlignNodeWidthsToMax((current) => !current)}

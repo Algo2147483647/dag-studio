@@ -47,6 +47,8 @@ interface TopbarProps {
   onAppearancePresetChange: (presetId: GraphAppearancePresetId) => void;
   onAppearanceReset: () => void;
   onAppearanceExport: () => void;
+  onAppearanceImportClick: (event: React.MouseEvent<HTMLInputElement>) => void;
+  onAppearanceImportChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onNodeDetailToggle: () => void;
   onNodeBordersToggle: () => void;
   onNodeWidthAlignToggle: () => void;
@@ -101,6 +103,8 @@ export default function Topbar({
   onAppearancePresetChange,
   onAppearanceReset,
   onAppearanceExport,
+  onAppearanceImportClick,
+  onAppearanceImportChange,
   onNodeDetailToggle,
   onNodeBordersToggle,
   onNodeWidthAlignToggle,
@@ -169,6 +173,8 @@ export default function Topbar({
               onAppearancePresetChange={onAppearancePresetChange}
               onAppearanceReset={onAppearanceReset}
               onAppearanceExport={onAppearanceExport}
+              onAppearanceImportClick={onAppearanceImportClick}
+              onAppearanceImportChange={onAppearanceImportChange}
               onNodeDetailToggle={onNodeDetailToggle}
               onNodeBordersToggle={onNodeBordersToggle}
               onNodeWidthAlignToggle={onNodeWidthAlignToggle}
@@ -211,6 +217,8 @@ interface SettingsModalProps {
   onAppearancePresetChange: (presetId: GraphAppearancePresetId) => void;
   onAppearanceReset: () => void;
   onAppearanceExport: () => void;
+  onAppearanceImportClick: (event: React.MouseEvent<HTMLInputElement>) => void;
+  onAppearanceImportChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onNodeDetailToggle: () => void;
   onNodeBordersToggle: () => void;
   onNodeWidthAlignToggle: () => void;
@@ -247,6 +255,8 @@ function SettingsModal({
   onAppearancePresetChange,
   onAppearanceReset,
   onAppearanceExport,
+  onAppearanceImportClick,
+  onAppearanceImportChange,
   onNodeDetailToggle,
   onNodeBordersToggle,
   onNodeWidthAlignToggle,
@@ -406,6 +416,10 @@ function SettingsModal({
                 <section className="settings-section appearance-actions-section" aria-labelledby="appearance-actions-title">
                   <p id="appearance-actions-title" className="control-label">UI Configuration</p>
                   <div className="workspace-action-row">
+                    <label htmlFor="appearanceInput" className="ghost-btn settings-action-btn appearance-import-label">
+                      Import
+                      <input type="file" id="appearanceInput" accept=".json,application/json" onClick={onAppearanceImportClick} onChange={onAppearanceImportChange} />
+                    </label>
                     <button type="button" className="ghost-btn settings-action-btn" onClick={onAppearanceExport}>Export</button>
                     <button type="button" className="ghost-btn settings-action-btn" onClick={onAppearanceReset}>Reset</button>
                   </div>

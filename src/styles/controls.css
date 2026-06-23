@@ -874,6 +874,19 @@
   text-align: center;
 }
 
+.appearance-import-label {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.appearance-import-label input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
 .settings-action-btn-active {
   background: rgba(40, 95, 223, 0.14);
   color: var(--accent-strong);

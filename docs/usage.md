@@ -20,14 +20,15 @@ The app remembers page preferences such as mode and layout selection across refr
 
 ## Controls
 
-The top bar controls button opens a settings dialog with four sections:
+The top bar controls button opens a settings dialog with three sections:
 
-- `General`: mode, layout engine, console visibility, initialization, and status
-- `Appearance`: layout tuning, title styling, detail visibility, borders, and width behavior
-- `Data`: field mapping, SVG export, JSON file import, and folder import
+- `General`: mode, console visibility, initialization, field mapping, SVG export, JSON file import, folder import, and status
+- `Appearance`: UI configuration import/export/reset, layout engine, layout tuning, presets, tokens, custom CSS, title styling, detail visibility, borders, and width behavior
 - `AI`: provider, model, API key, execution mode, and connection test
 
 AI providers include OpenAI-compatible endpoints, DeepSeek, Anthropic, Gemini, and Ollama.
+
+For the full graph UI configuration model, see [Graph Appearance System](graph-appearance.md).
 
 ## Loading and Starting Graphs
 
@@ -64,6 +65,22 @@ After loading JSON, the renderer finds roots by looking at both parent links and
 - `BFS` keeps the selected traversal close to breadth-first discovery order.
 - `Sugiyama layered` ranks nodes by dependency depth and applies crossing reduction before rendering.
 - `Dagre layered` uses Dagre's layered engine for a library-backed dependency layout.
+
+## Graph Appearance
+
+The `Appearance` settings tab controls the current graph UI independently from the graph JSON data.
+
+Key workflows:
+
+- `UI Configuration -> Import` loads a graph appearance JSON file.
+- `UI Configuration -> Export` downloads the current graph appearance as JSON.
+- `UI Configuration -> Reset` restores the default graph appearance.
+- `Presets` applies built-in looks such as `default`, `slate`, `blueprint`, `contrast`, `compact`, and `presentation`.
+- `Tokens` edits common `--dag-*` CSS variables without writing CSS.
+- `Custom CSS` replaces the graph CSS block used by the renderer and SVG export.
+- `Layout Tuning` adjusts spacing, node height, width, and stage minimums.
+
+Appearance changes are remembered across refreshes in page preferences. They are not embedded into saved graph JSON.
 
 ## Dense Graph Hover Mode
 
@@ -127,14 +144,15 @@ The viewer is schema-agnostic, so custom node fields are preserved and still ins
 
 In `Edit` mode, use `Show Console Sidebar` from the controls panel to open the left-side console.
 
-The console is designed for fast text-based graph edits:
+The console is designed for fast text-based graph and appearance edits:
 
 - one line is one instruction
 - multiple lines run as one batch
 - console commands start with `/`
 - plain text input is sent to AI when AI is enabled
 - AI may automatically run read-only commands in `Ask` mode to inspect graph data, but edit commands still require an auto-edit execution mode
-- successful mutation batches commit as a single undo step
+- successful graph mutation batches commit as a single graph undo step
+- successful appearance mutation batches commit as a single appearance undo step
 - parse or execution errors stop at the first failing line
 - command history is available with the arrow keys when suggestions are not open
 - `/clear` or `/cls` clears console output
@@ -144,6 +162,11 @@ The console is designed for fast text-based graph edits:
 - `/find <query>` searches node keys, titles, types, definitions, and custom fields
 - `/neighbors <node> [depth]` inspects local parent/child structure
 - `/path <from> <to>` finds the shortest directed path
+- `/layout <key> <number>` changes one layout tuning value
+- `/style-var <var> <value>` changes one `--dag-*` CSS variable
+- `/style-css show`, `/style-css append <css>`, and `/style-css replace <css>` inspect or update custom graph CSS
+- `/style-preset <id>` applies a built-in appearance preset
+- `/style-reset` restores the default graph appearance
 
 Common commands:
 
@@ -163,6 +186,9 @@ Common commands:
 - `/parents <node> = A,B`
 - `/children <node> = A,B`
 - `/set <node> <field> "value"`
+- `/style-preset contrast`
+- `/layout rowGap 28`
+- `/style-var --dag-edge-active #ff6b35`
 
 For the full command reference, see [Graph Console DSL](graph-console-dsl.md).
 
@@ -171,8 +197,11 @@ For the full command reference, see [Graph Console DSL](graph-console-dsl.md).
 Edit history is separate from navigation history.
 
 - `Back` restores the previous focus selection.
-- `Undo` and `Redo` apply only to graph data edits.
+- `Undo` and `Redo` apply to graph data edits and appearance edits.
+- Graph edit history is preferred when both graph and appearance undo records are available.
 - Supported edit actions include add, delete, rename, field edits, and relation edits.
+- Supported appearance actions include settings changes, presets, reset, layout commands, CSS variable commands, and CSS replacement.
+- Imported appearance JSON is sanitized and recorded as one appearance edit.
 - Creating a new edit after `Undo` clears the redo stack.
 
 Keyboard shortcuts:
@@ -209,4 +238,11 @@ Saving behavior notes:
 - saving preserves the document's active field names instead of rewriting them back to system names
 - changing field mapping affects interpretation, not the literal JSON keys written to disk
 
-The app also supports exporting the current view as SVG.
+The app also supports exporting the current view as SVG. SVG export includes the current graph CSS and `--dag-*` appearance variables.
+
+Appearance export is separate from graph saving:
+
+- `Appearance -> UI Configuration -> Export` downloads the current UI configuration as JSON.
+- `Appearance -> UI Configuration -> Import` loads a previously exported UI configuration JSON file.
+- `Appearance -> UI Configuration -> Reset` restores the default UI configuration.
+- `Save JSON` saves graph data only.

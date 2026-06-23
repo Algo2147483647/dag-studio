@@ -2,11 +2,11 @@
 
 This document summarizes the current AI capability system in DAG Studio. It covers the user-facing workflows, provider integration, execution modes, internal harness model, response protocol, validation path, persistence behavior, and current limitations.
 
-For console command syntax, see [Graph Console DSL](graph-console-dsl.md). For general product workflows, see [Usage Guide](usage.md).
+For console command syntax, see [Graph Console DSL](graph-console-dsl.md). For graph UI configuration, see [Graph Appearance System](graph-appearance.md). For general product workflows, see [Usage Guide](usage.md).
 
 ## Capability Overview
 
-DAG Studio's AI layer is a graph-editing assistant built on top of the existing console DSL. The model does not mutate graph data directly. Instead, it receives a structured context packet, returns a structured JSON response, and the application converts that response into answers, inspection commands, proposed plans, or validated command batches.
+DAG Studio's AI layer is a graph and appearance assistant built on top of the existing console DSL. The model does not mutate graph data or graph UI directly. Instead, it receives a structured context packet, returns a structured JSON response, and the application converts that response into answers, inspection commands, proposed plans, or validated command batches.
 
 The system supports these high-level capabilities:
 
@@ -16,6 +16,7 @@ The system supports these high-level capabilities:
 | Graph inspection | Request or automatically run read-only console commands such as `/find`, `/ls`, `/neighbors`, `/path`, `/keys`, and `/graph`. |
 | Edit planning | Produce a named plan with assumptions, affected nodes, proposed changes, rationales, and draft console commands. |
 | Command drafting | Convert natural-language graph edits into console command batches. |
+| Appearance editing | Convert natural-language UI requests into `/layout`, `/style-var`, `/style-css`, `/style-preset`, and `/style-reset` command batches. |
 | Preflight validation | Parse and simulate command batches before execution, including syntax checks, graph existence checks, risk classification, and diff preview generation. |
 | Review cards | Show AI-generated plans in the console with command text, risk level, validation summary, and diff preview. |
 | Controlled execution | Apply validated command batches only when the active execution mode and risk checks allow it. |
@@ -82,6 +83,7 @@ Each AI request includes a context packet with these sections:
 | --- | --- |
 | `system` | Agent role, language policy, response protocol version, execution mode, auto-edit flag, and destructive-change review policy. |
 | `graph` | Current graph summary, graph revision, selected nodes, focused nodes, application mode, layout mode, current console context node, node lookup index, and command reference. |
+| `appearance` | Current appearance summary, layout appearance values, CSS variables, custom CSS, presets, and stable SVG selectors for style commands. |
 | `tools` | Available console commands, command examples, and constraints for valid command generation. |
 | `memory` | Recent AI events, active plan, and working memory. |
 | `execution` | Pending command batch and last validation report, when available. |
@@ -97,6 +99,8 @@ Graph context is intentionally compressed:
 | Recent console lines included as synthetic events | Last `16` entries |
 
 When the graph is larger than the included context, the prompt instructs the model to use read-only inspection commands such as `/find`, `/ls`, `/neighbors`, `/path`, or `/graph`.
+
+Appearance context is much smaller and is normally included directly. The prompt instructs the model to use stable `.dag-*` selectors and `--dag-*` CSS variables when proposing UI changes.
 
 ## Response Protocol
 
@@ -137,9 +141,9 @@ Before any AI-generated command batch is applied, DAG Studio runs a preflight va
 2. Parse the source with the same console DSL parser used for manual commands.
 3. Reject invalid syntax with line-local diagnostics.
 4. Reject graph-dependent commands when no graph is loaded.
-5. Simulate execution against the current graph.
+5. Simulate execution against the current graph and current appearance.
 6. Classify risk from explicit model risk and command contents.
-7. Build a diff preview of expected node, field, and edge changes.
+7. Build a diff preview of expected node, field, edge, layout, CSS variable, and CSS changes.
 8. Mark the batch as validated or failed.
 
 The validation report includes per-command validity, errors, warnings, expected diffs, aggregate risk, confirmation requirement, and a human-readable summary.
@@ -151,8 +155,10 @@ Risk is computed from both model-provided risk and command-derived risk.
 | Risk | Examples |
 | --- | --- |
 | Low | Read-only commands such as `/help`, `/keys`, `/graph`, `/find`, `/ls`, `/neighbors`, `/path`, `/use`, `/show`, and `/json`. |
-| Medium | Non-destructive mutations such as `/add`, `/cp`, `/edge`, `/mv`, and `/set`. |
+| Medium | Non-destructive mutations such as `/add`, `/cp`, `/edge`, `/mv`, `/set`, `/style-css replace`, and `/style-reset`. |
 | High | Destructive commands and full relation replacements such as `/rm`, `/rm-edge`, `/unset`, `/parents`, and `/children`. |
+
+Most appearance commands are low risk because they do not change graph data. Full CSS replacement and full appearance reset are medium risk because they can replace a large part of the UI configuration.
 
 Execution policy:
 
@@ -196,7 +202,7 @@ AI state is split between page preferences and per-graph harness state.
 
 | Storage Area | Key | Contents |
 | --- | --- | --- |
-| Page preferences | `dag-studio:page-preferences` | AI settings, UI preferences, field mapping, theme, mode, layout, and console sidebar state. |
+| Page preferences | `dag-studio:page-preferences` | AI settings, UI preferences, field mapping, appearance, mode, layout, and console sidebar state. |
 | AI harness | `dag-studio:ai-harness:<encoded graph id>` | Session id, graph id, graph revision, working memory, active plan, pending command batch, recent events, artifact refs, and mode. |
 
 Persisted AI harness data is sanitized on load. Invalid plans, command batches, validation reports, events, and working memory are dropped or defaulted rather than trusted blindly.
@@ -208,6 +214,7 @@ The current safety model is built around these constraints:
 | Boundary | Mechanism |
 | --- | --- |
 | No direct graph writes by the model | The prompt requires console commands; the app only applies parsed console instructions. |
+| No direct UI writes by the model | Appearance changes must use parsed appearance console commands. |
 | Structured model output | Provider responses are parsed as JSON and must match known response shapes. |
 | Command allowlist | Every command must start with `/` and pass the console parser. |
 | Preflight simulation | AI commands are validated against the current graph before execution. |
@@ -242,6 +249,7 @@ The current safety model is built around these constraints:
 | AI settings UI and provider presets | [`src/components/Topbar.tsx`](../src/components/Topbar.tsx) |
 | Saved page preferences and default AI settings | [`src/state/preferences.ts`](../src/state/preferences.ts) |
 | Console command reference | [`src/console/reference.ts`](../src/console/reference.ts) |
+| Appearance command core | [`src/graph/appearanceCommands.ts`](../src/graph/appearanceCommands.ts) |
 | AI harness tests | [`src/test/aiHarness.test.ts`](../src/test/aiHarness.test.ts) |
 
 ## End-to-End Flow

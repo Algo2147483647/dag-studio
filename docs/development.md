@@ -37,7 +37,7 @@ Script behavior:
 
 - [`src/App.tsx`](../src/App.tsx): top-level application composition
 - [`src/components/`](../src/components/): UI components such as the workspace, top bar, modals, and console sidebar
-- [`src/graph/`](../src/graph/): graph types, normalization, serialization, selectors, and command-layer mutations
+- [`src/graph/`](../src/graph/): graph types, normalization, serialization, selectors, command-layer mutations, and appearance commands
 - [`src/state/`](../src/state/): reducer, actions, derived state, preferences, and recent-file state
 - [`src/layout/`](../src/layout/): graph layout selection and algorithm implementations
 - [`src/rendering/`](../src/rendering/): SVG stage, nodes, edges, and export helpers
@@ -54,7 +54,8 @@ The codebase is organized around a few clear responsibilities:
 - edits flow through graph commands and reducer-managed history
 - layout selection is separated from rendering so multiple layout engines can coexist
 - browser integrations such as file access and clipboard support live in adapters instead of core graph logic
-- the console DSL acts as a textual front end for the same mutation core used by the UI
+- graph appearance is a CSS-first configuration object stored separately from graph JSON
+- the console DSL acts as a textual front end for the same graph mutation and appearance command cores used by the UI
 
 ## Sample Data and Docs
 
@@ -62,6 +63,7 @@ The codebase is organized around a few clear responsibilities:
 - [`docs/usage.md`](usage.md): end-user workflows
 - [`docs/data-format.md`](data-format.md): graph JSON conventions
 - [`docs/graph-console-dsl.md`](graph-console-dsl.md): console command reference
+- [`docs/graph-appearance.md`](graph-appearance.md): graph UI appearance model, presets, commands, export, and reset behavior
 
 ## Suggested Workflow for Changes
 

@@ -4,11 +4,11 @@
 
 This document defines the **Graph Console DSL** used by `DAG Studio`.
 
-The DSL is a compact, line-oriented instruction set for editing graph JSON in **Edit Mode** through a left-side console panel. It is intended to feel closer to a shell, assembler, or low-level command monitor than to a general-purpose scripting language.
+The DSL is a compact, line-oriented instruction set for editing graph JSON and graph appearance in **Edit Mode** through a left-side console panel. It is intended to feel closer to a shell, assembler, or low-level command monitor than to a general-purpose scripting language.
 
 User-entered console commands must start with `/`, such as `/help` or `/add Child -p Parent`. Internally, the parser strips that prefix before dispatching the mnemonic. Plain text without `/` is reserved for AI chat when AI is enabled.
 
-The DSL is not a second editing engine. It is a textual front end for the existing graph mutation core.
+The DSL is not a second editing engine. It is a textual front end for the existing graph mutation core and the graph appearance command core.
 
 For a higher-level overview of the app and related documentation, see the repository [README](../README.md) and the [Documentation Index](index.md).
 
@@ -20,6 +20,7 @@ For a higher-level overview of the app and related documentation, see the reposi
 | Explicit | Each instruction should map to one clear editing action. |
 | Transactional | A batch of lines executes as one logical edit transaction. |
 | Equivalent | Console capabilities should match the right-click editing capabilities. |
+| Style-aware | Console capabilities should also cover graph UI appearance, presets, layout tuning, and custom CSS. |
 | Deterministic | The same input should always produce the same DAG result. |
 | Safe | Parse errors and graph errors should stop execution early and report the exact failing line. |
 
@@ -33,10 +34,10 @@ Console Source Text
 -> Tokenizer
 -> Parser
 -> Console Instructions
--> GraphCommand sequence
--> applyGraphCommand(...)
--> DAG result
--> reducer commit
+-> GraphCommand sequence and/or AppearanceCommand sequence
+-> applyGraphCommand(...) and/or applyAppearanceCommand(...)
+-> DAG result and/or GraphAppearance result
+-> reducer commit and/or appearance history commit
 ```
 
 ### 3.2 Layer Responsibilities
@@ -47,7 +48,9 @@ Console Source Text
 | Parser | Convert text lines into typed console instructions. |
 | Executor | Resolve context, execute instructions in order, stop on failure. |
 | Graph Command Core | Perform the actual graph mutation rules. |
-| Reducer / History | Commit a successful batch as one undoable transaction. |
+| Appearance Command Core | Perform layout, CSS variable, CSS block, preset, and reset mutations. |
+| Reducer / History | Commit a successful graph batch as one undoable graph transaction. |
+| Appearance History | Commit a successful appearance batch as one undoable appearance transaction. |
 
 ### 3.3 Non-Goals
 
@@ -59,6 +62,7 @@ Console Source Text
 | Full graph replacement | Bypasses the existing mutation model. |
 | Embedded multi-line JSON blocks | Makes parsing and line diagnostics harder. |
 | Wildcard selection | Risky for early destructive operations. |
+| Remote CSS imports | Appearance CSS is stored locally and sanitized before rendering. |
 
 ## 4. Console Operating Model
 
@@ -81,7 +85,7 @@ Console Source Text
 | Batch order | Top to bottom. |
 | Failure rule | Stop at the first error. |
 | Commit rule | Commit only if the full batch succeeds. |
-| Undo unit | One executed batch becomes one undo record. |
+| Undo unit | One executed graph mutation batch becomes one graph undo record; one executed appearance mutation batch becomes one appearance undo record. |
 
 ### 4.3 Context Register
 
@@ -151,6 +155,11 @@ The console maintains one implicit **current-node context register**.
 | `/set` | Mutation | Replace one node field with text, scalar, or JSON |
 | `/unset` | Mutation | Remove one node field |
 | `/json` | UI | Open raw node JSON editor |
+| `/layout` | Appearance | Set one layout appearance number |
+| `/style-var` | Appearance | Set or unset one `--dag-*` CSS variable |
+| `/style-css` | Appearance | Show, append, or replace custom graph CSS |
+| `/style-preset` | Appearance | Apply a built-in appearance preset |
+| `/style-reset` | Appearance | Restore the default graph appearance |
 
 ### 6.2 Modifier Table
 
@@ -172,6 +181,7 @@ The console maintains one implicit **current-node context register**.
 | `/ls` | DSL instruction | Print a compact node summary in the console output |
 | `/clear` | Console UI | Clear the console output |
 | `/cls` | Console UI | Alias for `/clear` |
+| `/style-css show` | DSL instruction | Print the current custom graph CSS |
 
 ## 7. Instruction Reference
 
@@ -772,6 +782,182 @@ Opens the raw JSON editor for the target node.
 /json .
 ```
 
+---
+
+## 7.17 `layout`
+
+### Synopsis
+
+```sh
+/layout <key> <number>
+```
+
+### Description
+
+Sets one numeric layout appearance value. Layout appearance controls graph spacing, node sizing, and minimum stage dimensions.
+
+### Supported Keys
+
+| Key | Meaning |
+| --- | --- |
+| `stagePaddingX` | Horizontal graph padding |
+| `stagePaddingY` | Vertical graph padding |
+| `columnGap` | Horizontal distance between layers |
+| `rowGap` | Vertical distance between rows |
+| `edgeLaneGap` | Spacing between edge lanes |
+| `nodeHeight` | Base node height |
+| `minNodeWidth` | Minimum node width |
+| `maxNodeWidth` | Maximum node width |
+| `stageMinWidth` | Minimum SVG stage width |
+| `stageMinHeight` | Minimum SVG stage height |
+
+### Behavioral Notes
+
+| Item | Behavior |
+| --- | --- |
+| Graph mutation | None |
+| Appearance mutation | Yes |
+| Graph required | No |
+| Undo history | Added as an appearance edit |
+
+### Examples
+
+```sh
+/layout rowGap 28
+/layout columnGap 260
+/layout maxNodeWidth 420
+```
+
+---
+
+## 7.18 `style-var`
+
+### Synopsis
+
+```sh
+/style-var <var> <value>
+/style-var --unset <var>
+```
+
+### Description
+
+Sets or unsets one graph CSS variable. Variable names must use the `--dag-*` namespace.
+
+### Examples
+
+```sh
+/style-var --dag-node-fill #ffffff
+/style-var --dag-edge-active #ff6b35
+/style-var --dag-title-font-size 18px
+/style-var --unset --dag-node-fill
+```
+
+### Behavioral Notes
+
+| Item | Behavior |
+| --- | --- |
+| Graph mutation | None |
+| Appearance mutation | Yes |
+| Graph required | No |
+| Undo history | Added as an appearance edit |
+| Sanitization | Non-`--dag-*` keys are rejected by the appearance sanitizer |
+
+---
+
+## 7.19 `style-css`
+
+### Synopsis
+
+```sh
+/style-css show
+/style-css append <css>
+/style-css replace <css>
+```
+
+### Description
+
+Reads or updates the custom graph CSS block.
+
+| Form | Effect |
+| --- | --- |
+| `show` | Prints the current custom CSS without mutating appearance |
+| `append` | Adds CSS after the current custom CSS |
+| `replace` | Replaces the current custom CSS |
+
+### Examples
+
+```sh
+/style-css show
+/style-css append .dag-edge[data-active="true"] path { stroke-width: 2.4; }
+/style-css replace .dag-node[data-selected="true"] .dag-node-card { stroke: #ff6b35; }
+```
+
+### Behavioral Notes
+
+| Item | Behavior |
+| --- | --- |
+| Graph mutation | None |
+| Appearance mutation | `append` and `replace` only |
+| Graph required | No |
+| Undo history | Added as an appearance edit for `append` and `replace` |
+| Sanitization | CSS is size-limited and `@import` rules are stripped |
+
+---
+
+## 7.20 `style-preset`
+
+### Synopsis
+
+```sh
+/style-preset <id>
+```
+
+### Description
+
+Applies one built-in graph appearance preset.
+
+### Presets
+
+| Preset | Intent |
+| --- | --- |
+| `default` | Balanced default UI |
+| `slate` | Quiet dark-neutral reading surface |
+| `blueprint` | Technical diagram look |
+| `contrast` | High-contrast inspection mode |
+| `compact` | Denser node spacing |
+| `presentation` | Larger, display-oriented graph styling |
+
+### Examples
+
+```sh
+/style-preset contrast
+/style-preset compact
+```
+
+---
+
+## 7.21 `style-reset`
+
+### Synopsis
+
+```sh
+/style-reset
+```
+
+### Description
+
+Restores the default graph appearance.
+
+### Behavioral Notes
+
+| Item | Behavior |
+| --- | --- |
+| Graph mutation | None |
+| Appearance mutation | Yes |
+| Graph required | No |
+| Undo history | Added as an appearance edit |
+| Risk | Medium when AI-generated because it replaces the whole appearance |
+
 ## 8. Batch Semantics
 
 ### 8.1 Batch Definition
@@ -786,7 +972,10 @@ A batch is the full multi-line source executed by one explicit console run actio
 | Intermediate state | Later instructions see earlier successful changes |
 | Failure handling | Abort on first failing line |
 | Commit timing | After all lines succeed |
-| Undo record | Single transaction |
+| Graph undo record | Single graph transaction when graph data changed |
+| Appearance undo record | Single appearance transaction when appearance changed |
+
+A batch can contain graph mutations, appearance mutations, UI-only commands, and read-only commands. Graph-dependent commands require a loaded graph; style-only commands do not.
 
 ### 8.3 Example Batch
 
@@ -797,6 +986,7 @@ A batch is the full multi-line source executed by one explicit console run actio
 /set AVL define "Self-balanced BST"
 /set RedBlack define "Balanced BST with color constraints"
 /children . = AVL,RedBlack
+/style-var --dag-edge-active #ff6b35
 ```
 
 ## 9. Diagnostics and Error Model
@@ -842,6 +1032,17 @@ A batch is the full multi-line source executed by one explicit console run actio
 | Copy Node | `/cp <source> <new> [-p <parent>]` |
 | Open Raw Node JSON | `/json <node>` |
 
+Appearance settings have matching console forms:
+
+| Settings Action | Console Form |
+| --- | --- |
+| Layout tuning | `/layout <key> <number>` |
+| Token editing | `/style-var <var> <value>` |
+| Token removal | `/style-var --unset <var>` |
+| Custom CSS editing | `/style-css append <css>` or `/style-css replace <css>` |
+| Preset selection | `/style-preset <id>` |
+| UI configuration reset | `/style-reset` |
+
 ## 11. Recommended Parser Strategy
 
 ### 11.1 Parsing Stages
@@ -878,7 +1079,15 @@ type ConsoleInstruction =
   | { type: "setChildren"; key: string; keys: string[]; line: number }
   | { type: "setField"; key: string; field: string; value: string; line: number }
   | { type: "unsetField"; key: string; field: string; line: number }
-  | { type: "json"; key: string; line: number };
+  | { type: "json"; key: string; line: number }
+  | { type: "setLayout"; key: string; value: number; line: number }
+  | { type: "setCssVar"; key: string; value: string; line: number }
+  | { type: "unsetCssVar"; key: string; line: number }
+  | { type: "appearanceCssShow"; line: number }
+  | { type: "appendCss"; css: string; line: number }
+  | { type: "replaceCss"; css: string; line: number }
+  | { type: "applyPreset"; presetId: string; line: number }
+  | { type: "resetAppearance"; line: number };
 ```
 
 ## 12. Recommended Executor Strategy
@@ -890,20 +1099,24 @@ type ConsoleInstruction =
 | Context resolution | Replace `.` with the current node |
 | Instruction dispatch | Convert console instructions into UI actions or graph commands |
 | Transaction simulation | Apply changes in sequence against a working DAG |
+| Appearance simulation | Apply style changes in sequence against a working appearance object |
 | Error trapping | Stop and report the first failure |
-| Commit handoff | Emit one reducer commit for a successful mutation batch |
+| Commit handoff | Emit graph and/or appearance commits for successful mutation batches |
 
 ### 12.2 Mixed UI / Mutation Behavior
 
 | Instruction Class | Handling |
 | --- | --- |
 | UI-only instructions | Execute as immediate UI operations |
-| Mutation instructions | Accumulate into transactional graph edits |
+| Graph mutation instructions | Accumulate into transactional graph edits |
+| Appearance mutation instructions | Accumulate into transactional appearance edits |
+| Appearance read-only instructions | Execute as console output without mutating appearance |
 
 Recommended V1 rule:
 
 - allow UI-only instructions such as `show` and `json`
-- treat mutation instructions as the batch that participates in undo history
+- treat graph mutation instructions as the batch that participates in graph undo history
+- treat appearance mutation instructions as the batch that participates in appearance undo history
 - if needed, disallow mixing UI-only instructions after mutation lines in the same run for simpler semantics
 
 ## 13. Worked Examples
@@ -961,6 +1174,13 @@ Recommended V1 rule:
 | P0 | `/set` |
 | P0 | `/unset` |
 | P0 | `/json` |
+| P0 | `/layout` |
+| P0 | `/style-var` |
+| P0 | `/style-css show` |
+| P0 | `/style-css append` |
+| P0 | `/style-css replace` |
+| P0 | `/style-preset` |
+| P0 | `/style-reset` |
 
 ### 14.2 Optional V1.1 Extensions
 
@@ -981,7 +1201,7 @@ The Graph Console DSL should behave like a compact graph-edit instruction set:
 - brief like shell commands
 - explicit like assembly mnemonics
 - transactional like an editor command buffer
-- backed by the existing graph mutation core
+- backed by the existing graph mutation and appearance command cores
 - self-describing through an in-console `/help` command
 
-That combination gives the console the speed of typed operations without sacrificing the safety and consistency of the current JSON editing model.
+That combination gives the console the speed of typed operations without sacrificing the safety and consistency of the current JSON and UI configuration models.
