@@ -1,7 +1,7 @@
 import { getNodeChildKeys, getNodeChildren, getNodeType } from "../graph/accessors";
 import { getDefaultFieldMapping, type FieldMapping } from "../graph/fieldMapping";
-import type { GraphLayoutMode, GraphSelection, GraphTheme, NodeKey, NormalizedDag, RelationValue } from "../graph/types";
-import { DEFAULT_GRAPH_THEME } from "../graph/types";
+import type { GraphLayoutMode, GraphSelection, NodeKey, NormalizedDag, RelationValue } from "../graph/types";
+import { DEFAULT_GRAPH_APPEARANCE, type GraphAppearance, type GraphLayoutAppearance } from "../graph/appearance";
 import { getRelationKeys } from "../graph/relations";
 import { structuredCloneValue } from "../graph/serialize";
 import { resolveStageEdgeGeometry } from "./edgeGeometry";
@@ -37,11 +37,12 @@ export function buildStageData(input: {
   mapping?: FieldMapping;
   selection: GraphSelection | null;
   layoutMode?: GraphLayoutMode;
-  theme?: GraphTheme;
+  appearance?: GraphAppearance;
   showNodeDetail?: boolean;
   alignNodeWidthsToMax?: boolean;
 }): StageData | null {
-  const { dag: sourceDag, mapping = getDefaultFieldMapping(), selection: requestedSelection, layoutMode = "sugiyama", theme = DEFAULT_GRAPH_THEME, showNodeDetail = true, alignNodeWidthsToMax = false } = input;
+  const { dag: sourceDag, mapping = getDefaultFieldMapping(), selection: requestedSelection, layoutMode = "sugiyama", appearance = DEFAULT_GRAPH_APPEARANCE, showNodeDetail = true, alignNodeWidthsToMax = false } = input;
+  const theme = appearance.layout;
   if (!sourceDag || Object.keys(sourceDag).length === 0) {
     return null;
   }
@@ -273,8 +274,8 @@ export function buildStageData(input: {
     edges,
     connectedKeysByNode,
     lanes,
-    stageWidth: Math.max(stageWidth, 980),
-    stageHeight: Math.max(stageHeight, 600),
+    stageWidth: Math.max(stageWidth, theme.stageMinWidth),
+    stageHeight: Math.max(stageHeight, theme.stageMinHeight),
     warnings: layoutResult.warnings,
   };
 }
@@ -285,7 +286,7 @@ function resolveLayout(
   layoutRoots: NodeKey[],
   mapping: FieldMapping,
   visualByKey: Map<NodeKey, { width: number }>,
-  theme: GraphTheme,
+  theme: GraphLayoutAppearance,
 ) {
   if (layoutMode === "sugiyama") {
     return buildSugiyamaLayout(layoutDag, layoutRoots, mapping);
@@ -304,7 +305,7 @@ function buildNodeVisualMap(
   dag: Record<NodeKey, NormalizedDag[NodeKey] | undefined>,
   nodeKeys: Set<NodeKey>,
   mapping: FieldMapping,
-  theme: GraphTheme,
+  theme: GraphLayoutAppearance,
   showNodeDetail: boolean,
   alignNodeWidthsToMax: boolean,
 ): Map<NodeKey, ReturnType<typeof getNodeVisual>> {
@@ -367,7 +368,7 @@ function getBarycentricScore(nodeKey: NodeKey, incomingMap: Record<NodeKey, Node
   return total / parents.length;
 }
 
-function measureStageInnerHeight(slotCountsByLayer: Map<number, number>, theme: GraphTheme): number {
+function measureStageInnerHeight(slotCountsByLayer: Map<number, number>, theme: GraphLayoutAppearance): number {
   let maxHeight = 0;
   slotCountsByLayer.forEach((slotCount) => {
     const layerHeight = slotCount * theme.nodeHeight + Math.max(slotCount - 1, 0) * theme.rowGap;
@@ -382,7 +383,7 @@ function applyAbsoluteLayoutGeometry(input: {
   nodesByLayer: Map<number, StageNode[]>;
   sortedLayers: number[];
   nodePositions: Map<NodeKey, { x: number; y: number }>;
-  theme: GraphTheme;
+  theme: GraphLayoutAppearance;
   selection: StageData["selection"];
 }): {
   lanes: StageData["lanes"];
@@ -473,7 +474,7 @@ function getRoutePointPosition(
   laneCenters: Map<number, number>,
   slotCountsByLayer: Map<number, number>,
   stageInnerHeight: number,
-  theme: GraphTheme,
+  theme: GraphLayoutAppearance,
   absoluteOffset?: { x: number; y: number },
 ): StageRoutePoint {
   if (typeof point.x === "number" && typeof point.y === "number") {

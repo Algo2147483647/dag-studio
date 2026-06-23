@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import type { GraphLayoutMode, GraphTheme } from "../graph/types";
+import type { GraphAppearance, GraphLayoutAppearance } from "../graph/appearance";
+import type { GraphLayoutMode, GraphTitleFontFamily } from "../graph/types";
 import { GRAPH_TITLE_FONT_OPTIONS } from "../graph/types";
 import type { AiExecutionMode, AiProvider, AiSettings } from "../ai/types";
 
@@ -9,7 +10,7 @@ type SettingsChapter = "general" | "appearance" | "ai";
 interface TopbarProps {
   topbarRef: React.RefObject<HTMLElement>;
   layoutMode: GraphLayoutMode;
-  theme: GraphTheme;
+  appearance: GraphAppearance;
   showNodeDetail: boolean;
   hideNodeBorders: boolean;
   alignNodeWidthsToMax: boolean;
@@ -39,8 +40,9 @@ interface TopbarProps {
   onSettingsToggle: () => void;
   onConsoleSidebarToggle: () => void;
   onLayoutModeChange: (mode: GraphLayoutMode) => void;
-  onThemeChange: <K extends keyof GraphTheme>(key: K, value: GraphTheme[K]) => void;
-  onThemeReset: () => void;
+  onLayoutAppearanceChange: <K extends keyof GraphLayoutAppearance>(key: K, value: GraphLayoutAppearance[K]) => void;
+  onAppearanceCssVarChange: (key: string, value: string) => void;
+  onAppearanceReset: () => void;
   onNodeDetailToggle: () => void;
   onNodeBordersToggle: () => void;
   onNodeWidthAlignToggle: () => void;
@@ -59,7 +61,7 @@ interface TopbarProps {
 export default function Topbar({
   topbarRef,
   layoutMode,
-  theme,
+  appearance,
   showNodeDetail,
   hideNodeBorders,
   alignNodeWidthsToMax,
@@ -89,8 +91,9 @@ export default function Topbar({
   onSettingsToggle,
   onConsoleSidebarToggle,
   onLayoutModeChange,
-  onThemeChange,
-  onThemeReset,
+  onLayoutAppearanceChange,
+  onAppearanceCssVarChange,
+  onAppearanceReset,
   onNodeDetailToggle,
   onNodeBordersToggle,
   onNodeWidthAlignToggle,
@@ -141,7 +144,7 @@ export default function Topbar({
             <SettingsModal
               open={settingsOpen}
               layoutMode={layoutMode}
-              theme={theme}
+              appearance={appearance}
               showNodeDetail={showNodeDetail}
               hideNodeBorders={hideNodeBorders}
               alignNodeWidthsToMax={alignNodeWidthsToMax}
@@ -153,8 +156,9 @@ export default function Topbar({
               aiBusy={aiBusy}
               onClose={onSettingsToggle}
               onLayoutModeChange={onLayoutModeChange}
-              onThemeChange={onThemeChange}
-              onThemeReset={onThemeReset}
+              onLayoutAppearanceChange={onLayoutAppearanceChange}
+              onAppearanceCssVarChange={onAppearanceCssVarChange}
+              onAppearanceReset={onAppearanceReset}
               onNodeDetailToggle={onNodeDetailToggle}
               onNodeBordersToggle={onNodeBordersToggle}
               onNodeWidthAlignToggle={onNodeWidthAlignToggle}
@@ -179,7 +183,7 @@ export default function Topbar({
 interface SettingsModalProps {
   open: boolean;
   layoutMode: GraphLayoutMode;
-  theme: GraphTheme;
+  appearance: GraphAppearance;
   showNodeDetail: boolean;
   hideNodeBorders: boolean;
   alignNodeWidthsToMax: boolean;
@@ -191,8 +195,9 @@ interface SettingsModalProps {
   aiBusy: boolean;
   onClose: () => void;
   onLayoutModeChange: (mode: GraphLayoutMode) => void;
-  onThemeChange: <K extends keyof GraphTheme>(key: K, value: GraphTheme[K]) => void;
-  onThemeReset: () => void;
+  onLayoutAppearanceChange: <K extends keyof GraphLayoutAppearance>(key: K, value: GraphLayoutAppearance[K]) => void;
+  onAppearanceCssVarChange: (key: string, value: string) => void;
+  onAppearanceReset: () => void;
   onNodeDetailToggle: () => void;
   onNodeBordersToggle: () => void;
   onNodeWidthAlignToggle: () => void;
@@ -211,7 +216,7 @@ interface SettingsModalProps {
 function SettingsModal({
   open,
   layoutMode,
-  theme,
+  appearance,
   showNodeDetail,
   hideNodeBorders,
   alignNodeWidthsToMax,
@@ -223,8 +228,9 @@ function SettingsModal({
   aiBusy,
   onClose,
   onLayoutModeChange,
-  onThemeChange,
-  onThemeReset,
+  onLayoutAppearanceChange,
+  onAppearanceCssVarChange,
+  onAppearanceReset,
   onNodeDetailToggle,
   onNodeBordersToggle,
   onNodeWidthAlignToggle,
@@ -258,6 +264,10 @@ function SettingsModal({
   };
   const selectedProvider = AI_PROVIDER_PRESETS[aiSettings.provider];
   const aiConnectionButtonText = getAiConnectionButtonText(aiConnectionStatus, aiBusy);
+  const titleFontFamily = appearance.cssVars["--dag-title-font-family"] || GRAPH_TITLE_FONT_OPTIONS[0].value;
+  const titleFontSize = parseCssPixelValue(appearance.cssVars["--dag-title-font-size"], 15);
+  const titleFontStyle = appearance.cssVars["--dag-title-font-style"] === "normal" ? "normal" : "italic";
+  const titleFontWeight = appearance.cssVars["--dag-title-font-weight"] === "700" ? 700 : 400;
 
   useEffect(() => {
     setAiConnectionStatus("idle");
@@ -396,15 +406,15 @@ function SettingsModal({
                 <section className="settings-section settings-section-emphasis" aria-labelledby="layout-tuning-title">
                   <div className="settings-section-header">
                     <p id="layout-tuning-title" className="control-label">Layout Tuning</p>
-                    <button type="button" className="settings-link-btn" onClick={onThemeReset}>Reset</button>
+                    <button type="button" className="settings-link-btn" onClick={onAppearanceReset}>Reset</button>
                   </div>
                   <div className="settings-slider-grid">
                     {LAYOUT_CONTROLS.map((control) => (
                       <LayoutSliderControl
                         key={control.key}
                         control={control}
-                        value={theme[control.key]}
-                        onChange={(value) => onThemeChange(control.key, value)}
+                        value={appearance.layout[control.key]}
+                        onChange={(value) => onLayoutAppearanceChange(control.key, value)}
                       />
                     ))}
                   </div>
@@ -415,9 +425,9 @@ function SettingsModal({
                   <div className="title-style-row">
                     <select
                       className="title-font-select"
-                      value={theme.titleFontFamily}
+                      value={titleFontFamily}
                       aria-label="Title font"
-                      onChange={(event) => onThemeChange("titleFontFamily", event.currentTarget.value as GraphTheme["titleFontFamily"])}
+                      onChange={(event) => onAppearanceCssVarChange("--dag-title-font-family", event.currentTarget.value as GraphTitleFontFamily)}
                     >
                       {GRAPH_TITLE_FONT_OPTIONS.map((font) => (
                         <option key={font.value} value={font.value}>{font.label}</option>
@@ -431,31 +441,31 @@ function SettingsModal({
                         min={10}
                         max={28}
                         step={1}
-                        value={theme.titleFontSize}
+                        value={titleFontSize}
                         aria-label="Title font size"
-                        onChange={(event) => onThemeChange("titleFontSize", clampNumberInput(event.currentTarget.value, 10, 28, theme.titleFontSize))}
-                        onBlur={(event) => onThemeChange("titleFontSize", clampNumberInput(event.currentTarget.value, 10, 28, theme.titleFontSize))}
+                        onChange={(event) => onAppearanceCssVarChange("--dag-title-font-size", `${clampNumberInput(event.currentTarget.value, 10, 28, titleFontSize)}px`)}
+                        onBlur={(event) => onAppearanceCssVarChange("--dag-title-font-size", `${clampNumberInput(event.currentTarget.value, 10, 28, titleFontSize)}px`)}
                       />
                       <span className="title-size-unit">px</span>
                     </label>
                     <div className="title-format-buttons" role="group" aria-label="Title format">
                       <button
                         type="button"
-                        className={`title-format-btn${theme.titleFontWeight === 700 ? " is-active" : ""}`}
+                        className={`title-format-btn${titleFontWeight === 700 ? " is-active" : ""}`}
                         title="Bold"
                         aria-label="Bold title"
-                        aria-pressed={theme.titleFontWeight === 700}
-                        onClick={() => onThemeChange("titleFontWeight", theme.titleFontWeight === 700 ? 400 : 700)}
+                        aria-pressed={titleFontWeight === 700}
+                        onClick={() => onAppearanceCssVarChange("--dag-title-font-weight", titleFontWeight === 700 ? "400" : "700")}
                       >
                         B
                       </button>
                       <button
                         type="button"
-                        className={`title-format-btn title-format-btn-italic${theme.titleFontStyle === "italic" ? " is-active" : ""}`}
+                        className={`title-format-btn title-format-btn-italic${titleFontStyle === "italic" ? " is-active" : ""}`}
                         title="Italic"
                         aria-label="Italic title"
-                        aria-pressed={theme.titleFontStyle === "italic"}
-                        onClick={() => onThemeChange("titleFontStyle", theme.titleFontStyle === "italic" ? "normal" : "italic")}
+                        aria-pressed={titleFontStyle === "italic"}
+                        onClick={() => onAppearanceCssVarChange("--dag-title-font-style", titleFontStyle === "italic" ? "normal" : "italic")}
                       >
                         I
                       </button>
@@ -805,7 +815,15 @@ function clampFloatInput(value: string, min: number, max: number, fallback: numb
   return Math.max(min, Math.min(max, parsed));
 }
 
-type LayoutControlKey = "columnGap" | "rowGap" | "edgeLaneGap" | "nodeHeight" | "maxNodeWidth";
+function parseCssPixelValue(value: string | undefined, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+type LayoutControlKey = keyof Pick<GraphLayoutAppearance, "columnGap" | "rowGap" | "edgeLaneGap" | "nodeHeight" | "maxNodeWidth">;
 
 interface LayoutControlDefinition {
   key: LayoutControlKey;

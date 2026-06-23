@@ -1,9 +1,14 @@
 const ARROW_MARKER_WIDTH = 10;
 const ARROW_MARKER_HEIGHT = 8;
 
-export default function GraphDefs() {
+interface GraphDefsProps {
+  appearanceCss: string;
+}
+
+export default function GraphDefs({ appearanceCss }: GraphDefsProps) {
   return (
     <defs>
+      <style>{appearanceCss}</style>
       <marker
         id="arrowhead"
         viewBox={`0 0 ${ARROW_MARKER_WIDTH} ${ARROW_MARKER_HEIGHT}`}

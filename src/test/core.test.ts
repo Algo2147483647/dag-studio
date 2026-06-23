@@ -1,4 +1,5 @@
 import { aiHarnessSuite } from "./aiHarness.test";
+import { appearanceSuite } from "./appearance.test";
 import { consoleSuite } from "./console.test";
 import { fieldMappingSuite } from "./fieldMapping.test";
 import { graphSuite } from "./graph.test";
@@ -9,6 +10,7 @@ import { stateSuite } from "./state.test";
 async function main() {
   const { passed, failed } = await runSuites([
     aiHarnessSuite,
+    appearanceSuite,
     graphSuite,
     importMergeSuite,
     consoleSuite,

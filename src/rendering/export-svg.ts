@@ -31,8 +31,27 @@ export function buildExportSvg(sourceSvg: SVGSVGElement): SVGSVGElement {
   clone.removeAttribute("data-margin-top");
 
   copyInlineSvgStyles(sourceSvg, clone);
+  copyDagCssVars(sourceSvg, clone);
   normalizeExportMarkerColor(sourceSvg, clone);
   return clone;
+}
+
+export function copyDagCssVars(sourceSvg: SVGSVGElement, cloneSvg: SVGSVGElement): void {
+  const sourceInlineStyle = sourceSvg.getAttribute("style") || "";
+  sourceInlineStyle
+    .split(";")
+    .map((declaration) => declaration.trim())
+    .filter((declaration) => declaration.startsWith("--dag-"))
+    .forEach((declaration) => {
+      const separatorIndex = declaration.indexOf(":");
+      if (separatorIndex <= 0) {
+        return;
+      }
+      cloneSvg.style.setProperty(
+        declaration.slice(0, separatorIndex).trim(),
+        declaration.slice(separatorIndex + 1).trim(),
+      );
+    });
 }
 
 export function copyInlineSvgStyles(sourceSvg: SVGSVGElement, cloneSvg: SVGSVGElement): void {
@@ -76,7 +95,7 @@ export function copyInlineSvgStyles(sourceSvg: SVGSVGElement, cloneSvg: SVGSVGEl
 }
 
 export function normalizeExportMarkerColor(sourceSvg: SVGSVGElement, cloneSvg: SVGSVGElement): void {
-  const firstEdge = sourceSvg.querySelector(".graph-edge");
+  const firstEdge = sourceSvg.querySelector(".dag-edge__path");
   const edgeStroke = firstEdge ? window.getComputedStyle(firstEdge).stroke.trim() : "";
   if (!edgeStroke) {
     return;

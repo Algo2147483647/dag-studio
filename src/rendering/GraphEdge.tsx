@@ -7,8 +7,15 @@ interface GraphEdgeProps {
 
 const GraphEdge = memo(function GraphEdge({ edge }: GraphEdgeProps) {
   return (
-    <g className="graph-edge-group">
-      <path className="graph-edge" d={edge.path} data-source={edge.source} data-target={edge.target} markerEnd="url(#arrowhead)" />
+    <g
+      className="dag-edge"
+      data-source={edge.source}
+      data-target={edge.target}
+      data-weight={String(edge.weight ?? "")}
+      data-label={edge.label}
+      data-active="false"
+    >
+      <path className="dag-edge__path" d={edge.path} markerEnd="url(#arrowhead)" />
       {edge.label ? <EdgeLabel label={edge.label} x={edge.labelPosition.x} y={edge.labelPosition.y} /> : null}
     </g>
   );
@@ -25,8 +32,8 @@ function EdgeLabel({ label, x, y }: { label: string; x: number; y: number }) {
 
   return (
     <>
-      <rect className="graph-edge-label-bg" x={x - labelWidth / 2} y={y - 10} width={labelWidth} height={16} rx={8} ry={8} />
-      <text className="graph-edge-label" x={x} y={y + 1} textAnchor="middle">
+      <rect className="dag-edge__label-bg" x={x - labelWidth / 2} y={y - 10} width={labelWidth} height={16} rx={8} ry={8} />
+      <text className="dag-edge__label-text" x={x} y={y + 1} textAnchor="middle">
         {label}
       </text>
     </>

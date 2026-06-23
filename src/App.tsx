@@ -34,9 +34,9 @@ import RelationEditorModal from "./components/RelationEditorModal";
 import SaveJsonModal from "./components/SaveJsonModal";
 import Topbar from "./components/Topbar";
 import Workspace from "./components/Workspace";
-import { DEFAULT_GRAPH_THEME } from "./graph/types";
-import type { GraphLayoutMode, GraphTheme, NodeKey, NormalizedDag } from "./graph/types";
+import type { GraphLayoutMode, NodeKey, NormalizedDag } from "./graph/types";
 import { getGraphLayoutLabel } from "./graph/types";
+import { DEFAULT_GRAPH_APPEARANCE, sanitizeGraphAppearance, type GraphAppearance, type GraphLayoutAppearance } from "./graph/appearance";
 import type { EditTransaction } from "./state/initialState";
 import { collectBatchEffects, buildConsoleMutationLabel, executeConsoleInstructions } from "./console/executor";
 import { parseConsoleSource } from "./console/dsl";
@@ -67,7 +67,7 @@ import { loadPersistedAiHarnessState, savePersistedAiHarnessState } from "./ai/p
 export default function App() {
   const [state, dispatch] = useReducer(graphReducer, initialGraphAppState);
   const [fieldMapping, setFieldMapping] = useState<FieldMapping>(() => loadGraphPagePreferences().fieldMapping || getDefaultFieldMapping());
-  const [theme, setTheme] = useState<GraphTheme>(() => loadGraphPagePreferences().theme || DEFAULT_GRAPH_THEME);
+  const [appearance, setAppearance] = useState<GraphAppearance>(() => loadGraphPagePreferences().appearance || DEFAULT_GRAPH_APPEARANCE);
   const [showNodeDetail, setShowNodeDetail] = useState<boolean>(() => loadGraphPagePreferences().showNodeDetail ?? true);
   const [hideNodeBorders, setHideNodeBorders] = useState<boolean>(() => loadGraphPagePreferences().hideNodeBorders ?? false);
   const [alignNodeWidthsToMax, setAlignNodeWidthsToMax] = useState<boolean>(() => loadGraphPagePreferences().alignNodeWidthsToMax ?? false);
@@ -138,7 +138,7 @@ export default function App() {
     saveGraphPagePreferences({
       mode: state.mode,
       layoutMode: state.layout.mode,
-      theme,
+      appearance,
       showNodeDetail,
       hideNodeBorders,
       alignNodeWidthsToMax,
@@ -147,7 +147,7 @@ export default function App() {
       fieldMapping,
       aiSettings,
     });
-  }, [aiSettings, alignNodeWidthsToMax, fieldMapping, hideNodeBorders, showNodeDetail, state.layout.mode, state.mode, state.ui.consoleSidebarOpen, state.ui.consoleSidebarWidth, theme]);
+  }, [aiSettings, alignNodeWidthsToMax, appearance, fieldMapping, hideNodeBorders, showNodeDetail, state.layout.mode, state.mode, state.ui.consoleSidebarOpen, state.ui.consoleSidebarWidth]);
 
   useEffect(() => {
     const graphId = state.source.fileName || "local-graph";
@@ -197,7 +197,7 @@ export default function App() {
     setActiveSuggestionIndex(0);
   }, [consoleInput]);
 
-  const stage = useMemo(() => state.dag ? buildStageData({ dag: state.dag, mapping: fieldMapping, selection: state.selection, layoutMode: state.layout.mode, theme, showNodeDetail, alignNodeWidthsToMax }) : null, [alignNodeWidthsToMax, fieldMapping, showNodeDetail, state.dag, state.layout.mode, state.selection, theme]);
+  const stage = useMemo(() => state.dag ? buildStageData({ dag: state.dag, mapping: fieldMapping, selection: state.selection, layoutMode: state.layout.mode, appearance, showNodeDetail, alignNodeWidthsToMax }) : null, [alignNodeWidthsToMax, appearance, fieldMapping, showNodeDetail, state.dag, state.layout.mode, state.selection]);
   const parentSelection = useMemo(() => state.dag && stage ? getParentLevelSelection(state.dag, stage.topLevelKeys, fieldMapping) : null, [fieldMapping, stage, state.dag]);
   const consoleSidebarVisible = state.ui.consoleSidebarOpen;
   const consoleSuggestions = useMemo(() => getConsoleSuggestions(consoleInput), [consoleInput]);
@@ -935,12 +935,28 @@ export default function App() {
     dispatch({ type: "layoutModeChanged", mode });
   }
 
-  function handleThemeChange<K extends keyof GraphTheme>(key: K, value: GraphTheme[K]) {
-    setTheme((current) => ({ ...current, [key]: value }));
+  function handleLayoutAppearanceChange<K extends keyof GraphLayoutAppearance>(key: K, value: GraphLayoutAppearance[K]) {
+    setAppearance((current) => sanitizeGraphAppearance({
+      ...current,
+      layout: {
+        ...current.layout,
+        [key]: value,
+      },
+    }));
   }
 
-  function handleThemeReset() {
-    setTheme(DEFAULT_GRAPH_THEME);
+  function handleAppearanceCssVarChange(key: string, value: string) {
+    setAppearance((current) => sanitizeGraphAppearance({
+      ...current,
+      cssVars: {
+        ...current.cssVars,
+        [key]: value,
+      },
+    }));
+  }
+
+  function handleAppearanceReset() {
+    setAppearance(DEFAULT_GRAPH_APPEARANCE);
   }
 
   async function handleAiConnectionTest() {
@@ -1013,7 +1029,7 @@ export default function App() {
       <Topbar
         topbarRef={topbarRef}
         layoutMode={state.layout.mode}
-        theme={theme}
+        appearance={appearance}
         showNodeDetail={showNodeDetail}
         hideNodeBorders={hideNodeBorders}
         alignNodeWidthsToMax={alignNodeWidthsToMax}
@@ -1043,8 +1059,9 @@ export default function App() {
         onSettingsToggle={() => dispatch({ type: "settingsToggled" })}
         onConsoleSidebarToggle={() => dispatch({ type: "consoleSidebarToggled" })}
         onLayoutModeChange={handleLayoutModeChange}
-        onThemeChange={handleThemeChange}
-        onThemeReset={handleThemeReset}
+        onLayoutAppearanceChange={handleLayoutAppearanceChange}
+        onAppearanceCssVarChange={handleAppearanceCssVarChange}
+        onAppearanceReset={handleAppearanceReset}
         onNodeDetailToggle={handleNodeDetailToggle}
         onNodeBordersToggle={() => setHideNodeBorders((current) => !current)}
         onNodeWidthAlignToggle={() => setAlignNodeWidthsToMax((current) => !current)}
@@ -1134,7 +1151,7 @@ export default function App() {
         )}
         sidebarOpen={consoleSidebarVisible}
         sidebarWidth={state.ui.consoleSidebarWidth}
-        theme={theme}
+        appearance={appearance}
         onInitializeCanvas={initializeCanvas}
         focusedKey={focusedKey}
         hideNodeBorders={hideNodeBorders}

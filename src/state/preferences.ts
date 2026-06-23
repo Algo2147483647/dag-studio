@@ -1,5 +1,5 @@
-import type { GraphLayoutMode, GraphMode, GraphTheme } from "../graph/types";
-import { DEFAULT_GRAPH_THEME, GRAPH_TITLE_FONT_OPTIONS } from "../graph/types";
+import type { GraphLayoutMode, GraphMode } from "../graph/types";
+import { DEFAULT_GRAPH_APPEARANCE, sanitizeGraphAppearance, type GraphAppearance } from "../graph/appearance";
 import { getDefaultFieldMapping, sanitizeFieldMapping, type FieldMapping } from "../graph/fieldMapping";
 import type { AiExecutionMode, AiProvider, AiSettings } from "../ai/types";
 
@@ -8,7 +8,7 @@ const GRAPH_PAGE_PREFERENCES_KEY = "dag-studio:page-preferences";
 export interface GraphPagePreferences {
   mode: GraphMode;
   layoutMode: GraphLayoutMode;
-  theme: GraphTheme;
+  appearance: GraphAppearance;
   showNodeDetail: boolean;
   hideNodeBorders: boolean;
   alignNodeWidthsToMax: boolean;
@@ -37,7 +37,7 @@ export function getInitialGraphPagePreferences(): GraphPagePreferences {
   return {
     mode: "edit",
     layoutMode: "sugiyama",
-    theme: DEFAULT_GRAPH_THEME,
+    appearance: DEFAULT_GRAPH_APPEARANCE,
     showNodeDetail: true,
     hideNodeBorders: false,
     alignNodeWidthsToMax: false,
@@ -87,7 +87,7 @@ export function parseGraphPagePreferences(raw: string | null): Partial<GraphPage
     layoutMode?: unknown;
     consoleSidebarOpen?: unknown;
     consoleSidebarWidth?: unknown;
-    theme?: unknown;
+    appearance?: unknown;
     showNodeDetail?: unknown;
     hideNodeBorders?: unknown;
     alignNodeWidthsToMax?: unknown;
@@ -110,8 +110,8 @@ export function parseGraphPagePreferences(raw: string | null): Partial<GraphPage
   if (parsed.layoutMode === "level" || parsed.layoutMode === "sugiyama" || parsed.layoutMode === "dagre") {
     next.layoutMode = parsed.layoutMode;
   }
-  if (parsed.theme && typeof parsed.theme === "object" && !Array.isArray(parsed.theme)) {
-    next.theme = sanitizeGraphTheme(parsed.theme);
+  if (parsed.appearance && typeof parsed.appearance === "object" && !Array.isArray(parsed.appearance)) {
+    next.appearance = sanitizeGraphAppearance(parsed.appearance);
   }
   if (typeof parsed.showNodeDetail === "boolean") {
     next.showNodeDetail = parsed.showNodeDetail;
@@ -149,43 +149,11 @@ function getBrowserStorage(): StorageLike | null {
   return window.localStorage;
 }
 
-function sanitizeGraphTheme(input: object): GraphTheme {
-  const record = input as Record<string, unknown>;
-  const minNodeWidth = clampNumericPreference(record.minNodeWidth, DEFAULT_GRAPH_THEME.minNodeWidth, 140, 260);
-  const maxNodeWidth = clampNumericPreference(record.maxNodeWidth, DEFAULT_GRAPH_THEME.maxNodeWidth, minNodeWidth, 480);
-  return {
-    stagePaddingX: DEFAULT_GRAPH_THEME.stagePaddingX,
-    stagePaddingY: DEFAULT_GRAPH_THEME.stagePaddingY,
-    columnGap: clampNumericPreference(record.columnGap, DEFAULT_GRAPH_THEME.columnGap, 48, 260),
-    rowGap: clampNumericPreference(record.rowGap, DEFAULT_GRAPH_THEME.rowGap, 4, 140),
-    edgeLaneGap: clampNumericPreference(record.edgeLaneGap, DEFAULT_GRAPH_THEME.edgeLaneGap, 4, 96),
-    nodeHeight: clampNumericPreference(record.nodeHeight, DEFAULT_GRAPH_THEME.nodeHeight, 44, 160),
-    minNodeWidth,
-    maxNodeWidth,
-    titleFontFamily: sanitizeTitleFontFamily(record.titleFontFamily),
-    titleFontSize: clampNumericPreference(record.titleFontSize, DEFAULT_GRAPH_THEME.titleFontSize, 10, 28),
-    titleFontStyle: record.titleFontStyle === "normal" || record.titleFontStyle === "italic"
-      ? record.titleFontStyle
-      : DEFAULT_GRAPH_THEME.titleFontStyle,
-    titleFontWeight: record.titleFontWeight === 700 || record.titleFontWeight === "700"
-      ? 700
-      : DEFAULT_GRAPH_THEME.titleFontWeight,
-  };
-}
-
 function clampNumericPreference(value: unknown, fallback: number, min: number, max: number): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return fallback;
   }
   return Math.max(min, Math.min(max, Math.round(value)));
-}
-
-function sanitizeTitleFontFamily(value: unknown): GraphTheme["titleFontFamily"] {
-  if (typeof value !== "string") {
-    return DEFAULT_GRAPH_THEME.titleFontFamily;
-  }
-  const match = GRAPH_TITLE_FONT_OPTIONS.find((option) => option.value === value);
-  return match?.value || DEFAULT_GRAPH_THEME.titleFontFamily;
 }
 
 function sanitizeAiSettings(input: object): AiSettings {

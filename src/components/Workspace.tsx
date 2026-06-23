@@ -1,6 +1,6 @@
 import GraphStage from "../rendering/GraphStage";
 import type { StageData } from "../layout/types";
-import type { GraphTheme } from "../graph/types";
+import type { GraphAppearance } from "../graph/appearance";
 import EmptyState from "./EmptyState";
 
 interface WorkspaceProps {
@@ -11,7 +11,7 @@ interface WorkspaceProps {
   sidebar: React.ReactNode;
   sidebarOpen: boolean;
   sidebarWidth: number;
-  theme: GraphTheme;
+  appearance: GraphAppearance;
   onInitializeCanvas: () => void;
   focusedKey: string | null;
   hideNodeBorders: boolean;
@@ -30,7 +30,7 @@ export default function Workspace({
   sidebar,
   sidebarOpen,
   sidebarWidth,
-  theme,
+  appearance,
   onInitializeCanvas,
   focusedKey,
   hideNodeBorders,
@@ -65,7 +65,7 @@ export default function Workspace({
                 stage={stage}
                 focusedKey={focusedKey}
                 hideNodeBorders={hideNodeBorders}
-                theme={theme}
+                appearance={appearance}
                 svgRef={svgRef}
                 onNodeClick={onNodeClick}
                 onNodeContextMenu={onNodeContextMenu}

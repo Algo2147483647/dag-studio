@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, type CSSProperties } from "react";
 import type { StageData } from "../layout/types";
-import type { GraphTheme } from "../graph/types";
+import { appearanceToStageStyle, type GraphAppearance } from "../graph/appearance";
 import GraphBackdrop from "./GraphBackdrop";
 import GraphDefs from "./GraphDefs";
 import GraphEdge from "./GraphEdge";
@@ -15,31 +15,26 @@ interface GraphStageProps {
   stage: StageData;
   focusedKey: string | null;
   hideNodeBorders: boolean;
-  theme: GraphTheme;
+  appearance: GraphAppearance;
   svgRef: React.RefObject<SVGSVGElement>;
   onNodeClick: (key: string) => void;
   onNodeContextMenu: (event: React.MouseEvent<SVGGElement>, key: string) => void;
   onFocusChange: (key: string | null) => void;
 }
 
-export default function GraphStage({ stage, focusedKey, hideNodeBorders, theme, svgRef, onNodeClick, onNodeContextMenu, onFocusChange }: GraphStageProps) {
+export default function GraphStage({ stage, focusedKey, hideNodeBorders, appearance, svgRef, onNodeClick, onNodeContextMenu, onFocusChange }: GraphStageProps) {
   const hoveredKeyRef = useRef<string | null>(null);
   const focusedKeyRef = useRef<string | null>(focusedKey);
   const appliedInteractiveKeyRef = useRef<string | null>(null);
   const nodeElementsByKeyRef = useRef(new Map<string, SVGGElement>());
-  const edgeElementsByNodeKeyRef = useRef(new Map<string, SVGPathElement[]>());
+  const edgeElementsByNodeKeyRef = useRef(new Map<string, SVGGElement[]>());
   const connectedNodeElementsRef = useRef(new Set<SVGGElement>());
-  const activeEdgeElementsRef = useRef(new Set<SVGPathElement>());
+  const activeEdgeElementsRef = useRef(new Set<SVGGElement>());
   const currentNodeElementRef = useRef<SVGGElement | null>(null);
   const isDenseStage = stage.nodes.length >= DENSE_STAGE_NODE_THRESHOLD
     || stage.edges.length >= DENSE_STAGE_EDGE_THRESHOLD
     || stage.stageWidth * stage.stageHeight >= DENSE_STAGE_AREA_THRESHOLD;
-  const stageStyle = {
-    "--graph-title-font-family": theme.titleFontFamily,
-    "--graph-title-font-size": `${theme.titleFontSize}px`,
-    "--graph-title-font-style": theme.titleFontStyle,
-    "--graph-title-font-weight": String(theme.titleFontWeight),
-  } as CSSProperties;
+  const stageStyle = appearanceToStageStyle(appearance) as CSSProperties;
 
   const clearInteractiveClasses = useCallback(() => {
     const svgElement = svgRef.current;
@@ -47,17 +42,22 @@ export default function GraphStage({ stage, focusedKey, hideNodeBorders, theme, 
       return;
     }
 
-    svgElement.classList.remove("has-interactive-node");
+    svgElement.dataset.hasInteractiveNode = "false";
 
     if (currentNodeElementRef.current) {
-      currentNodeElementRef.current.classList.remove("is-current");
+      currentNodeElementRef.current.dataset.hovered = "false";
+      currentNodeElementRef.current.dataset.focused = "false";
       currentNodeElementRef.current = null;
     }
 
-    connectedNodeElementsRef.current.forEach((nodeElement) => nodeElement.classList.remove("is-connected"));
+    connectedNodeElementsRef.current.forEach((nodeElement) => {
+      nodeElement.dataset.connected = "false";
+    });
     connectedNodeElementsRef.current.clear();
 
-    activeEdgeElementsRef.current.forEach((edgeElement) => edgeElement.classList.remove("is-active-edge"));
+    activeEdgeElementsRef.current.forEach((edgeElement) => {
+      edgeElement.dataset.active = "false";
+    });
     activeEdgeElementsRef.current.clear();
   }, [svgRef]);
 
@@ -69,6 +69,13 @@ export default function GraphStage({ stage, focusedKey, hideNodeBorders, theme, 
 
     const previousKey = appliedInteractiveKeyRef.current;
     if (previousKey === nextKey) {
+      if (nextKey) {
+        const currentNodeElement = nodeElementsByKeyRef.current.get(nextKey);
+        if (currentNodeElement) {
+          currentNodeElement.dataset.hovered = hoveredKeyRef.current === nextKey ? "true" : "false";
+          currentNodeElement.dataset.focused = focusedKeyRef.current === nextKey ? "true" : "false";
+        }
+      }
       return;
     }
 
@@ -92,14 +99,16 @@ export default function GraphStage({ stage, focusedKey, hideNodeBorders, theme, 
     const nextEdgeElements = new Set(edgeElementsByNodeKeyRef.current.get(nextKey) || []);
 
     if (!previousKey) {
-      svgElement.classList.add("has-interactive-node");
+      svgElement.dataset.hasInteractiveNode = "true";
     }
 
     if (currentNodeElementRef.current && currentNodeElementRef.current !== nextNodeElement) {
-      currentNodeElementRef.current.classList.remove("is-current");
+      currentNodeElementRef.current.dataset.hovered = "false";
+      currentNodeElementRef.current.dataset.focused = "false";
     }
 
-    nextNodeElement.classList.add("is-current");
+    nextNodeElement.dataset.hovered = hoveredKeyRef.current === nextKey ? "true" : "false";
+    nextNodeElement.dataset.focused = focusedKeyRef.current === nextKey ? "true" : "false";
     currentNodeElementRef.current = nextNodeElement;
 
     previousConnectedKeys.forEach((connectedKey) => {
@@ -110,7 +119,7 @@ export default function GraphStage({ stage, focusedKey, hideNodeBorders, theme, 
       if (!connectedNodeElement) {
         return;
       }
-      connectedNodeElement.classList.remove("is-connected");
+      connectedNodeElement.dataset.connected = "false";
       connectedNodeElementsRef.current.delete(connectedNodeElement);
     });
 
@@ -119,7 +128,7 @@ export default function GraphStage({ stage, focusedKey, hideNodeBorders, theme, 
       if (!connectedNodeElement) {
         return;
       }
-      connectedNodeElement.classList.add("is-connected");
+      connectedNodeElement.dataset.connected = "true";
       connectedNodeElementsRef.current.add(connectedNodeElement);
     });
 
@@ -127,12 +136,12 @@ export default function GraphStage({ stage, focusedKey, hideNodeBorders, theme, 
       if (nextEdgeElements.has(edgeElement)) {
         return;
       }
-      edgeElement.classList.remove("is-active-edge");
+      edgeElement.dataset.active = "false";
       activeEdgeElementsRef.current.delete(edgeElement);
     });
 
     nextEdgeElements.forEach((edgeElement) => {
-      edgeElement.classList.add("is-active-edge");
+      edgeElement.dataset.active = "true";
       activeEdgeElementsRef.current.add(edgeElement);
     });
 
@@ -206,7 +215,11 @@ export default function GraphStage({ stage, focusedKey, hideNodeBorders, theme, 
 
   return (
     <svg
-      className={`graph-stage${isDenseStage ? " graph-stage--dense" : ""}${hideNodeBorders ? " graph-stage--borderless" : ""}`}
+      className="dag-graph"
+      data-layout={stage.layoutMode}
+      data-density={isDenseStage ? "dense" : "normal"}
+      data-borderless={hideNodeBorders ? "true" : "false"}
+      data-has-interactive-node="false"
       ref={svgRef}
       viewBox={`0 0 ${stage.stageWidth} ${stage.stageHeight}`}
       width={stage.stageWidth}
@@ -215,9 +228,9 @@ export default function GraphStage({ stage, focusedKey, hideNodeBorders, theme, 
       role="img"
       aria-label={`DAG view focused on ${stage.selection.label}`}
     >
-      <GraphDefs />
+      <GraphDefs appearanceCss={appearance.css} />
       <GraphBackdrop stage={stage} />
-      <g className="graph-edge-layer">
+      <g className="dag-edge-layer">
         {stage.edges.map((edge) => (
           <GraphEdge
             key={edge.id}
@@ -225,7 +238,7 @@ export default function GraphStage({ stage, focusedKey, hideNodeBorders, theme, 
           />
         ))}
       </g>
-      <g className="graph-node-layer">
+      <g className="dag-node-layer">
         {stage.nodes.map((node) => (
           <GraphNode
             key={node.key}
@@ -250,13 +263,13 @@ function resolveNodeKey(target: EventTarget | null): string | null {
   if (!(target instanceof Element)) {
     return null;
   }
-  return target.closest<SVGGElement>(".graph-node[data-node-key]")?.dataset.nodeKey || null;
+  return target.closest<SVGGElement>(".dag-node[data-key]")?.dataset.key || null;
 }
 
 function collectNodeElements(svgElement: SVGSVGElement): Map<string, SVGGElement> {
   const nodeElementsByKey = new Map<string, SVGGElement>();
-  svgElement.querySelectorAll<SVGGElement>(".graph-node[data-node-key]").forEach((nodeElement) => {
-    const nodeKey = nodeElement.dataset.nodeKey;
+  svgElement.querySelectorAll<SVGGElement>(".dag-node[data-key]").forEach((nodeElement) => {
+    const nodeKey = nodeElement.dataset.key;
     if (nodeKey) {
       nodeElementsByKey.set(nodeKey, nodeElement);
     }
@@ -264,9 +277,9 @@ function collectNodeElements(svgElement: SVGSVGElement): Map<string, SVGGElement
   return nodeElementsByKey;
 }
 
-function collectEdgeElements(svgElement: SVGSVGElement): Map<string, SVGPathElement[]> {
-  const edgeElementsByNodeKey = new Map<string, SVGPathElement[]>();
-  svgElement.querySelectorAll<SVGPathElement>(".graph-edge[data-source][data-target]").forEach((edgeElement) => {
+function collectEdgeElements(svgElement: SVGSVGElement): Map<string, SVGGElement[]> {
+  const edgeElementsByNodeKey = new Map<string, SVGGElement[]>();
+  svgElement.querySelectorAll<SVGGElement>(".dag-edge[data-source][data-target]").forEach((edgeElement) => {
     const sourceKey = edgeElement.dataset.source;
     const targetKey = edgeElement.dataset.target;
     if (sourceKey) {

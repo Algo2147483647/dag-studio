@@ -1,4 +1,5 @@
-import type { GraphTheme, NodeKey } from "../graph/types";
+import type { GraphLayoutAppearance } from "../graph/appearance";
+import type { NodeKey } from "../graph/types";
 import type { LayoutEdgeRoute, StageNode, StageRoutePoint } from "./types";
 
 const SUGIYAMA_CHANNEL_INSET = 12;
@@ -60,7 +61,7 @@ export function buildSugiyamaVerticalPlanner(input: {
   nodesByLayer: Map<number, StageNode[]>;
   logicalSlotCountsByLayer: Map<number, number>;
   sortedLayers: number[];
-  theme: GraphTheme;
+  theme: GraphLayoutAppearance;
 }): SugiyamaVerticalPlanner {
   const { nodesByLayer, logicalSlotCountsByLayer, sortedLayers, theme } = input;
   const planByLayer = new Map<number, LayerVerticalPlan>();
@@ -198,7 +199,7 @@ export function buildSugiyamaStageRoutes(input: {
   return stageRoutes;
 }
 
-function buildLayerVerticalPlan(nodes: StageNode[], logicalSlotCount: number, theme: GraphTheme): LayerVerticalPlan {
+function buildLayerVerticalPlan(nodes: StageNode[], logicalSlotCount: number, theme: GraphLayoutAppearance): LayerVerticalPlan {
   const nodeBands: LayerNodeBand[] = [];
   const orderY = new Map<number, number>();
   const realNodes = nodes.slice().sort((left, right) => left.order - right.order);
@@ -241,7 +242,7 @@ function buildLayerVerticalPlan(nodes: StageNode[], logicalSlotCount: number, th
   return { totalHeight: cursorY || theme.nodeHeight, nodeBands, orderY };
 }
 
-function buildLayerEdgeCorridors(nodes: StageNode[], logicalSlotCount: number, theme: GraphTheme): LayerEdgeCorridor[] {
+function buildLayerEdgeCorridors(nodes: StageNode[], logicalSlotCount: number, theme: GraphLayoutAppearance): LayerEdgeCorridor[] {
   if (!nodes.length) {
     const logicalOrders = buildLogicalOrderRange(0, logicalSlotCount - 1);
     return [{
@@ -266,7 +267,7 @@ function buildLayerEdgeCorridors(nodes: StageNode[], logicalSlotCount: number, t
   return corridors;
 }
 
-function createCorridor(logicalOrders: number[], theme: GraphTheme): LayerEdgeCorridor {
+function createCorridor(logicalOrders: number[], theme: GraphLayoutAppearance): LayerEdgeCorridor {
   return {
     logicalOrders,
     laneYs: [],
@@ -274,7 +275,7 @@ function createCorridor(logicalOrders: number[], theme: GraphTheme): LayerEdgeCo
   };
 }
 
-function computeCorridorHeight(laneCount: number, theme: GraphTheme): number {
+function computeCorridorHeight(laneCount: number, theme: GraphLayoutAppearance): number {
   if (laneCount <= 0) {
     return EMPTY_CORRIDOR_HEIGHT;
   }
@@ -282,7 +283,7 @@ function computeCorridorHeight(laneCount: number, theme: GraphTheme): number {
   return Math.max(edgeDemand, EMPTY_CORRIDOR_HEIGHT, theme.rowGap);
 }
 
-function assignCorridorYs(corridor: LayerEdgeCorridor, topY: number, theme: GraphTheme): void {
+function assignCorridorYs(corridor: LayerEdgeCorridor, topY: number, theme: GraphLayoutAppearance): void {
   if (!corridor.logicalOrders.length) {
     corridor.laneYs = [];
     return;

@@ -24,24 +24,19 @@ const GraphNode = memo(function GraphNode({
 }: GraphNodeProps) {
   const hasDetail = node.detailLines.length > 0;
   const style = node.colorTokens ? ({
-    "--graph-node-glow": node.colorTokens.glow,
-    "--graph-node-fill": node.colorTokens.fill,
-    "--graph-node-root-fill": node.colorTokens.rootFill,
-    "--graph-node-active-fill": node.colorTokens.activeFill,
-    "--graph-node-border": node.colorTokens.border,
-    "--graph-node-border-strong": node.colorTokens.borderStrong,
-    "--graph-node-active-border": node.colorTokens.activeBorder,
-    "--graph-node-pin-fill": node.colorTokens.pinFill,
-    "--graph-node-pin-stroke": node.colorTokens.pinStroke,
-    "--graph-node-pin-core": node.colorTokens.pinCore,
-    "--graph-node-affordance-bg": node.colorTokens.affordanceBg,
-    "--graph-node-affordance-text": node.colorTokens.affordanceText,
+    "--dag-node-glow": node.colorTokens.glow,
+    "--dag-node-fill": node.colorTokens.fill,
+    "--dag-node-root-fill": node.colorTokens.rootFill,
+    "--dag-node-active-fill": node.colorTokens.activeFill,
+    "--dag-node-border": node.colorTokens.border,
+    "--dag-node-border-strong": node.colorTokens.borderStrong,
+    "--dag-node-active-border": node.colorTokens.activeBorder,
+    "--dag-node-pin-fill": node.colorTokens.pinFill,
+    "--dag-node-pin-stroke": node.colorTokens.pinStroke,
+    "--dag-node-pin-core": node.colorTokens.pinCore,
+    "--dag-node-affordance-bg": node.colorTokens.affordanceBg,
+    "--dag-node-affordance-text": node.colorTokens.affordanceText,
   } as CSSProperties) : undefined;
-  const className = [
-    "graph-node",
-    node.isRoot ? "is-root" : "",
-    isActive ? "is-active" : "",
-  ].filter(Boolean).join(" ");
   const affordanceLabel = node.typeLabel || "";
   const affordanceWidth = Math.min(
     Math.max(
@@ -67,9 +62,16 @@ const GraphNode = memo(function GraphNode({
 
   return (
     <g
-      className={className}
-      data-node-key={node.key}
-      data-node-type={node.typeLabel}
+      className="dag-node"
+      data-key={node.key}
+      data-type={node.typeLabel || ""}
+      data-root={node.isRoot ? "true" : "false"}
+      data-selected={isActive ? "true" : "false"}
+      data-focused="false"
+      data-hovered="false"
+      data-connected="false"
+      data-layer={node.layer}
+      data-order={node.order}
       style={style}
       transform={`translate(${node.x - node.width / 2}, ${node.y - node.height / 2})`}
       tabIndex={0}
@@ -81,12 +83,12 @@ const GraphNode = memo(function GraphNode({
       onBlur={() => onFocusChange(null)}
       onKeyDown={handleKeyDown}
     >
-      <ellipse className="graph-node__glow" cx={node.width / 2} cy={node.height / 2} rx={node.width / 2 + 16} ry={node.height / 2 + 10} />
-      <rect className="graph-node__shape" width={node.width} height={node.height} rx={24} ry={24} />
-      <circle className="graph-node__pin" cx={26} cy={node.height / 2} r={11} />
-      <circle className="graph-node__pin-core" cx={26} cy={node.height / 2} r={4} />
+      <ellipse className="dag-node__glow" cx={node.width / 2} cy={node.height / 2} rx={node.width / 2 + 16} ry={node.height / 2 + 10} />
+      <rect className="dag-node__shape" width={node.width} height={node.height} rx={24} ry={24} />
+      <circle className="dag-node__pin" cx={26} cy={node.height / 2} r={11} />
+      <circle className="dag-node__pin-core" cx={26} cy={node.height / 2} r={4} />
       <text
-        className="graph-node__title"
+        className="dag-node__title"
         x={48}
         y={hasDetail ? 29 : node.height / 2}
         dominantBaseline={hasDetail ? undefined : "middle"}
@@ -94,7 +96,7 @@ const GraphNode = memo(function GraphNode({
         {node.displayTitle}
       </text>
       {hasDetail ? (
-        <text className="graph-node__detail" x={48} y={45}>
+        <text className="dag-node__detail" x={48} y={45}>
           {node.detailLines.map((line, index) => (
             <tspan key={`${line}-${index}`} x={48} dy={index === 0 ? 0 : DETAIL_LINE_HEIGHT}>
               {line}
@@ -103,9 +105,9 @@ const GraphNode = memo(function GraphNode({
         </text>
       ) : null}
       {affordanceLabel ? (
-        <g className="graph-node__affordance">
-          <rect className="graph-node__affordance-bg" x={affordanceX} y={node.height - 21} width={affordanceWidth} height={14} rx={7} ry={7} />
-          <text className="graph-node__affordance-text" x={affordanceX + affordanceWidth / 2} y={node.height - 10} textAnchor="middle">
+        <g className="dag-node__affordance">
+          <rect className="dag-node__affordance-bg" x={affordanceX} y={node.height - 21} width={affordanceWidth} height={14} rx={7} ry={7} />
+          <text className="dag-node__affordance-text" x={affordanceX + affordanceWidth / 2} y={node.height - 10} textAnchor="middle">
             {affordanceLabel}
           </text>
         </g>
