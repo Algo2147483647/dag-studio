@@ -3,8 +3,13 @@ import type { CSSProperties } from "react";
 export interface GraphAppearance {
   version: 1;
   layout: GraphLayoutAppearance;
+  display: GraphDisplayAppearance;
   cssVars: Record<string, string>;
   css: string;
+}
+
+export interface GraphDisplayAppearance {
+  showEdgeLabels: boolean;
 }
 
 export interface GraphLayoutAppearance {
@@ -233,6 +238,9 @@ export const DEFAULT_GRAPH_APPEARANCE: GraphAppearance = {
     stageMinWidth: 980,
     stageMinHeight: 600,
   },
+  display: {
+    showEdgeLabels: true,
+  },
   cssVars: {
     "--dag-text-strong": "#162033",
     "--dag-text-soft": "#8792a2",
@@ -259,6 +267,9 @@ export function sanitizeGraphAppearance(input: unknown): GraphAppearance {
   const layoutInput = record.layout && typeof record.layout === "object" && !Array.isArray(record.layout)
     ? record.layout as Record<string, unknown>
     : {};
+  const displayInput = record.display && typeof record.display === "object" && !Array.isArray(record.display)
+    ? record.display as Record<string, unknown>
+    : {};
   const minNodeWidth = clampNumeric(layoutInput.minNodeWidth, defaultLayout.minNodeWidth, 140, 260);
   const maxNodeWidth = clampNumeric(layoutInput.maxNodeWidth, defaultLayout.maxNodeWidth, minNodeWidth, 480);
 
@@ -275,6 +286,9 @@ export function sanitizeGraphAppearance(input: unknown): GraphAppearance {
       maxNodeWidth,
       stageMinWidth: clampNumeric(layoutInput.stageMinWidth, defaultLayout.stageMinWidth, 320, 4000),
       stageMinHeight: clampNumeric(layoutInput.stageMinHeight, defaultLayout.stageMinHeight, 240, 3000),
+    },
+    display: {
+      showEdgeLabels: displayInput.showEdgeLabels === undefined ? DEFAULT_GRAPH_APPEARANCE.display.showEdgeLabels : displayInput.showEdgeLabels === true,
     },
     cssVars: sanitizeCssVars(record.cssVars),
     css: sanitizeCss(record.css),

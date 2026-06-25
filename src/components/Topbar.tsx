@@ -44,6 +44,7 @@ interface TopbarProps {
   onLayoutAppearanceChange: <K extends keyof GraphLayoutAppearance>(key: K, value: GraphLayoutAppearance[K]) => void;
   onAppearanceCssVarChange: (key: string, value: string) => void;
   onAppearanceCssChange: (css: string) => void;
+  onAppearanceDisplayChange: <K extends keyof GraphAppearance["display"]>(key: K, value: GraphAppearance["display"][K]) => void;
   onAppearancePresetChange: (presetId: GraphAppearancePresetId) => void;
   onAppearanceReset: () => void;
   onAppearanceExport: () => void;
@@ -100,6 +101,7 @@ export default function Topbar({
   onLayoutAppearanceChange,
   onAppearanceCssVarChange,
   onAppearanceCssChange,
+  onAppearanceDisplayChange,
   onAppearancePresetChange,
   onAppearanceReset,
   onAppearanceExport,
@@ -168,6 +170,7 @@ export default function Topbar({
               onLayoutAppearanceChange={onLayoutAppearanceChange}
               onAppearanceCssVarChange={onAppearanceCssVarChange}
               onAppearanceCssChange={onAppearanceCssChange}
+              onAppearanceDisplayChange={onAppearanceDisplayChange}
               onAppearancePresetChange={onAppearancePresetChange}
               onAppearanceReset={onAppearanceReset}
               onAppearanceExport={onAppearanceExport}
@@ -212,6 +215,7 @@ interface SettingsModalProps {
   onLayoutAppearanceChange: <K extends keyof GraphLayoutAppearance>(key: K, value: GraphLayoutAppearance[K]) => void;
   onAppearanceCssVarChange: (key: string, value: string) => void;
   onAppearanceCssChange: (css: string) => void;
+  onAppearanceDisplayChange: <K extends keyof GraphAppearance["display"]>(key: K, value: GraphAppearance["display"][K]) => void;
   onAppearancePresetChange: (presetId: GraphAppearancePresetId) => void;
   onAppearanceReset: () => void;
   onAppearanceExport: () => void;
@@ -250,6 +254,7 @@ function SettingsModal({
   onLayoutAppearanceChange,
   onAppearanceCssVarChange,
   onAppearanceCssChange,
+  onAppearanceDisplayChange,
   onAppearancePresetChange,
   onAppearanceReset,
   onAppearanceExport,
@@ -613,6 +618,14 @@ function SettingsModal({
                     </button>
                     <button type="button" className={`ghost-btn settings-action-btn${alignNodeWidthsToMax ? " settings-action-btn-active" : ""}`} aria-pressed={alignNodeWidthsToMax} onClick={onNodeWidthAlignToggle}>
                       {alignNodeWidthsToMax ? "Auto Width" : "Max Width"}
+                    </button>
+                    <button
+                      type="button"
+                      className={`ghost-btn settings-action-btn${appearance.display.showEdgeLabels ? " settings-action-btn-active" : ""}`}
+                      aria-pressed={appearance.display.showEdgeLabels}
+                      onClick={() => onAppearanceDisplayChange("showEdgeLabels", !appearance.display.showEdgeLabels)}
+                    >
+                      {appearance.display.showEdgeLabels ? "Hide Edge Labels" : "Show Edge Labels"}
                     </button>
                   </div>
                 </section>

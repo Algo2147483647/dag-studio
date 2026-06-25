@@ -11,7 +11,7 @@ DAG Studio separates graph data from graph appearance.
 | Area | Stored In | Purpose |
 | --- | --- | --- |
 | Graph data | The opened or saved graph JSON file | Nodes, fields, parent/child relations, and edge metadata |
-| Graph appearance | Page preferences and optional downloaded appearance JSON | Layout dimensions, CSS variables, and custom graph CSS |
+| Graph appearance | Page preferences and optional downloaded appearance JSON | Layout dimensions, display flags, CSS variables, and custom graph CSS |
 
 Appearance changes do not rewrite graph JSON. They affect how the current graph is rendered and how exported SVG output looks.
 
@@ -23,6 +23,7 @@ The editable appearance object is `GraphAppearance`.
 interface GraphAppearance {
   version: 1;
   layout: GraphLayoutAppearance;
+  display: GraphDisplayAppearance;
   cssVars: Record<string, string>;
   css: string;
 }
@@ -44,6 +45,9 @@ A downloaded appearance file has the same shape:
     "maxNodeWidth": 360,
     "stageMinWidth": 960,
     "stageMinHeight": 620
+  },
+  "display": {
+    "showEdgeLabels": true
   },
   "cssVars": {
     "--dag-node-fill": "#ffffff",
@@ -71,6 +75,14 @@ Layout values are sanitized before use. Invalid, missing, or out-of-range values
 | `maxNodeWidth` | Maximum node width |
 | `stageMinWidth` | Minimum SVG stage width |
 | `stageMinHeight` | Minimum SVG stage height |
+
+## Display Appearance
+
+Display flags control graph visibility choices that are not layout geometry or raw CSS.
+
+| Key | Meaning |
+| --- | --- |
+| `showEdgeLabels` | Whether relation-value edge labels are rendered |
 
 ## CSS Variables
 
@@ -136,7 +148,7 @@ The settings dialog has an `Appearance` tab for graph UI configuration.
 | Tokens | Edit common CSS variables without writing CSS |
 | Custom CSS | Replace the graph CSS block directly |
 | Title | Configure graph title typography |
-| View | Toggle node detail, borders, and width alignment |
+| View | Toggle node detail, borders, width alignment, and edge labels |
 
 `Import`, `Export`, and `Reset` are intentionally grouped under `UI Configuration` because they apply to the whole appearance object, not just layout tuning.
 

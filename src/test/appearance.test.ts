@@ -23,7 +23,14 @@ export const appearanceSuite = defineSuite("appearance", [
     assert.equal(appearance.layout.minNodeWidth, 260);
     assert.equal(appearance.layout.maxNodeWidth, 260);
     assert.equal(appearance.layout.stageMinWidth, 4000);
+    assert.equal(appearance.display.showEdgeLabels, true);
     assert.equal(appearance.css, DEFAULT_GRAPH_APPEARANCE.css);
+  }),
+
+  defineTest("sanitizeGraphAppearance preserves edge label display preference", () => {
+    assert.equal(sanitizeGraphAppearance({ display: { showEdgeLabels: false } }).display.showEdgeLabels, false);
+    assert.equal(sanitizeGraphAppearance({ display: { showEdgeLabels: "false" } }).display.showEdgeLabels, false);
+    assert.equal(sanitizeGraphAppearance({ display: {} }).display.showEdgeLabels, true);
   }),
 
   defineTest("sanitizeGraphAppearance only accepts dag css vars and removes imports", () => {
@@ -53,11 +60,15 @@ export const appearanceSuite = defineSuite("appearance", [
           ...DEFAULT_GRAPH_APPEARANCE.layout,
           columnGap: 144,
         },
+        display: {
+          showEdgeLabels: false,
+        },
       },
     });
     const parsed = parseGraphPagePreferences(raw);
 
     assert.equal(parsed?.appearance?.layout.columnGap, 144);
+    assert.equal(parsed?.appearance?.display.showEdgeLabels, false);
     assert.equal(parsed?.appearance?.cssVars["--dag-title-font-size"], "18px");
     assert.equal(parsed?.appearance?.cssVars["--dag-title-font-style"], "normal");
   }),

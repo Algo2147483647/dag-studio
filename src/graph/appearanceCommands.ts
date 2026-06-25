@@ -217,6 +217,11 @@ function buildAppearanceDiff(before: GraphAppearance, after: GraphAppearance): s
       lines.push(`~ layout.${key}: ${before.layout[key]} -> ${after.layout[key]}`);
     }
   });
+  (Object.keys(after.display) as Array<keyof GraphAppearance["display"]>).forEach((key) => {
+    if (before.display[key] !== after.display[key]) {
+      lines.push(`~ display.${key}: ${before.display[key]} -> ${after.display[key]}`);
+    }
+  });
   const cssVarKeys = Array.from(new Set([...Object.keys(before.cssVars), ...Object.keys(after.cssVars)])).sort();
   cssVarKeys.forEach((key) => {
     if (before.cssVars[key] !== after.cssVars[key]) {

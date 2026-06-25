@@ -235,6 +235,7 @@ export default function GraphStage({ stage, focusedKey, hideNodeBorders, appeara
           <GraphEdge
             key={edge.id}
             edge={edge}
+            showLabel={appearance.display.showEdgeLabels}
           />
         ))}
       </g>

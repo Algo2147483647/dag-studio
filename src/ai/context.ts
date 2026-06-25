@@ -82,6 +82,7 @@ function formatAppearanceSummary(appearance: GraphAppearance): string {
     "Stable SVG selectors: .dag-graph, .dag-node, .dag-node__shape, .dag-node__title, .dag-node__detail, .dag-edge, .dag-edge__path, .dag-stage__lane.",
     "Useful data selectors: .dag-node[data-type=\"service\"], .dag-node[data-root=\"true\"], .dag-edge[data-weight=\"2\"], .dag-edge[data-active=\"true\"].",
     `Appearance layout: ${JSON.stringify(appearance.layout)}`,
+    `Appearance display: ${JSON.stringify(appearance.display)}`,
     "Appearance cssVars:",
     vars,
   ].join("\n");

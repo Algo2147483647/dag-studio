@@ -1014,6 +1014,17 @@ export default function App() {
     commitAppearance(nextAppearance, `Set ${key}.`);
   }
 
+  function handleAppearanceDisplayChange<K extends keyof GraphAppearance["display"]>(key: K, value: GraphAppearance["display"][K]) {
+    const nextAppearance = sanitizeGraphAppearance({
+      ...appearance,
+      display: {
+        ...appearance.display,
+        [key]: value,
+      },
+    });
+    commitAppearance(nextAppearance, `Set display ${String(key)}.`);
+  }
+
   function handleAppearanceCssChange(css: string) {
     commitAppearance(applyAppearanceCommand(appearance, { type: "replaceCss", css }).appearance, "Replaced graph CSS.");
   }
@@ -1178,6 +1189,7 @@ export default function App() {
         onLayoutAppearanceChange={handleLayoutAppearanceChange}
         onAppearanceCssVarChange={handleAppearanceCssVarChange}
         onAppearanceCssChange={handleAppearanceCssChange}
+        onAppearanceDisplayChange={handleAppearanceDisplayChange}
         onAppearancePresetChange={handleAppearancePresetChange}
         onAppearanceReset={handleAppearanceReset}
         onAppearanceExport={handleAppearanceExport}

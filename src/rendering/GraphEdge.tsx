@@ -3,9 +3,10 @@ import type { StageEdge } from "../layout/types";
 
 interface GraphEdgeProps {
   edge: StageEdge;
+  showLabel: boolean;
 }
 
-const GraphEdge = memo(function GraphEdge({ edge }: GraphEdgeProps) {
+const GraphEdge = memo(function GraphEdge({ edge, showLabel }: GraphEdgeProps) {
   return (
     <g
       className="dag-edge"
@@ -16,7 +17,7 @@ const GraphEdge = memo(function GraphEdge({ edge }: GraphEdgeProps) {
       data-active="false"
     >
       <path className="dag-edge__path" d={edge.path} markerEnd="url(#arrowhead)" />
-      {edge.label ? <EdgeLabel label={edge.label} x={edge.labelPosition.x} y={edge.labelPosition.y} /> : null}
+      {showLabel && edge.label ? <EdgeLabel label={edge.label} x={edge.labelPosition.x} y={edge.labelPosition.y} /> : null}
     </g>
   );
 }, areEqualGraphEdgeProps);
@@ -24,7 +25,7 @@ const GraphEdge = memo(function GraphEdge({ edge }: GraphEdgeProps) {
 export default GraphEdge;
 
 function areEqualGraphEdgeProps(previous: GraphEdgeProps, next: GraphEdgeProps): boolean {
-  return previous.edge === next.edge;
+  return previous.edge === next.edge && previous.showLabel === next.showLabel;
 }
 
 function EdgeLabel({ label, x, y }: { label: string; x: number; y: number }) {
