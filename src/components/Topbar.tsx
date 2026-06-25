@@ -272,6 +272,9 @@ function SettingsModal({
   const [activeChapter, setActiveChapter] = useState<SettingsChapter>("general");
   const [providerMenuOpen, setProviderMenuOpen] = useState(false);
   const [aiConnectionStatus, setAiConnectionStatus] = useState<AiConnectionStatus>("idle");
+  const [appearanceCssDraft, setAppearanceCssDraft] = useState(appearance.css);
+  const [cssVarDrafts, setCssVarDrafts] = useState<Record<string, string>>(() => buildCssVarDrafts(appearance));
+  const [titleSizeDraft, setTitleSizeDraft] = useState(() => String(parseCssPixelValue(appearance.cssVars["--dag-title-font-size"], 15)));
   const updateAiSetting = <K extends keyof AiSettings>(key: K, value: AiSettings[K]) => {
     onAiSettingsChange({ ...aiSettings, [key]: value });
   };
@@ -297,10 +300,36 @@ function SettingsModal({
     setAiConnectionStatus("idle");
   }, [aiSettings.provider, aiSettings.baseUrl, aiSettings.model, aiSettings.apiKey]);
 
+  useEffect(() => {
+    setAppearanceCssDraft(appearance.css);
+    setCssVarDrafts(buildCssVarDrafts(appearance));
+    setTitleSizeDraft(String(titleFontSize));
+  }, [appearance, titleFontSize]);
+
   const handleAiConnectionTestClick = async () => {
     setAiConnectionStatus("testing");
     const ok = await onAiConnectionTest();
     setAiConnectionStatus(ok ? "success" : "error");
+  };
+
+  const commitAppearanceCssDraft = () => {
+    if (appearanceCssDraft !== appearance.css) {
+      onAppearanceCssChange(appearanceCssDraft);
+    }
+  };
+
+  const commitCssVarDraft = (key: string, value: string) => {
+    if ((appearance.cssVars[key] || "") !== value) {
+      onAppearanceCssVarChange(key, value);
+    }
+  };
+
+  const commitTitleSizeDraft = () => {
+    const value = `${clampNumberInput(titleSizeDraft, 10, 28, titleFontSize)}px`;
+    if (appearance.cssVars["--dag-title-font-size"] !== value) {
+      onAppearanceCssVarChange("--dag-title-font-size", value);
+    }
+    setTitleSizeDraft(String(parseCssPixelValue(value, titleFontSize)));
   };
 
   if (!open) {
@@ -481,8 +510,15 @@ function SettingsModal({
                           id={`appearance-token-${token.key}`}
                           className="settings-text-input"
                           type="text"
-                          value={appearance.cssVars[token.key] || ""}
-                          onChange={(event) => onAppearanceCssVarChange(token.key, event.currentTarget.value)}
+                          value={cssVarDrafts[token.key] ?? appearance.cssVars[token.key] ?? ""}
+                          onChange={(event) => setCssVarDrafts((current) => ({ ...current, [token.key]: event.currentTarget.value }))}
+                          onBlur={(event) => commitCssVarDraft(token.key, event.currentTarget.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              commitCssVarDraft(token.key, event.currentTarget.value);
+                              event.currentTarget.blur();
+                            }
+                          }}
                         />
                       </label>
                     ))}
@@ -493,10 +529,17 @@ function SettingsModal({
                   <p id="appearance-css-title" className="control-label">Custom CSS</p>
                   <textarea
                     className="settings-text-input appearance-css-editor"
-                    value={appearance.css}
+                    value={appearanceCssDraft}
                     spellCheck={false}
                     rows={10}
-                    onChange={(event) => onAppearanceCssChange(event.currentTarget.value)}
+                    onChange={(event) => setAppearanceCssDraft(event.currentTarget.value)}
+                    onBlur={commitAppearanceCssDraft}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                        commitAppearanceCssDraft();
+                        event.currentTarget.blur();
+                      }
+                    }}
                   />
                 </section>
 
@@ -521,10 +564,16 @@ function SettingsModal({
                         min={10}
                         max={28}
                         step={1}
-                        value={titleFontSize}
+                        value={titleSizeDraft}
                         aria-label="Title font size"
-                        onChange={(event) => onAppearanceCssVarChange("--dag-title-font-size", `${clampNumberInput(event.currentTarget.value, 10, 28, titleFontSize)}px`)}
-                        onBlur={(event) => onAppearanceCssVarChange("--dag-title-font-size", `${clampNumberInput(event.currentTarget.value, 10, 28, titleFontSize)}px`)}
+                        onChange={(event) => setTitleSizeDraft(event.currentTarget.value)}
+                        onBlur={commitTitleSizeDraft}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            commitTitleSizeDraft();
+                            event.currentTarget.blur();
+                          }
+                        }}
                       />
                       <span className="title-size-unit">px</span>
                     </label>
@@ -901,6 +950,10 @@ function parseCssPixelValue(value: string | undefined, fallback: number): number
   }
   const parsed = parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function buildCssVarDrafts(appearance: GraphAppearance): Record<string, string> {
+  return Object.fromEntries(APPEARANCE_TOKEN_CONTROLS.map((token) => [token.key, appearance.cssVars[token.key] || ""]));
 }
 
 type LayoutControlKey = keyof Pick<GraphLayoutAppearance, "columnGap" | "rowGap" | "edgeLaneGap" | "nodeHeight" | "maxNodeWidth">;
