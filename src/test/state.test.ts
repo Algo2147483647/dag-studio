@@ -116,6 +116,19 @@ export const stateSuite = defineSuite("state", [
     assert.match(nextState.ui.status, /Original file still has unsaved changes/);
   }),
 
+  defineTest("consoleSidebarWidthChanged preserves unrestricted widths", () => {
+    const state: GraphAppState = {
+      ...initialGraphAppState,
+      ui: {
+        ...initialGraphAppState.ui,
+        consoleSidebarWidth: 360,
+      },
+    };
+
+    assert.equal(graphReducer(state, { type: "consoleSidebarWidthChanged", width: 120 }).ui.consoleSidebarWidth, 120);
+    assert.equal(graphReducer(state, { type: "consoleSidebarWidthChanged", width: 900 }).ui.consoleSidebarWidth, 900);
+  }),
+
   defineTest("repairHistoryAfterCommand remaps renamed selections and removes deleted ones", () => {
     const dag = createSampleDag();
     const state: GraphAppState = {

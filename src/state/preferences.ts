@@ -139,7 +139,7 @@ export function parseGraphPagePreferences(raw: string | null): Partial<GraphPage
 }
 
 export function clampConsoleSidebarWidth(width: number): number {
-  return Math.max(280, Math.min(680, Math.round(width)));
+  return Math.round(width);
 }
 
 function getBrowserStorage(): StorageLike | null {
