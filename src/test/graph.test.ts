@@ -3,6 +3,7 @@ import { applyGraphCommand, collectSubtreeNodeKeys } from "../graph/commands";
 import { createInitialCanvasDag, INITIAL_CANVAS_NODE_KEY } from "../graph/initialCanvas";
 import { getParentLevelSelection, getInitialSelection, remapSelectionKeys, removeSelectionKeys, sanitizeNodeLabel } from "../graph/selectors";
 import { serializeDag } from "../graph/serialize";
+import { estimateTextWidth, wrapDetailText } from "../layout/text";
 import { defineSuite, defineTest } from "./harness";
 import { createChildOnlyDag, createCustomFieldMapping, createForestDag, createMappedSampleDag, createSampleDag } from "./fixtures";
 
@@ -15,6 +16,18 @@ export const graphSuite = defineSuite("graph", [
     assert.equal(serialized[INITIAL_CANVAS_NODE_KEY].define, "Start building your graph from this root node.");
     assert.deepEqual(serialized[INITIAL_CANVAS_NODE_KEY].parents, {});
     assert.deepEqual(serialized[INITIAL_CANVAS_NODE_KEY].children, {});
+  }),
+
+  defineTest("detail text wrapping uses estimated visual width instead of raw character count", () => {
+    assert.ok(estimateTextWidth("MMMM", 10) > estimateTextWidth("iiii", 10));
+
+    const lines = wrapDetailText("这是一个包含宽字符的很长副标题用于测试换行和截断", 72, 2);
+
+    assert.equal(lines.length, 2);
+    assert.ok(lines[1].endsWith("..."));
+    lines.forEach((line) => {
+      assert.ok(estimateTextWidth(line, 10) <= 72);
+    });
   }),
 
   defineTest("renameNode updates reciprocal relations without mutating the source dag", () => {

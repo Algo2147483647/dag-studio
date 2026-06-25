@@ -13,7 +13,8 @@ import { buildDagreLayout } from "./algorithms/dagre";
 import { buildSugiyamaLayout } from "./algorithms/sugiyama";
 import { buildSugiyamaStageRoutes, buildSugiyamaVerticalPlanner } from "./sugiyama-edge-routing";
 
-const DETAIL_MAX_LINE_LENGTH = 48;
+const DETAIL_HORIZONTAL_INSET = 74;
+const DETAIL_MIN_LINE_WIDTH = 72;
 const DETAIL_MAX_LINES = 2;
 type TypeColorSwatch = {
   hue: number;
@@ -82,7 +83,9 @@ export function buildStageData(input: {
       title: visual.title,
       displayTitle: truncateTitleToWidth(visual.title, visual.width),
       detail: visual.detail,
-      detailLines: visual.detail ? wrapDetailText(visual.detail, DETAIL_MAX_LINE_LENGTH, DETAIL_MAX_LINES) : [],
+      detailLines: visual.detail
+        ? wrapDetailText(visual.detail, Math.max(visual.width - DETAIL_HORIZONTAL_INSET, DETAIL_MIN_LINE_WIDTH), DETAIL_MAX_LINES)
+        : [],
       typeLabel,
       colorTokens: typeLabel ? typeColorMap.get(typeLabel) : undefined,
       width: visual.width,
