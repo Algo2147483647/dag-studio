@@ -25,9 +25,6 @@ const GraphNode = memo(function GraphNode({
   const hasDetail = node.detailLines.length > 0;
   const style = node.colorTokens ? ({
     "--dag-node-glow": node.colorTokens.glow,
-    "--dag-node-fill": node.colorTokens.fill,
-    "--dag-node-root-fill": node.colorTokens.rootFill,
-    "--dag-node-active-fill": node.colorTokens.activeFill,
     "--dag-node-border": node.colorTokens.border,
     "--dag-node-border-strong": node.colorTokens.borderStrong,
     "--dag-node-active-border": node.colorTokens.activeBorder,

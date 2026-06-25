@@ -48,6 +48,11 @@ export const appearanceSuite = defineSuite("appearance", [
     assert.doesNotMatch(appearance.css, /@import/i);
   }),
 
+  defineTest("default root and active node fills follow the configured node fill", () => {
+    assert.match(DEFAULT_GRAPH_APPEARANCE.css, /fill:\s*var\(--dag-node-root-fill,\s*var\(--dag-node-fill\)\)/);
+    assert.match(DEFAULT_GRAPH_APPEARANCE.css, /fill:\s*var\(--dag-node-active-fill,\s*var\(--dag-node-fill\)\)/);
+  }),
+
   defineTest("latest preferences parse appearance directly", () => {
     const raw = JSON.stringify({
       appearance: {

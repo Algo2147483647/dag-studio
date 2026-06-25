@@ -157,7 +157,7 @@ export const DEFAULT_GRAPH_CSS = `
 .dag-node[data-root="true"] .dag-node__shape {
   stroke: var(--dag-node-border-strong);
   stroke-width: 1.7;
-  fill: var(--dag-node-root-fill, rgba(252, 254, 255, 0.94));
+  fill: var(--dag-node-root-fill, var(--dag-node-fill));
 }
 
 .dag-node[data-root="true"] .dag-node__glow {
@@ -169,7 +169,7 @@ export const DEFAULT_GRAPH_CSS = `
 .dag-node[data-focused="true"] .dag-node__shape,
 .dag-node[data-selected="true"] .dag-node__shape {
   stroke: var(--dag-node-active-border, rgba(39, 79, 152, 0.48));
-  fill: var(--dag-node-active-fill, rgba(251, 253, 255, 0.96));
+  fill: var(--dag-node-active-fill, var(--dag-node-fill));
   filter: drop-shadow(0 14px 26px rgba(29, 52, 97, 0.1));
 }
 

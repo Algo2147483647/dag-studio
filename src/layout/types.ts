@@ -2,9 +2,6 @@ import type { DagNode, GraphLayoutMode, GraphSelection, NodeKey, RelationValue }
 
 export interface StageNodeColorTokens {
   glow: string;
-  fill: string;
-  rootFill: string;
-  activeFill: string;
   border: string;
   borderStrong: string;
   activeBorder: string;

@@ -567,9 +567,6 @@ function createNodeColorTokens(swatch: TypeColorSwatch): StageNodeColorTokens {
 
   return {
     glow: hsla(hue, saturation + 8, lightness + 2, 0.13),
-    fill: "rgba(252, 253, 255, 0.88)",
-    rootFill: "rgba(252, 254, 255, 0.94)",
-    activeFill: "rgba(251, 253, 255, 0.96)",
     border: hsla(hue, saturation, lightness, 0.34),
     borderStrong: hsla(hue, saturation + 4, lightness - 5, 0.52),
     activeBorder: hsla(hue, saturation + 8, lightness - 3, 0.66),
