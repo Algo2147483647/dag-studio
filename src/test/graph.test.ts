@@ -1,11 +1,22 @@
 import assert from "node:assert/strict";
 import { applyGraphCommand, collectSubtreeNodeKeys } from "../graph/commands";
+import { createInitialCanvasDag, INITIAL_CANVAS_NODE_KEY } from "../graph/initialCanvas";
 import { getParentLevelSelection, getInitialSelection, remapSelectionKeys, removeSelectionKeys, sanitizeNodeLabel } from "../graph/selectors";
 import { serializeDag } from "../graph/serialize";
 import { defineSuite, defineTest } from "./harness";
 import { createChildOnlyDag, createCustomFieldMapping, createForestDag, createMappedSampleDag, createSampleDag } from "./fixtures";
 
 export const graphSuite = defineSuite("graph", [
+  defineTest("initial canvas node does not generate a default title field", () => {
+    const dag = createInitialCanvasDag();
+    const serialized = serializeDag(dag);
+
+    assert.equal("title" in serialized[INITIAL_CANVAS_NODE_KEY], false);
+    assert.equal(serialized[INITIAL_CANVAS_NODE_KEY].define, "Start building your graph from this root node.");
+    assert.deepEqual(serialized[INITIAL_CANVAS_NODE_KEY].parents, {});
+    assert.deepEqual(serialized[INITIAL_CANVAS_NODE_KEY].children, {});
+  }),
+
   defineTest("renameNode updates reciprocal relations without mutating the source dag", () => {
     const sourceDag = createSampleDag();
     const beforeSnapshot = serializeDag(sourceDag);

@@ -34,10 +34,15 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
       setLastEdited("fields");
       setMarkdownFields(buildDefaultMarkdownFieldState(nextFields));
       setIsEditing(false);
-      setIsFullscreen(false);
       setError("");
     }
   }, [fieldMapping, node, nodeKey, open]);
+
+  useEffect(() => {
+    if (open) {
+      setIsFullscreen(false);
+    }
+  }, [nodeKey, open]);
 
   useEffect(() => {
     if (!open || !isEditing || initialFocus !== "raw") {
