@@ -11,36 +11,27 @@ import {
 import { getFullGraphSelection, getInitialSelection, getParentLevelSelection, sanitizeNodeLabel } from "./graph/selectors";
 import { serializeDag } from "./graph/serialize";
 import { copyTextToClipboard } from "./adapters/clipboard";
-import { buildTimestampFileName, downloadJsonFile, ensureJsonExtension } from "./adapters/download";
-import { canOverwrite, openJsonDirectoryWithAccess, openJsonFileWithAccess, openJsonFilesWithAccess, readJsonFile, requestWritablePermission, writeJsonToHandle, type PickedJsonCollection } from "./adapters/fileAccess";
-import { loadRecentImportMetadata, loadRecentJsonCollection, saveRecentDirectoryImport, saveRecentFileImport } from "./adapters/recentImport";
-import {
-  isExternalUrl,
-  loadRelativeLinkMetadata,
-  loadRelativeLinkRoot,
-  openRelativeLinkRootDirectory,
-  resolveRelativeFile,
-  saveRelativeLinkRoot,
-  type FilePreviewKind,
-  type RelativeLinkRoot,
-  type ResolvedRelativeFile,
-} from "./adapters/relativeLinks";
+import { buildTimestampFileName, downloadJsonFile } from "./adapters/download";
+import { canOverwrite, openJsonFileWithAccess, readJsonFile } from "./adapters/fileAccess";
 import { downloadSvg } from "./rendering/export-svg";
-import { buildImportedDag, type ImportGraphDocument, type ImportWarning } from "./graph/importMerge";
 import { useDefaultGraph } from "./hooks/useDefaultGraph";
+import { useGraphImport } from "./hooks/useGraphImport";
 import { useGraphPan } from "./hooks/useGraphPan";
+import { useGraphPreferences } from "./hooks/useGraphPreferences";
+import { useGraphSave } from "./hooks/useGraphSave";
 import { useGraphZoom } from "./hooks/useGraphZoom";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useOutsideDismiss } from "./hooks/useOutsideDismiss";
+import { useRelativeFilePreview } from "./hooks/useRelativeFilePreview";
 import { useResizeObserver } from "./hooks/useResizeObserver";
 import { repairSelectionAfterCommand } from "./state/derived";
 import { graphReducer, repairHistoryAfterCommand } from "./state/graphReducer";
 import { initialGraphAppState } from "./state/initialState";
-import { loadGraphPagePreferences, saveGraphPagePreferences } from "./state/preferences";
+import { loadGraphPagePreferences } from "./state/preferences";
 import ConsoleSidebar, { type ConsoleEntry, type ConsoleReviewCard } from "./components/ConsoleSidebar";
 import ContextMenu, { type ContextMenuAction } from "./components/ContextMenu";
 import FieldMappingModal from "./components/FieldMappingModal";
-import { MarkdownValue } from "./components/NodeFieldEditor";
+import FilePreviewModal from "./components/FilePreviewModal";
 import NodeDetailModal from "./components/NodeDetailModal";
 import RelationEditorModal from "./components/RelationEditorModal";
 import SaveJsonModal from "./components/SaveJsonModal";
@@ -86,11 +77,6 @@ export default function App() {
   const [showNodeDetail, setShowNodeDetail] = useState<boolean>(() => loadGraphPagePreferences().showNodeDetail ?? true);
   const [hideNodeBorders, setHideNodeBorders] = useState<boolean>(() => loadGraphPagePreferences().hideNodeBorders ?? false);
   const [alignNodeWidthsToMax, setAlignNodeWidthsToMax] = useState<boolean>(() => loadGraphPagePreferences().alignNodeWidthsToMax ?? false);
-  const [relativeLinkRoot, setRelativeLinkRoot] = useState<RelativeLinkRoot | null>(() => {
-    const metadata = loadRelativeLinkMetadata();
-    return metadata ? { name: metadata.name, handle: null } : null;
-  });
-  const [filePreview, setFilePreview] = useState<FilePreviewState | null>(null);
   const [aiSettings, setAiSettings] = useState<AiSettings>(() => loadGraphPagePreferences().aiSettings);
   const [defaultGraphAutoLoadEnabled, setDefaultGraphAutoLoadEnabled] = useState(false);
   const [aiHarness, setAiHarness] = useState(() => createInitialAiHarnessState(aiSettings.executionMode));
@@ -114,83 +100,35 @@ export default function App() {
   const restoredReviewCardRef = useRef<string | null>(null);
 
   useDefaultGraph(dispatch, suppressDefaultGraphRef, setFieldMapping, defaultGraphAutoLoadEnabled);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function restoreRelativeLinkRoot() {
-      const metadata = loadRelativeLinkMetadata();
-      if (!metadata?.canAutoLoad) {
-        return;
-      }
-      try {
-        const restored = await loadRelativeLinkRoot();
-        if (!cancelled && restored) {
-          setRelativeLinkRoot(restored);
-          dispatch({ type: "statusChanged", status: `Restored relative link base path: ${restored.name}.` });
-        }
-      } catch (error) {
-        console.warn("Unable to restore relative link root", error);
-      }
-    }
-    restoreRelativeLinkRoot();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function restoreRecentImport() {
-      const metadata = loadRecentImportMetadata();
-      if (!metadata?.canAutoLoad) {
-        if (!cancelled) {
-          suppressDefaultGraphRef.current = false;
-          setDefaultGraphAutoLoadEnabled(true);
-        }
-        return;
-      }
-
-      try {
-        const recentCollection = await loadRecentJsonCollection();
-        if (cancelled) {
-          return;
-        }
-        if (!recentCollection || recentCollection.files.length === 0) {
-          suppressDefaultGraphRef.current = false;
-          setDefaultGraphAutoLoadEnabled(true);
-          return;
-        }
-        await loadPickedJsonFiles(recentCollection, Boolean(recentCollection.directoryHandle), false);
-      } catch (error) {
-        console.warn("Unable to restore recent import", error);
-        if (!cancelled) {
-          suppressDefaultGraphRef.current = false;
-          setDefaultGraphAutoLoadEnabled(true);
-        }
-      }
-    }
-
-    restoreRecentImport();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    saveGraphPagePreferences({
-      mode: state.mode,
-      layoutMode: state.layout.mode,
-      appearance,
-      showNodeDetail,
-      hideNodeBorders,
-      alignNodeWidthsToMax,
-      consoleSidebarOpen: state.ui.consoleSidebarOpen,
-      consoleSidebarWidth: state.ui.consoleSidebarWidth,
-      fieldMapping,
-      aiSettings,
-    });
-  }, [aiSettings, alignNodeWidthsToMax, appearance, fieldMapping, hideNodeBorders, showNodeDetail, state.layout.mode, state.mode, state.ui.consoleSidebarOpen, state.ui.consoleSidebarWidth]);
+  const {
+    relativeLinkRoot,
+    filePreview,
+    handleRelativeLinkRootSelect,
+    handleOpenRelativeLink,
+    handleRelativeLinkError,
+    closeFilePreview,
+  } = useRelativeFilePreview(dispatch);
+  const {
+    handleFileInputClick,
+    handleFileInputChange,
+    handleFolderInputClick,
+    handleFolderInputChange,
+  } = useGraphImport({
+    dispatch,
+    fieldMapping,
+    setFieldMapping,
+    suppressDefaultGraphRef,
+    setDefaultGraphAutoLoadEnabled,
+  });
+  useGraphPreferences({
+    state,
+    appearance,
+    showNodeDetail,
+    hideNodeBorders,
+    alignNodeWidthsToMax,
+    fieldMapping,
+    aiSettings,
+  });
 
   useEffect(() => {
     const graphId = state.source.fileName || "local-graph";
@@ -265,6 +203,11 @@ export default function App() {
     const savedDag = getSavedRevisionDag(state.editHistory, state.dag);
     return serializeDagToJson(savedDag || {}, fieldMapping);
   }, [fieldMapping, state.dag, state.editHistory]);
+  const { handleOverwriteJson, handleSaveJsonAsNew } = useGraphSave({
+    source: state.source,
+    currentJsonContent,
+    dispatch,
+  });
 
   const handleZoomChange = useCallback((scale: number, minScale?: number) => {
     dispatch({ type: "zoomChanged", scale, minScale });
@@ -762,238 +705,6 @@ export default function App() {
     window.addEventListener("pointerup", handlePointerUp);
   }, [state.ui.consoleSidebarWidth]);
 
-  async function handleFileInputClick(event: React.MouseEvent<HTMLInputElement>) {
-    if (typeof window.showOpenFilePicker !== "function") {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    try {
-      const pickedFiles = await openJsonFilesWithAccess();
-      if (pickedFiles.files.length > 0) {
-        await loadPickedJsonFiles(pickedFiles);
-      }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
-      console.error(error);
-      dispatch({ type: "statusChanged", status: "The selected JSON files could not be opened." });
-    }
-  }
-
-  async function handleFileInputChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files || []).map((file) => ({
-      file,
-      handle: null,
-      path: file.webkitRelativePath || file.name,
-    }));
-    if (!files.length) {
-      return;
-    }
-    await loadPickedJsonFiles({
-      files,
-      name: files.length === 1 ? files[0].file.name : "selected-json-files.json",
-    });
-    event.target.value = "";
-  }
-
-  async function handleFolderInputClick(event: React.MouseEvent<HTMLInputElement>) {
-    if (typeof window.showDirectoryPicker !== "function") {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    try {
-      const pickedDirectory = await openJsonDirectoryWithAccess();
-      if (pickedDirectory) {
-        await loadPickedJsonFiles(pickedDirectory, true);
-      }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
-      console.error(error);
-      dispatch({ type: "statusChanged", status: "The selected folder could not be opened." });
-    }
-  }
-
-  async function handleFolderInputChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files || []).map((file) => ({
-      file,
-      handle: null,
-      path: file.webkitRelativePath || file.name,
-    }));
-    if (!files.length) {
-      return;
-    }
-
-    const firstPathPart = files[0].path.split(/[\\/]/)[0] || "folder";
-    await loadPickedJsonFiles({
-      files,
-      name: `${firstPathPart}-merged.json`,
-    }, true);
-    event.target.value = "";
-  }
-
-  async function handleRelativeLinkRootSelect() {
-    if (typeof window.showDirectoryPicker !== "function") {
-      const message = "This browser does not support choosing a resolve path. Use a browser with File System Access API support.";
-      dispatch({ type: "statusChanged", status: message });
-      window.alert(message);
-      return;
-    }
-
-    try {
-      const root = await openRelativeLinkRootDirectory();
-      if (!root) {
-        return;
-      }
-      await saveRelativeLinkRoot(root);
-      setRelativeLinkRoot(root);
-      dispatch({ type: "statusChanged", status: `Relative link base path set to ${root.name}.` });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
-      console.error(error);
-      const message = "Unable to choose or save the relative link resolve path.";
-      dispatch({ type: "statusChanged", status: message });
-      window.alert(message);
-    }
-  }
-
-  async function handleOpenRelativeLink(url: string) {
-    if (isExternalUrl(url)) {
-      window.open(url, "_blank", "noopener,noreferrer");
-      return;
-    }
-
-    const result = await resolveRelativeFile(relativeLinkRoot, url);
-    if (!result.ok) {
-      handleRelativeLinkError(result.message);
-      return;
-    }
-
-    openResolvedFilePreview(result.file);
-  }
-
-  function handleRelativeLinkError(message: string) {
-    dispatch({ type: "statusChanged", status: message });
-    window.alert(message);
-  }
-
-  function openResolvedFilePreview(file: ResolvedRelativeFile) {
-    setFilePreview((current) => {
-      if (current?.url) {
-        URL.revokeObjectURL(current.url);
-      }
-      return {
-        originalUrl: file.originalUrl,
-        path: file.path,
-        file: file.file,
-        url: file.url,
-        previewKind: file.previewKind,
-      };
-    });
-    dispatch({ type: "statusChanged", status: `Opened ${file.path}.` });
-  }
-
-  function closeFilePreview() {
-    setFilePreview((current) => {
-      if (current?.url) {
-        URL.revokeObjectURL(current.url);
-      }
-      return null;
-    });
-  }
-
-  async function loadPickedJsonFiles(collection: PickedJsonCollection, fromFolder = false, cacheRecentImport = true) {
-    suppressDefaultGraphRef.current = true;
-    const { files: pickedFiles, name: sourceName } = collection;
-    const jsonFiles = pickedFiles.filter((item) => isJsonFileName(item.path || item.file.name));
-    const skippedNonJsonCount = pickedFiles.length - jsonFiles.length;
-    if (jsonFiles.length === 0) {
-      dispatch({
-        type: "statusChanged",
-        status: fromFolder
-          ? "The selected folder did not contain any JSON files."
-          : "No JSON files were selected.",
-      });
-      return;
-    }
-
-    const documents: ImportGraphDocument[] = [];
-    const parseFailures: string[] = [];
-
-    for (const pickedFile of jsonFiles) {
-      const displayName = pickedFile.path || pickedFile.file.name;
-      try {
-        documents.push({
-          name: displayName,
-          payload: await readJsonFile(pickedFile.file),
-        });
-      } catch (error) {
-        console.error(error);
-        parseFailures.push(displayName);
-      }
-    }
-
-    if (!documents.length) {
-      dispatch({
-        type: "statusChanged",
-        status: `Could not parse any selected JSON file${jsonFiles.length === 1 ? "" : "s"}.`,
-      });
-      return;
-    }
-
-    try {
-      const imported = buildImportedDag(documents, fieldMapping);
-      const dag = imported.dag;
-      if (Object.keys(dag).length === 0) {
-        dispatch({
-          type: "statusChanged",
-          status: "The selected JSON did not contain any graph nodes.",
-        });
-        return;
-      }
-
-      const singleWritableSource = !fromFolder && jsonFiles.length === 1 && parseFailures.length === 0 ? jsonFiles[0] : null;
-      const fileName = singleWritableSource ? singleWritableSource.file.name : ensureJsonExtension(sourceName || "merged-graph.json");
-      setFieldMapping(imported.mapping);
-      dispatch({
-        type: "graphLoaded",
-        dag,
-        fileName,
-        fileHandle: singleWritableSource?.handle || null,
-        selection: getInitialSelection(dag, imported.mapping),
-        status: buildImportStatus({
-          nodeCount: Object.keys(dag).length,
-          sourceName: fileName,
-          loadedJsonCount: documents.length,
-          selectedJsonCount: jsonFiles.length,
-          skippedNonJsonCount,
-          parseFailures,
-          warnings: imported.warnings,
-        }),
-      });
-      if (cacheRecentImport) {
-        try {
-          if (fromFolder) {
-            await saveRecentDirectoryImport(collection);
-          } else {
-            await saveRecentFileImport(collection);
-          }
-        } catch (error) {
-          console.warn("Unable to save recent import source", error);
-        }
-      }
-    } catch (error) {
-      console.error(error);
-      dispatch({ type: "statusChanged", status: "The selected JSON files could not be loaded into a graph." });
-    }
-  }
-
   function initializeCanvas() {
     suppressDefaultGraphRef.current = true;
     const dag = createInitialCanvasDag(fieldMapping);
@@ -1230,36 +941,6 @@ export default function App() {
     dispatch({ type: "statusChanged", status: "Exported current view as dag-graph.svg." });
   }
 
-  function getCurrentJsonContent(): string {
-    return currentJsonContent;
-  }
-
-  async function handleOverwriteJson() {
-    if (!state.source.fileHandle || !canOverwrite(state.source.fileHandle)) {
-      dispatch({ type: "statusChanged", status: "Direct overwrite is unavailable. Reopen the JSON with file access, or save a new copy." });
-      return;
-    }
-    const sourceFileName = ensureJsonExtension(state.source.fileName || state.source.fileHandle.name || "graph.json");
-    try {
-      const granted = await requestWritablePermission(state.source.fileHandle);
-      if (!granted) {
-        dispatch({ type: "statusChanged", status: "Write permission was not granted for the source JSON file." });
-        return;
-      }
-      await writeJsonToHandle(state.source.fileHandle, getCurrentJsonContent());
-      dispatch({ type: "saved", status: `Saved JSON to ${sourceFileName}.` });
-    } catch (error) {
-      console.error(error);
-      dispatch({ type: "statusChanged", status: `Unable to overwrite ${sourceFileName}.` });
-    }
-  }
-
-  function handleSaveJsonAsNew() {
-    const outputFileName = buildTimestampFileName(state.source.fileName || "graph.json");
-    downloadJsonFile(getCurrentJsonContent(), outputFileName);
-    dispatch({ type: "savedAsCopy", status: `Saved JSON as ${outputFileName}. Original file still has unsaved changes.` });
-  }
-
   const relationEditor = state.ui.relationEditor;
   const detailNodeKey = state.ui.nodeDetail?.nodeKey || null;
 
@@ -1478,163 +1159,6 @@ export default function App() {
   );
 }
 
-interface FilePreviewState {
-  originalUrl: string;
-  path: string;
-  file: File;
-  url: string;
-  previewKind: FilePreviewKind;
-}
-
-function FilePreviewModal({
-  preview,
-  relativeLinkRoot,
-  onOpenRelativeLink,
-  onRelativeLinkError,
-  onClose,
-}: {
-  preview: FilePreviewState | null;
-  relativeLinkRoot: RelativeLinkRoot | null;
-  onOpenRelativeLink: (url: string) => void;
-  onRelativeLinkError: (message: string) => void;
-  onClose: () => void;
-}) {
-  const [textContent, setTextContent] = useState("");
-  const [readError, setReadError] = useState("");
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setTextContent("");
-    setReadError("");
-    if (!preview || (preview.previewKind !== "markdown" && preview.previewKind !== "text")) {
-      return;
-    }
-
-    preview.file.text()
-      .then((content) => {
-        if (!cancelled) {
-          setTextContent(content);
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          const detail = error instanceof Error ? error.message : "Unable to read file content.";
-          setReadError(`Unable to read file "${preview.path}". ${detail}`);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [preview]);
-
-  useEffect(() => {
-    if (preview) {
-      setIsFullscreen(false);
-    }
-  }, [preview]);
-
-  if (!preview) {
-    return null;
-  }
-  const activePreview = preview;
-
-  return (
-    <div className={`file-preview-modal is-visible${isFullscreen ? " is-fullscreen" : ""}`} role="presentation">
-      <section className="file-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="file-preview-title">
-        <div className="file-preview-header">
-          <div>
-            <p className="file-preview-eyebrow">File Preview</p>
-            <h3 id="file-preview-title">{activePreview.path}</h3>
-            <p className="file-preview-source">Original link: {activePreview.originalUrl}</p>
-          </div>
-          <div className="file-preview-actions">
-            <button
-              className="ghost-btn file-preview-fullscreen-btn"
-              type="button"
-              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-              aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-              aria-pressed={isFullscreen ? "true" : "false"}
-              onClick={() => setIsFullscreen((current) => !current)}
-            >
-              <FilePreviewFullscreenIcon active={isFullscreen} />
-            </button>
-            <button className="ghost-btn modal-icon-close-btn" type="button" title="Close preview" aria-label="Close preview" onClick={onClose}>
-              <FilePreviewCloseIcon />
-            </button>
-          </div>
-        </div>
-        <div className="file-preview-body">
-          {readError ? <p className="node-detail-error">{readError}</p> : renderFilePreviewContent()}
-        </div>
-      </section>
-    </div>
-  );
-
-  function renderFilePreviewContent() {
-    if (activePreview.previewKind === "image") {
-      return <img className="file-preview-image" src={activePreview.url} alt={activePreview.file.name} />;
-    }
-    if (activePreview.previewKind === "html") {
-      return <iframe className="file-preview-frame" title={activePreview.path} src={activePreview.url} sandbox="" />;
-    }
-    if (activePreview.previewKind === "markdown") {
-      return textContent ? (
-        <MarkdownValue
-          value={textContent}
-          previewSurface
-          relativeLinkRoot={relativeLinkRoot}
-          onOpenRelativeLink={onOpenRelativeLink}
-          onRelativeLinkError={onRelativeLinkError}
-        />
-      ) : <p className="node-detail-empty">Reading file: {activePreview.path}</p>;
-    }
-    if (activePreview.previewKind === "text") {
-      return textContent ? <pre className="file-preview-text">{textContent}</pre> : <p className="node-detail-empty">Reading file: {activePreview.path}</p>;
-    }
-    return (
-      <div className="file-preview-unsupported">
-        <p>This file type is not supported for preview.</p>
-        <p>Original link: {activePreview.originalUrl}</p>
-        <p>Resolved target: {activePreview.path}</p>
-        <a href={activePreview.url} target="_blank" rel="noreferrer">Open in browser</a>
-      </div>
-    );
-  }
-}
-
-function FilePreviewFullscreenIcon({ active }: { active: boolean }) {
-  if (active) {
-    return (
-      <svg viewBox="0 0 24 24" className="modal-icon-close-svg" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M8 3v5H3" />
-        <path d="M21 8h-5V3" />
-        <path d="M16 21v-5h5" />
-        <path d="M3 16h5v5" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg viewBox="0 0 24 24" className="modal-icon-close-svg" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 8V3h5" />
-      <path d="M16 3h5v5" />
-      <path d="M21 16v5h-5" />
-      <path d="M8 21H3v-5" />
-    </svg>
-  );
-}
-
-function FilePreviewCloseIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="modal-icon-close-svg" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M6 6L18 18" />
-      <path d="M18 6L6 18" />
-    </svg>
-  );
-}
-
 function buildConsoleSuccessMessage(
   instructionCount: number,
   mutationCount: number,
@@ -1764,10 +1288,6 @@ function isExecutionApproval(message: string): boolean {
   ].some((phrase) => normalized.includes(phrase));
 }
 
-function isJsonFileName(fileName: string): boolean {
-  return /\.json$/i.test(fileName);
-}
-
 function serializeDagToJson(dag: NormalizedDag, mapping: FieldMapping): string {
   return JSON.stringify(serializeDag(dag, mapping), null, 2);
 }
@@ -1797,45 +1317,6 @@ function getSavedRevisionDag(
 
   const nextTransaction = editHistory.undoStack.find((transaction) => transaction.revisionBefore === editHistory.savedRevision);
   return nextTransaction?.beforeDag || currentDag;
-}
-
-function buildImportStatus({
-  nodeCount,
-  sourceName,
-  loadedJsonCount,
-  selectedJsonCount,
-  skippedNonJsonCount,
-  parseFailures,
-  warnings,
-}: {
-  nodeCount: number;
-  sourceName: string;
-  loadedJsonCount: number;
-  selectedJsonCount: number;
-  skippedNonJsonCount: number;
-  parseFailures: string[];
-  warnings: ImportWarning[];
-}): string {
-  const sourceLabel = loadedJsonCount === 1
-    ? sourceName
-    : `${sourceName} from ${loadedJsonCount} JSON files`;
-  const issueCount = parseFailures.length + warnings.length + skippedNonJsonCount;
-  const parsedSuffix = selectedJsonCount === loadedJsonCount
-    ? ""
-    : ` ${selectedJsonCount - loadedJsonCount} selected JSON file${selectedJsonCount - loadedJsonCount === 1 ? "" : "s"} could not be parsed.`;
-  const warningSuffix = issueCount > 0
-    ? ` ${issueCount} import warning${issueCount === 1 ? "" : "s"}; valid JSON files were loaded.`
-    : "";
-
-  if (warnings.length > 0 || parseFailures.length > 0) {
-    console.warn("DAG Studio import warnings", {
-      parseFailures,
-      warnings: warnings.map((warning) => warning.message),
-      skippedNonJsonCount,
-    });
-  }
-
-  return `${nodeCount} nodes loaded from ${sourceLabel}.${parsedSuffix}${warningSuffix}`;
 }
 
 interface ConsoleSuggestion {
