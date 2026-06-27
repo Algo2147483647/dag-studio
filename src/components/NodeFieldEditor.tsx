@@ -1,8 +1,12 @@
 import type { NodeKey } from "../graph/types";
 import { formatMappedFieldLabel, getSemanticFieldName, type FieldMapping, type MappableSystemFieldKey } from "../graph/fieldMapping";
 import { normalizeRelationField } from "../graph/relations";
+import type { RelativeLinkRoot } from "../adapters/relativeLinks";
+import { isExternalUrl, isRelativeLink, resolveRelativeFile, resolveRelativePath } from "../adapters/relativeLinks";
 import { parseRelationInput } from "./RelationEditorModal";
+import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import rehypeRaw from "rehype-raw";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -22,10 +26,13 @@ interface NodeFieldEditorProps {
   field: EditableField;
   value: string;
   showMarkdown: boolean;
+  relativeLinkRoot: RelativeLinkRoot | null;
+  onOpenRelativeLink: (url: string) => void;
+  onRelativeLinkError: (message: string) => void;
   onChange: (value: string) => void;
 }
 
-export default function NodeFieldEditor({ field, value, showMarkdown, onChange }: NodeFieldEditorProps) {
+export default function NodeFieldEditor({ field, value, showMarkdown, relativeLinkRoot, onOpenRelativeLink, onRelativeLinkError, onChange }: NodeFieldEditorProps) {
   if (field.name === "key") {
     return <input className="node-detail-editor node-detail-editor--input" type="text" spellCheck={false} value={value} onChange={(event) => onChange(event.target.value)} />;
   }
@@ -39,13 +46,35 @@ export default function NodeFieldEditor({ field, value, showMarkdown, onChange }
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
-      {showMarkdown && supportsMarkdown(field) ? <MarkdownValue value={value} previewSurface /> : null}
+      {showMarkdown && supportsMarkdown(field) ? (
+        <MarkdownValue
+          value={value}
+          previewSurface
+          relativeLinkRoot={relativeLinkRoot}
+          onOpenRelativeLink={onOpenRelativeLink}
+          onRelativeLinkError={onRelativeLinkError}
+        />
+      ) : null}
       {getEditorHint(field) ? <p className="node-detail-editor-hint">{getEditorHint(field)}</p> : null}
     </div>
   );
 }
 
-export function MarkdownValue({ value, emphasize = false, previewSurface = false }: { value: string; emphasize?: boolean; previewSurface?: boolean }) {
+export function MarkdownValue({
+  value,
+  emphasize = false,
+  previewSurface = false,
+  relativeLinkRoot = null,
+  onOpenRelativeLink,
+  onRelativeLinkError,
+}: {
+  value: string;
+  emphasize?: boolean;
+  previewSurface?: boolean;
+  relativeLinkRoot?: RelativeLinkRoot | null;
+  onOpenRelativeLink?: (url: string) => void;
+  onRelativeLinkError?: (message: string) => void;
+}) {
   if (!value.trim()) {
     return <p className="node-detail-empty">(empty string)</p>;
   }
@@ -58,10 +87,117 @@ export function MarkdownValue({ value, emphasize = false, previewSurface = false
         previewSurface ? "node-detail-markdown--preview" : "",
       ].filter(Boolean).join(" ")}
     >
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeRaw, rehypeKatex]}
+        components={{
+          a: ({ href, children, ...props }) => {
+            const url = String(href || "");
+            if (!url || isExternalUrl(url) || !isRelativeLink(url)) {
+              return <a href={href} target={isExternalUrl(url) ? "_blank" : undefined} rel={isExternalUrl(url) ? "noreferrer" : undefined} {...props}>{children}</a>;
+            }
+            const resolved = resolveRelativePath(url);
+            return (
+              <a
+                href={href}
+                title={resolved.ok ? `Resolves to: ${relativeLinkRoot?.name || "(no resolve path selected)"}/${resolved.path}` : resolved.message}
+                {...props}
+                onClick={(event) => {
+                  event.preventDefault();
+                  onOpenRelativeLink?.(url);
+                }}
+              >
+                {children}
+              </a>
+            );
+          },
+          img: ({ src, alt, ...props }) => (
+            <RelativeMarkdownImage
+              src={String(src || "")}
+              alt={String(alt || "")}
+              relativeLinkRoot={relativeLinkRoot}
+              onRelativeLinkError={onRelativeLinkError}
+              {...props}
+            />
+          ),
+        }}
+      >
         {value}
       </ReactMarkdown>
     </div>
+  );
+}
+
+function RelativeMarkdownImage({
+  src,
+  alt,
+  relativeLinkRoot,
+  onRelativeLinkError: _onRelativeLinkError,
+  ...props
+}: {
+  src: string;
+  alt: string;
+  relativeLinkRoot: RelativeLinkRoot | null;
+  onRelativeLinkError?: (message: string) => void;
+} & React.ImgHTMLAttributes<HTMLImageElement>) {
+  const [resolvedSrc, setResolvedSrc] = useState(src);
+  const [unavailable, setUnavailable] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl = "";
+    setUnavailable(false);
+
+    if (!src || isExternalUrl(src) || !isRelativeLink(src)) {
+      setResolvedSrc(src);
+      return;
+    }
+
+    if (!relativeLinkRoot?.handle) {
+      setResolvedSrc("");
+      setUnavailable(true);
+      return;
+    }
+
+    setResolvedSrc("");
+    resolveRelativeFile(relativeLinkRoot, src).then((result) => {
+      if (cancelled) {
+        if (result.ok) {
+          URL.revokeObjectURL(result.file.url);
+        }
+        return;
+      }
+      if (!result.ok) {
+        setUnavailable(true);
+        return;
+      }
+      objectUrl = result.file.url;
+      setResolvedSrc(result.file.url);
+    });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [relativeLinkRoot, src]);
+
+  if (unavailable) {
+    return null;
+  }
+
+  if (!resolvedSrc) {
+    return <span className="node-detail-image-loading">Loading image: {src}</span>;
+  }
+
+  return (
+    <img
+      src={resolvedSrc}
+      alt={alt}
+      {...props}
+      onError={() => setUnavailable(true)}
+    />
   );
 }
 

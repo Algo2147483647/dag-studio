@@ -36,6 +36,8 @@ interface FileSystemDirectoryHandle {
   kind?: "directory";
   name: string;
   entries?: () => AsyncIterableIterator<[string, FileSystemFileHandle | FileSystemDirectoryHandle]>;
+  getDirectoryHandle?: (name: string, options?: { create?: boolean }) => Promise<FileSystemDirectoryHandle>;
+  getFileHandle?: (name: string, options?: { create?: boolean }) => Promise<FileSystemFileHandle>;
   queryPermission?: (options?: { mode?: "read" | "readwrite" }) => Promise<PermissionState>;
   requestPermission?: (options?: { mode?: "read" | "readwrite" }) => Promise<PermissionState>;
 }

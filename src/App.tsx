@@ -14,6 +14,17 @@ import { copyTextToClipboard } from "./adapters/clipboard";
 import { buildTimestampFileName, downloadJsonFile, ensureJsonExtension } from "./adapters/download";
 import { canOverwrite, openJsonDirectoryWithAccess, openJsonFileWithAccess, openJsonFilesWithAccess, readJsonFile, requestWritablePermission, writeJsonToHandle, type PickedJsonCollection } from "./adapters/fileAccess";
 import { loadRecentImportMetadata, loadRecentJsonCollection, saveRecentDirectoryImport, saveRecentFileImport } from "./adapters/recentImport";
+import {
+  isExternalUrl,
+  loadRelativeLinkMetadata,
+  loadRelativeLinkRoot,
+  openRelativeLinkRootDirectory,
+  resolveRelativeFile,
+  saveRelativeLinkRoot,
+  type FilePreviewKind,
+  type RelativeLinkRoot,
+  type ResolvedRelativeFile,
+} from "./adapters/relativeLinks";
 import { downloadSvg } from "./rendering/export-svg";
 import { buildImportedDag, type ImportGraphDocument, type ImportWarning } from "./graph/importMerge";
 import { useDefaultGraph } from "./hooks/useDefaultGraph";
@@ -29,6 +40,7 @@ import { loadGraphPagePreferences, saveGraphPagePreferences } from "./state/pref
 import ConsoleSidebar, { type ConsoleEntry, type ConsoleReviewCard } from "./components/ConsoleSidebar";
 import ContextMenu, { type ContextMenuAction } from "./components/ContextMenu";
 import FieldMappingModal from "./components/FieldMappingModal";
+import { MarkdownValue } from "./components/NodeFieldEditor";
 import NodeDetailModal from "./components/NodeDetailModal";
 import RelationEditorModal from "./components/RelationEditorModal";
 import SaveJsonModal from "./components/SaveJsonModal";
@@ -74,6 +86,11 @@ export default function App() {
   const [showNodeDetail, setShowNodeDetail] = useState<boolean>(() => loadGraphPagePreferences().showNodeDetail ?? true);
   const [hideNodeBorders, setHideNodeBorders] = useState<boolean>(() => loadGraphPagePreferences().hideNodeBorders ?? false);
   const [alignNodeWidthsToMax, setAlignNodeWidthsToMax] = useState<boolean>(() => loadGraphPagePreferences().alignNodeWidthsToMax ?? false);
+  const [relativeLinkRoot, setRelativeLinkRoot] = useState<RelativeLinkRoot | null>(() => {
+    const metadata = loadRelativeLinkMetadata();
+    return metadata ? { name: metadata.name, handle: null } : null;
+  });
+  const [filePreview, setFilePreview] = useState<FilePreviewState | null>(null);
   const [aiSettings, setAiSettings] = useState<AiSettings>(() => loadGraphPagePreferences().aiSettings);
   const [defaultGraphAutoLoadEnabled, setDefaultGraphAutoLoadEnabled] = useState(false);
   const [aiHarness, setAiHarness] = useState(() => createInitialAiHarnessState(aiSettings.executionMode));
@@ -97,6 +114,29 @@ export default function App() {
   const restoredReviewCardRef = useRef<string | null>(null);
 
   useDefaultGraph(dispatch, suppressDefaultGraphRef, setFieldMapping, defaultGraphAutoLoadEnabled);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function restoreRelativeLinkRoot() {
+      const metadata = loadRelativeLinkMetadata();
+      if (!metadata?.canAutoLoad) {
+        return;
+      }
+      try {
+        const restored = await loadRelativeLinkRoot();
+        if (!cancelled && restored) {
+          setRelativeLinkRoot(restored);
+          dispatch({ type: "statusChanged", status: `Restored relative link base path: ${restored.name}.` });
+        }
+      } catch (error) {
+        console.warn("Unable to restore relative link root", error);
+      }
+    }
+    restoreRelativeLinkRoot();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -796,6 +836,78 @@ export default function App() {
     event.target.value = "";
   }
 
+  async function handleRelativeLinkRootSelect() {
+    if (typeof window.showDirectoryPicker !== "function") {
+      const message = "This browser does not support choosing a resolve path. Use a browser with File System Access API support.";
+      dispatch({ type: "statusChanged", status: message });
+      window.alert(message);
+      return;
+    }
+
+    try {
+      const root = await openRelativeLinkRootDirectory();
+      if (!root) {
+        return;
+      }
+      await saveRelativeLinkRoot(root);
+      setRelativeLinkRoot(root);
+      dispatch({ type: "statusChanged", status: `Relative link base path set to ${root.name}.` });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      console.error(error);
+      const message = "Unable to choose or save the relative link resolve path.";
+      dispatch({ type: "statusChanged", status: message });
+      window.alert(message);
+    }
+  }
+
+  async function handleOpenRelativeLink(url: string) {
+    if (isExternalUrl(url)) {
+      window.open(url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    const result = await resolveRelativeFile(relativeLinkRoot, url);
+    if (!result.ok) {
+      handleRelativeLinkError(result.message);
+      return;
+    }
+
+    openResolvedFilePreview(result.file);
+  }
+
+  function handleRelativeLinkError(message: string) {
+    dispatch({ type: "statusChanged", status: message });
+    window.alert(message);
+  }
+
+  function openResolvedFilePreview(file: ResolvedRelativeFile) {
+    setFilePreview((current) => {
+      if (current?.url) {
+        URL.revokeObjectURL(current.url);
+      }
+      return {
+        originalUrl: file.originalUrl,
+        path: file.path,
+        file: file.file,
+        url: file.url,
+        previewKind: file.previewKind,
+      };
+    });
+    dispatch({ type: "statusChanged", status: `Opened ${file.path}.` });
+  }
+
+  function closeFilePreview() {
+    setFilePreview((current) => {
+      if (current?.url) {
+        URL.revokeObjectURL(current.url);
+      }
+      return null;
+    });
+  }
+
   async function loadPickedJsonFiles(collection: PickedJsonCollection, fromFolder = false, cacheRecentImport = true) {
     suppressDefaultGraphRef.current = true;
     const { files: pickedFiles, name: sourceName } = collection;
@@ -1162,6 +1274,7 @@ export default function App() {
         alignNodeWidthsToMax={alignNodeWidthsToMax}
         status={status}
         fileName={state.source.fileName}
+        relativeLinkRootName={relativeLinkRoot?.name || ""}
         hasGraph={Boolean(stage)}
         canBack={state.history.length > 0}
         canUp={Boolean(parentSelection)}
@@ -1202,6 +1315,7 @@ export default function App() {
         onFileInputChange={handleFileInputChange}
         onFolderInputClick={handleFolderInputClick}
         onFolderInputChange={handleFolderInputChange}
+        onRelativeLinkRootSelect={handleRelativeLinkRootSelect}
         onInitializeCanvas={initializeCanvas}
         onExport={handleExportSvg}
         onSaveJson={() => state.dag ? dispatch({ type: "saveDialogOpened" }) : dispatch({ type: "statusChanged", status: "Load or render a graph before saving JSON." })}
@@ -1318,12 +1432,22 @@ export default function App() {
         node={detailNodeKey && state.dag ? state.dag[detailNodeKey] || null : null}
         fieldMapping={fieldMapping}
         initialFocus={nodeDetailInitialFocus}
+        relativeLinkRoot={relativeLinkRoot}
+        onOpenRelativeLink={handleOpenRelativeLink}
+        onRelativeLinkError={handleRelativeLinkError}
         onSave={(nextKey, fields) => {
           if (detailNodeKey) {
             commitCommand({ type: "updateNodeFields", key: detailNodeKey, nextKey, fields });
           }
         }}
         onClose={() => dispatch({ type: "modalClosed" })}
+      />
+      <FilePreviewModal
+        preview={filePreview}
+        relativeLinkRoot={relativeLinkRoot}
+        onOpenRelativeLink={handleOpenRelativeLink}
+        onRelativeLinkError={handleRelativeLinkError}
+        onClose={closeFilePreview}
       />
       <SaveJsonModal
         open={state.ui.saveDialogOpen}
@@ -1352,6 +1476,113 @@ export default function App() {
       />
     </div>
   );
+}
+
+interface FilePreviewState {
+  originalUrl: string;
+  path: string;
+  file: File;
+  url: string;
+  previewKind: FilePreviewKind;
+}
+
+function FilePreviewModal({
+  preview,
+  relativeLinkRoot,
+  onOpenRelativeLink,
+  onRelativeLinkError,
+  onClose,
+}: {
+  preview: FilePreviewState | null;
+  relativeLinkRoot: RelativeLinkRoot | null;
+  onOpenRelativeLink: (url: string) => void;
+  onRelativeLinkError: (message: string) => void;
+  onClose: () => void;
+}) {
+  const [textContent, setTextContent] = useState("");
+  const [readError, setReadError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    setTextContent("");
+    setReadError("");
+    if (!preview || (preview.previewKind !== "markdown" && preview.previewKind !== "text")) {
+      return;
+    }
+
+    preview.file.text()
+      .then((content) => {
+        if (!cancelled) {
+          setTextContent(content);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          const detail = error instanceof Error ? error.message : "Unable to read file content.";
+          setReadError(`Unable to read file "${preview.path}". ${detail}`);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [preview]);
+
+  if (!preview) {
+    return null;
+  }
+  const activePreview = preview;
+
+  return (
+    <div className="file-preview-modal is-visible" role="presentation">
+      <section className="file-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="file-preview-title">
+        <div className="file-preview-header">
+          <div>
+            <p className="file-preview-eyebrow">File Preview</p>
+            <h3 id="file-preview-title">{activePreview.path}</h3>
+            <p className="file-preview-source">Original link: {activePreview.originalUrl}</p>
+          </div>
+          <button className="ghost-btn modal-icon-close-btn" type="button" title="Close preview" aria-label="Close preview" onClick={onClose}>
+            <span aria-hidden="true">x</span>
+          </button>
+        </div>
+        <div className="file-preview-body">
+          {readError ? <p className="node-detail-error">{readError}</p> : renderFilePreviewContent()}
+        </div>
+      </section>
+    </div>
+  );
+
+  function renderFilePreviewContent() {
+    if (activePreview.previewKind === "image") {
+      return <img className="file-preview-image" src={activePreview.url} alt={activePreview.file.name} />;
+    }
+    if (activePreview.previewKind === "html") {
+      return <iframe className="file-preview-frame" title={activePreview.path} src={activePreview.url} sandbox="" />;
+    }
+    if (activePreview.previewKind === "markdown") {
+      return textContent ? (
+        <MarkdownValue
+          value={textContent}
+          previewSurface
+          relativeLinkRoot={relativeLinkRoot}
+          onOpenRelativeLink={onOpenRelativeLink}
+          onRelativeLinkError={onRelativeLinkError}
+        />
+      ) : <p className="node-detail-empty">Reading file: {activePreview.path}</p>;
+    }
+    if (activePreview.previewKind === "text") {
+      return textContent ? <pre className="file-preview-text">{textContent}</pre> : <p className="node-detail-empty">Reading file: {activePreview.path}</p>;
+    }
+    return (
+      <div className="file-preview-unsupported">
+        <p>This file type is not supported for preview.</p>
+        <p>Original link: {activePreview.originalUrl}</p>
+        <p>Resolved target: {activePreview.path}</p>
+        <a href={activePreview.url} target="_blank" rel="noreferrer">Open in browser</a>
+      </div>
+    );
+  }
 }
 
 function buildConsoleSuccessMessage(
@@ -1480,10 +1711,6 @@ function isExecutionApproval(message: string): boolean {
     "run it",
     "do it",
     "complete",
-    "执行",
-    "应用",
-    "完成",
-    "确认",
   ].some((phrase) => normalized.includes(phrase));
 }
 

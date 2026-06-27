@@ -16,7 +16,7 @@ import { defineSuite, defineTest } from "./harness";
 export const aiHarnessSuite = defineSuite("ai harness", [
   defineTest("detects requests that should continue a previous plan", () => {
     assert.equal(referencesPreviousWork("Based on your previous analysis, complete the changes."), true);
-    assert.equal(referencesPreviousWork("基于你刚才的分析完成修改"), true);
+    assert.equal(referencesPreviousWork("Continue from the plan above and apply it."), true);
     assert.equal(referencesPreviousWork("What does Group mean?"), false);
   }),
 

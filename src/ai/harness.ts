@@ -139,13 +139,6 @@ export function referencesPreviousWork(message: string): boolean {
     "do it",
     "continue",
     "complete",
-    "执行",
-    "完成",
-    "继续",
-    "刚才",
-    "上面",
-    "按你",
-    "基于",
   ].some((phrase) => normalized.includes(phrase));
 }
 

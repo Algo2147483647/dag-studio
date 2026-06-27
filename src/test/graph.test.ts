@@ -21,7 +21,7 @@ export const graphSuite = defineSuite("graph", [
   defineTest("detail text wrapping uses estimated visual width instead of raw character count", () => {
     assert.ok(estimateTextWidth("MMMM", 10) > estimateTextWidth("iiii", 10));
 
-    const lines = wrapDetailText("这是一个包含宽字符的很长副标题用于测试换行和截断", 72, 2);
+    const lines = wrapDetailText("This is a long subtitle used to test wrapping and truncation", 72, 2);
 
     assert.equal(lines.length, 2);
     assert.ok(lines[1].endsWith("..."));

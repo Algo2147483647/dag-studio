@@ -17,6 +17,7 @@ interface TopbarProps {
   alignNodeWidthsToMax: boolean;
   status: string;
   fileName: string;
+  relativeLinkRootName: string;
   hasGraph: boolean;
   canBack: boolean;
   canUp: boolean;
@@ -57,6 +58,7 @@ interface TopbarProps {
   onFileInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onFolderInputClick: (event: React.MouseEvent<HTMLInputElement>) => void;
   onFolderInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onRelativeLinkRootSelect: () => void;
   onInitializeCanvas: () => void;
   onExport: () => void;
   onSaveJson: () => void;
@@ -74,6 +76,7 @@ export default function Topbar({
   alignNodeWidthsToMax,
   status,
   fileName,
+  relativeLinkRootName,
   hasGraph,
   canBack,
   canUp,
@@ -114,6 +117,7 @@ export default function Topbar({
   onFileInputChange,
   onFolderInputClick,
   onFolderInputChange,
+  onRelativeLinkRootSelect,
   onInitializeCanvas,
   onExport,
   onSaveJson,
@@ -161,6 +165,7 @@ export default function Topbar({
               alignNodeWidthsToMax={alignNodeWidthsToMax}
               status={status}
               fileName={fileName}
+              relativeLinkRootName={relativeLinkRootName}
               hasGraph={hasGraph}
               consoleSidebarOpen={consoleSidebarOpen}
               aiSettings={aiSettings}
@@ -184,6 +189,7 @@ export default function Topbar({
               onFileInputChange={onFileInputChange}
               onFolderInputClick={onFolderInputClick}
               onFolderInputChange={onFolderInputChange}
+              onRelativeLinkRootSelect={onRelativeLinkRootSelect}
               onInitializeCanvas={onInitializeCanvas}
               onExport={onExport}
               onFieldMappingOpen={onFieldMappingOpen}
@@ -206,6 +212,7 @@ interface SettingsModalProps {
   alignNodeWidthsToMax: boolean;
   status: string;
   fileName: string;
+  relativeLinkRootName: string;
   hasGraph: boolean;
   consoleSidebarOpen: boolean;
   aiSettings: AiSettings;
@@ -229,6 +236,7 @@ interface SettingsModalProps {
   onFileInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onFolderInputClick: (event: React.MouseEvent<HTMLInputElement>) => void;
   onFolderInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onRelativeLinkRootSelect: () => void;
   onInitializeCanvas: () => void;
   onExport: () => void;
   onFieldMappingOpen: () => void;
@@ -245,6 +253,7 @@ function SettingsModal({
   alignNodeWidthsToMax,
   status,
   fileName,
+  relativeLinkRootName,
   hasGraph,
   consoleSidebarOpen,
   aiSettings,
@@ -268,6 +277,7 @@ function SettingsModal({
   onFileInputChange,
   onFolderInputClick,
   onFolderInputChange,
+  onRelativeLinkRootSelect,
   onInitializeCanvas,
   onExport,
   onFieldMappingOpen,
@@ -386,12 +396,12 @@ function SettingsModal({
                 <section className="settings-section" aria-labelledby="file-actions-title">
                   <p id="file-actions-title" className="control-label">Files</p>
                   <div className="import-action-row">
-                    <label htmlFor="fileInput" className="file-input-label">
-                      <span className="file-input-text">{truncateFileName(fileName)}</span>
+                    <label htmlFor="fileInput" className="ghost-btn settings-action-btn file-input-label" title={fileName ? `Current file: ${fileName}` : "Import JSON file"}>
+                      <span className="file-input-text">Import File</span>
                       <input type="file" id="fileInput" accept=".json,application/json" multiple onClick={onFileInputClick} onChange={onFileInputChange} />
                     </label>
-                    <label htmlFor="folderInput" className="file-input-label folder-input-label">
-                      <span className="file-input-text">Open Folder</span>
+                    <label htmlFor="folderInput" className="ghost-btn settings-action-btn file-input-label folder-input-label" title="Import JSON files from a folder">
+                      <span className="file-input-text">Import Folder</span>
                       <input
                         type="file"
                         id="folderInput"
@@ -402,6 +412,15 @@ function SettingsModal({
                         {...DIRECTORY_INPUT_PROPS}
                       />
                     </label>
+                    <button
+                      id="relative-link-root-btn"
+                      className="ghost-btn settings-action-btn"
+                      type="button"
+                      title={relativeLinkRootName ? `Current resolve path: ${relativeLinkRootName}` : "Choose a base path for relative links"}
+                      onClick={onRelativeLinkRootSelect}
+                    >
+                      Resolve Path
+                    </button>
                     <button id="export-btn" className="ghost-btn settings-action-btn" type="button" disabled={!hasGraph} onClick={onExport}>Export SVG</button>
                   </div>
                 </section>

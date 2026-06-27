@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { DagNode, NodeKey } from "../graph/types";
 import { getMappedFieldName, type FieldMapping } from "../graph/fieldMapping";
 import { getRelationKeys } from "../graph/relations";
+import type { RelativeLinkRoot } from "../adapters/relativeLinks";
 import NodeFieldEditor, { MarkdownValue, buildEditableFields, formatEditorValue, parseNodeFieldValue, supportsMarkdown, type EditableField } from "./NodeFieldEditor";
 import { buildRawNodeEditorValue, parseRawNodeEditorValue } from "./nodeDetailRawJson";
 
@@ -11,11 +12,14 @@ interface NodeDetailModalProps {
   node: DagNode | null;
   fieldMapping: FieldMapping;
   initialFocus?: "fields" | "raw";
+  relativeLinkRoot: RelativeLinkRoot | null;
+  onOpenRelativeLink: (url: string) => void;
+  onRelativeLinkError: (message: string) => void;
   onSave: (nextKey: NodeKey, fields: Record<string, unknown>) => void;
   onClose: () => void;
 }
 
-export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, initialFocus = "fields", onSave, onClose }: NodeDetailModalProps) {
+export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, initialFocus = "fields", relativeLinkRoot, onOpenRelativeLink, onRelativeLinkError, onSave, onClose }: NodeDetailModalProps) {
   const [fields, setFields] = useState<EditableField[]>([]);
   const [values, setValues] = useState<Record<string, string>>({});
   const [rawJsonValue, setRawJsonValue] = useState("");
@@ -120,10 +124,20 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
                       field={field}
                       value={values[field.name] ?? ""}
                       showMarkdown={Boolean(markdownFields[field.name])}
+                      relativeLinkRoot={relativeLinkRoot}
+                      onOpenRelativeLink={onOpenRelativeLink}
+                      onRelativeLinkError={onRelativeLinkError}
                       onChange={(value) => handleFieldChange(field.name, value)}
                     />
                   ) : (
-                    <NodeFieldPreview field={field} value={values[field.name] ?? ""} showMarkdown={Boolean(markdownFields[field.name])} />
+                    <NodeFieldPreview
+                      field={field}
+                      value={values[field.name] ?? ""}
+                      showMarkdown={Boolean(markdownFields[field.name])}
+                      relativeLinkRoot={relativeLinkRoot}
+                      onOpenRelativeLink={onOpenRelativeLink}
+                      onRelativeLinkError={onRelativeLinkError}
+                    />
                   )}
                 </article>
               )) : <p className="node-detail-empty">No fields are available for this node.</p>}
@@ -321,12 +335,34 @@ function FullscreenIcon({ active }: { active: boolean }) {
   );
 }
 
-function NodeFieldPreview({ field, value, showMarkdown }: { field: EditableField; value: string; showMarkdown: boolean }) {
+function NodeFieldPreview({
+  field,
+  value,
+  showMarkdown,
+  relativeLinkRoot,
+  onOpenRelativeLink,
+  onRelativeLinkError,
+}: {
+  field: EditableField;
+  value: string;
+  showMarkdown: boolean;
+  relativeLinkRoot: RelativeLinkRoot | null;
+  onOpenRelativeLink: (url: string) => void;
+  onRelativeLinkError: (message: string) => void;
+}) {
   if (!value.trim()) {
     return <p className="node-detail-empty">(empty string)</p>;
   }
   if (showMarkdown && supportsMarkdown(field)) {
-    return <MarkdownValue value={value} previewSurface />;
+    return (
+      <MarkdownValue
+        value={value}
+        previewSurface
+        relativeLinkRoot={relativeLinkRoot}
+        onOpenRelativeLink={onOpenRelativeLink}
+        onRelativeLinkError={onRelativeLinkError}
+      />
+    );
   }
   if (field.name === "key" || field.editorKind === "plainText" || field.editorKind === "multilineText") {
     return <p className="node-detail-text">{value}</p>;
