@@ -918,7 +918,7 @@
 .node-detail-markdown--preview {
   padding: 14px;
   border-radius: 12px;
-  background: rgba(246, 249, 253, 0.86);
+  background: rgba(248, 250, 253, 0.82);
 }
 
 .node-detail-markdown > :first-child {
@@ -1087,6 +1087,10 @@
   display: flex;
 }
 
+.file-preview-modal.is-fullscreen {
+  padding: 0;
+}
+
 .file-preview-dialog {
   width: min(1040px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
@@ -1097,6 +1101,13 @@
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 24px 48px rgba(26, 39, 63, 0.2);
+}
+
+.file-preview-modal.is-fullscreen .file-preview-dialog {
+  width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  border-radius: 0;
 }
 
 .file-preview-header {
@@ -1131,7 +1142,28 @@
   text-transform: uppercase;
 }
 
+.file-preview-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.file-preview-fullscreen-btn {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 999px;
+}
+
 .file-preview-body {
+  flex: 1 1 auto;
   min-height: 280px;
   overflow: auto;
   padding: 16px 18px 18px;

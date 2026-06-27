@@ -1501,6 +1501,7 @@ function FilePreviewModal({
 }) {
   const [textContent, setTextContent] = useState("");
   const [readError, setReadError] = useState("");
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -1528,13 +1529,19 @@ function FilePreviewModal({
     };
   }, [preview]);
 
+  useEffect(() => {
+    if (preview) {
+      setIsFullscreen(false);
+    }
+  }, [preview]);
+
   if (!preview) {
     return null;
   }
   const activePreview = preview;
 
   return (
-    <div className="file-preview-modal is-visible" role="presentation">
+    <div className={`file-preview-modal is-visible${isFullscreen ? " is-fullscreen" : ""}`} role="presentation">
       <section className="file-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="file-preview-title">
         <div className="file-preview-header">
           <div>
@@ -1542,9 +1549,21 @@ function FilePreviewModal({
             <h3 id="file-preview-title">{activePreview.path}</h3>
             <p className="file-preview-source">Original link: {activePreview.originalUrl}</p>
           </div>
-          <button className="ghost-btn modal-icon-close-btn" type="button" title="Close preview" aria-label="Close preview" onClick={onClose}>
-            <span aria-hidden="true">x</span>
-          </button>
+          <div className="file-preview-actions">
+            <button
+              className="ghost-btn file-preview-fullscreen-btn"
+              type="button"
+              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              aria-pressed={isFullscreen ? "true" : "false"}
+              onClick={() => setIsFullscreen((current) => !current)}
+            >
+              <FilePreviewFullscreenIcon active={isFullscreen} />
+            </button>
+            <button className="ghost-btn modal-icon-close-btn" type="button" title="Close preview" aria-label="Close preview" onClick={onClose}>
+              <FilePreviewCloseIcon />
+            </button>
+          </div>
         </div>
         <div className="file-preview-body">
           {readError ? <p className="node-detail-error">{readError}</p> : renderFilePreviewContent()}
@@ -1583,6 +1602,37 @@ function FilePreviewModal({
       </div>
     );
   }
+}
+
+function FilePreviewFullscreenIcon({ active }: { active: boolean }) {
+  if (active) {
+    return (
+      <svg viewBox="0 0 24 24" className="modal-icon-close-svg" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M8 3v5H3" />
+        <path d="M21 8h-5V3" />
+        <path d="M16 21v-5h5" />
+        <path d="M3 16h5v5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" className="modal-icon-close-svg" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 8V3h5" />
+      <path d="M16 3h5v5" />
+      <path d="M21 16v5h-5" />
+      <path d="M8 21H3v-5" />
+    </svg>
+  );
+}
+
+function FilePreviewCloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="modal-icon-close-svg" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 6L18 18" />
+      <path d="M18 6L6 18" />
+    </svg>
+  );
 }
 
 function buildConsoleSuccessMessage(
