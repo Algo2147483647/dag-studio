@@ -1,5 +1,5 @@
 import type { ChangeEvent, Dispatch, MouseEvent, MutableRefObject, SetStateAction } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ensureJsonExtension } from "../adapters/download";
 import { openJsonDirectoryWithAccess, openJsonFilesWithAccess, readJsonFile, type PickedJsonCollection } from "../adapters/fileAccess";
 import { loadRecentImportMetadata, loadRecentJsonCollection, saveRecentDirectoryImport, saveRecentFileImport } from "../adapters/recentImport";
@@ -7,6 +7,12 @@ import { type FieldMapping } from "../graph/fieldMapping";
 import { buildImportedDag, type ImportGraphDocument, type ImportWarning } from "../graph/importMerge";
 import { getInitialSelection } from "../graph/selectors";
 import type { GraphAction } from "../state/graphActions";
+
+export interface ImportFileButtonState {
+  status: "idle" | "success" | "error";
+  label: string;
+  fileName?: string;
+}
 
 export function useGraphImport({
   dispatch,
@@ -21,6 +27,11 @@ export function useGraphImport({
   suppressDefaultGraphRef: MutableRefObject<boolean>;
   setDefaultGraphAutoLoadEnabled: Dispatch<SetStateAction<boolean>>;
 }) {
+  const [importFileButtonState, setImportFileButtonState] = useState<ImportFileButtonState>({
+    status: "idle",
+    label: "Import File",
+  });
+
   useEffect(() => {
     let cancelled = false;
 
@@ -76,6 +87,10 @@ export function useGraphImport({
         return;
       }
       console.error(error);
+      setImportFileButtonState({
+        status: "error",
+        label: "error",
+      });
       dispatch({ type: "statusChanged", status: "The selected JSON files could not be opened." });
     }
   }
@@ -140,6 +155,12 @@ export function useGraphImport({
     const jsonFiles = pickedFiles.filter((item) => isJsonFileName(item.path || item.file.name));
     const skippedNonJsonCount = pickedFiles.length - jsonFiles.length;
     if (jsonFiles.length === 0) {
+      if (!fromFolder) {
+        setImportFileButtonState({
+          status: "error",
+          label: "error",
+        });
+      }
       dispatch({
         type: "statusChanged",
         status: fromFolder
@@ -166,6 +187,12 @@ export function useGraphImport({
     }
 
     if (!documents.length) {
+      if (!fromFolder) {
+        setImportFileButtonState({
+          status: "error",
+          label: "error",
+        });
+      }
       dispatch({
         type: "statusChanged",
         status: `Could not parse any selected JSON file${jsonFiles.length === 1 ? "" : "s"}.`,
@@ -177,6 +204,12 @@ export function useGraphImport({
       const imported = buildImportedDag(documents, fieldMapping);
       const dag = imported.dag;
       if (Object.keys(dag).length === 0) {
+        if (!fromFolder) {
+          setImportFileButtonState({
+            status: "error",
+            label: "error",
+          });
+        }
         dispatch({
           type: "statusChanged",
           status: "The selected JSON did not contain any graph nodes.",
@@ -186,6 +219,13 @@ export function useGraphImport({
 
       const singleWritableSource = !fromFolder && jsonFiles.length === 1 && parseFailures.length === 0 ? jsonFiles[0] : null;
       const fileName = singleWritableSource ? singleWritableSource.file.name : ensureJsonExtension(sourceName || "merged-graph.json");
+      if (!fromFolder) {
+        setImportFileButtonState({
+          status: "success",
+          label: fileName,
+          fileName,
+        });
+      }
       setFieldMapping(imported.mapping);
       dispatch({
         type: "graphLoaded",
@@ -216,11 +256,18 @@ export function useGraphImport({
       }
     } catch (error) {
       console.error(error);
+      if (!fromFolder) {
+        setImportFileButtonState({
+          status: "error",
+          label: "error",
+        });
+      }
       dispatch({ type: "statusChanged", status: "The selected JSON files could not be loaded into a graph." });
     }
   }
 
   return {
+    importFileButtonState,
     handleFileInputClick,
     handleFileInputChange,
     handleFolderInputClick,

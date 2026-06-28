@@ -3,6 +3,7 @@ import type { GraphAppearance, GraphLayoutAppearance } from "../graph/appearance
 import type { GraphAppearancePresetId } from "../graph/appearanceCommands";
 import type { GraphLayoutMode } from "../graph/types";
 import type { AiSettings } from "../ai/types";
+import type { ImportFileButtonState } from "../hooks/useGraphImport";
 import SettingsModal from "./settings/SettingsModal";
 import { ArrowLeftIcon, ArrowUpIcon, FitIcon, GraphRootsIcon, MinusIcon, PlusIcon, RedoIcon, SaveIcon, SlidersIcon, UndoIcon } from "./topbar/TopbarIcons";
 import IconButton from "./ui/IconButton";
@@ -17,6 +18,7 @@ interface TopbarProps {
   alignNodeWidthsToMax: boolean;
   status: string;
   fileName: string;
+  importFileButtonState: ImportFileButtonState;
   relativeLinkRootName: string;
   hasGraph: boolean;
   canBack: boolean;
@@ -76,6 +78,7 @@ export default function Topbar({
   alignNodeWidthsToMax,
   status,
   fileName,
+  importFileButtonState,
   relativeLinkRootName,
   hasGraph,
   canBack,
@@ -165,6 +168,7 @@ export default function Topbar({
               alignNodeWidthsToMax={alignNodeWidthsToMax}
               status={status}
               fileName={fileName}
+              importFileButtonState={importFileButtonState}
               relativeLinkRootName={relativeLinkRootName}
               hasGraph={hasGraph}
               consoleSidebarOpen={consoleSidebarOpen}

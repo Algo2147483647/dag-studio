@@ -4,6 +4,7 @@ import type { GraphAppearance, GraphLayoutAppearance } from "../../graph/appeara
 import type { GraphAppearancePresetId } from "../../graph/appearanceCommands";
 import type { GraphLayoutMode } from "../../graph/types";
 import type { AiSettings } from "../../ai/types";
+import type { ImportFileButtonState } from "../../hooks/useGraphImport";
 import { CloseIcon } from "../topbar/TopbarIcons";
 import AiSettingsPanel, { type AiConnectionStatus } from "./AiSettingsPanel";
 import AppearanceSettings from "./AppearanceSettings";
@@ -20,6 +21,7 @@ interface SettingsModalProps {
   alignNodeWidthsToMax: boolean;
   status: string;
   fileName: string;
+  importFileButtonState: ImportFileButtonState;
   relativeLinkRootName: string;
   hasGraph: boolean;
   consoleSidebarOpen: boolean;
@@ -61,6 +63,7 @@ export default function SettingsModal({
   alignNodeWidthsToMax,
   status,
   fileName,
+  importFileButtonState,
   relativeLinkRootName,
   hasGraph,
   consoleSidebarOpen,
@@ -164,6 +167,7 @@ export default function SettingsModal({
               <GeneralSettings
                 status={status}
                 fileName={fileName}
+                importFileButtonState={importFileButtonState}
                 relativeLinkRootName={relativeLinkRootName}
                 hasGraph={hasGraph}
                 consoleSidebarOpen={consoleSidebarOpen}

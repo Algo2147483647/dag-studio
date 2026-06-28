@@ -109,6 +109,7 @@ export default function App() {
     closeFilePreview,
   } = useRelativeFilePreview(dispatch);
   const {
+    importFileButtonState,
     handleFileInputClick,
     handleFileInputChange,
     handleFolderInputClick,
@@ -955,6 +956,7 @@ export default function App() {
         alignNodeWidthsToMax={alignNodeWidthsToMax}
         status={status}
         fileName={state.source.fileName}
+        importFileButtonState={importFileButtonState}
         relativeLinkRootName={relativeLinkRoot?.name || ""}
         hasGraph={Boolean(stage)}
         canBack={state.history.length > 0}

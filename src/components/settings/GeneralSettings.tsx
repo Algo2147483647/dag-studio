@@ -1,9 +1,11 @@
 import type { ChangeEvent, MouseEvent } from "react";
+import type { ImportFileButtonState } from "../../hooks/useGraphImport";
 import { DIRECTORY_INPUT_PROPS } from "./settingsConfig";
 
 interface GeneralSettingsProps {
   status: string;
   fileName: string;
+  importFileButtonState: ImportFileButtonState;
   relativeLinkRootName: string;
   hasGraph: boolean;
   consoleSidebarOpen: boolean;
@@ -22,6 +24,7 @@ interface GeneralSettingsProps {
 export default function GeneralSettings({
   status,
   fileName,
+  importFileButtonState,
   relativeLinkRootName,
   hasGraph,
   consoleSidebarOpen,
@@ -36,13 +39,26 @@ export default function GeneralSettings({
   onExport,
   onFieldMappingOpen,
 }: GeneralSettingsProps) {
+  const importFileClassName = [
+    "ghost-btn",
+    "settings-action-btn",
+    "file-input-label",
+    importFileButtonState.status === "success" ? "file-input-label-success" : "",
+    importFileButtonState.status === "error" ? "file-input-label-error" : "",
+  ].filter(Boolean).join(" ");
+  const importFileTitle = importFileButtonState.status === "success"
+    ? `Current file: ${importFileButtonState.fileName || fileName}`
+    : importFileButtonState.status === "error"
+      ? "Import error"
+      : fileName ? `Current file: ${fileName}` : "Import JSON file";
+
   return (
     <>
       <section className="settings-section" aria-labelledby="file-actions-title">
         <p id="file-actions-title" className="control-label">Files</p>
         <div className="import-action-row">
-          <label htmlFor="fileInput" className="ghost-btn settings-action-btn file-input-label" title={fileName ? `Current file: ${fileName}` : "Import JSON file"}>
-            <span className="file-input-text">Import File</span>
+          <label htmlFor="fileInput" className={importFileClassName} title={importFileTitle}>
+            <span className="file-input-text">{importFileButtonState.label}</span>
             <input type="file" id="fileInput" accept=".json,application/json" multiple onClick={onFileInputClick} onChange={onFileInputChange} />
           </label>
           <label htmlFor="folderInput" className="ghost-btn settings-action-btn file-input-label folder-input-label" title="Import JSON files from a folder">
