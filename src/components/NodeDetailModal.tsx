@@ -3,7 +3,7 @@ import type { DagNode, NodeKey } from "../graph/types";
 import { getMappedFieldName, type FieldMapping } from "../graph/fieldMapping";
 import { getRelationKeys } from "../graph/relations";
 import type { RelativeLinkRoot } from "../adapters/relativeLinks";
-import NodeFieldEditor, { MarkdownValue, buildEditableFields, formatEditorValue, parseNodeFieldValue, supportsMarkdown, type EditableField } from "./NodeFieldEditor";
+import NodeFieldEditor, { LinkValue, MarkdownValue, buildEditableFields, formatEditorValue, hasDisplayLink, parseNodeFieldValue, supportsDisplayMode, type EditableField, type FieldDisplayMode } from "./NodeFieldEditor";
 import { buildRawNodeEditorValue, parseRawNodeEditorValue } from "./nodeDetailRawJson";
 
 interface NodeDetailModalProps {
@@ -24,7 +24,7 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
   const [values, setValues] = useState<Record<string, string>>({});
   const [rawJsonValue, setRawJsonValue] = useState("");
   const [lastEdited, setLastEdited] = useState<"fields" | "raw">("fields");
-  const [markdownFields, setMarkdownFields] = useState<Record<string, boolean>>({});
+  const [fieldDisplayModes, setFieldDisplayModes] = useState<Record<string, FieldDisplayMode>>({});
   const [isEditing, setIsEditing] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [error, setError] = useState("");
@@ -36,7 +36,7 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
       setValues(Object.fromEntries(nextFields.map((field) => [field.name, formatEditorValue(field)])));
       setRawJsonValue(buildRawNodeEditorValue(nodeKey, node, fieldMapping));
       setLastEdited("fields");
-      setMarkdownFields(buildDefaultMarkdownFieldState(nextFields));
+      setFieldDisplayModes(buildDefaultFieldDisplayModes(nextFields));
       setIsEditing(false);
       setError("");
     }
@@ -108,22 +108,18 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
                 <article key={field.name} className="node-detail-field">
                   <div className="node-detail-field__header">
                     <p className="node-detail-field__label">{field.displayName}</p>
-                    {supportsMarkdown(field) ? (
-                      <button
-                        className={`node-detail-markdown-toggle${markdownFields[field.name] ? " is-active" : ""}`}
-                        type="button"
-                        aria-pressed={markdownFields[field.name] ? "true" : "false"}
-                        onClick={() => toggleMarkdownField(field.name)}
-                      >
-                        {markdownFields[field.name] ? "Hide Preview" : "Markdown Preview"}
-                      </button>
+                    {supportsDisplayMode(field) ? (
+                      <FieldDisplayModeToggle
+                        mode={fieldDisplayModes[field.name] || "text"}
+                        onChange={(mode) => setFieldDisplayMode(field.name, mode)}
+                      />
                     ) : null}
                   </div>
                   {isEditing ? (
                     <NodeFieldEditor
                       field={field}
                       value={values[field.name] ?? ""}
-                      showMarkdown={Boolean(markdownFields[field.name])}
+                      displayMode={fieldDisplayModes[field.name] || "text"}
                       relativeLinkRoot={relativeLinkRoot}
                       onOpenRelativeLink={onOpenRelativeLink}
                       onRelativeLinkError={onRelativeLinkError}
@@ -133,7 +129,7 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
                     <NodeFieldPreview
                       field={field}
                       value={values[field.name] ?? ""}
-                      showMarkdown={Boolean(markdownFields[field.name])}
+                      displayMode={fieldDisplayModes[field.name] || "text"}
                       relativeLinkRoot={relativeLinkRoot}
                       onOpenRelativeLink={onOpenRelativeLink}
                       onRelativeLinkError={onRelativeLinkError}
@@ -191,9 +187,9 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
     const nextFields = buildEditableFields(parsed.nextKey, { ...parsed.fields, key: parsed.nextKey }, fieldMapping);
     setFields(nextFields);
     setValues(Object.fromEntries(nextFields.map((field) => [field.name, formatEditorValue(field)])));
-    setMarkdownFields((current) => {
-      const defaults = buildDefaultMarkdownFieldState(nextFields);
-      return Object.fromEntries(Object.keys(defaults).map((fieldName) => [fieldName, current[fieldName] ?? true]));
+    setFieldDisplayModes((current) => {
+      const defaults = buildDefaultFieldDisplayModes(nextFields);
+      return Object.fromEntries(Object.keys(defaults).map((fieldName) => [fieldName, current[fieldName] ?? defaults[fieldName]]));
     });
   }
 
@@ -244,9 +240,39 @@ export default function NodeDetailModal({ open, nodeKey, node, fieldMapping, ini
     setIsEditing(false);
   }
 
-  function toggleMarkdownField(fieldName: string) {
-    setMarkdownFields((current) => ({ ...current, [fieldName]: !current[fieldName] }));
+  function setFieldDisplayMode(fieldName: string, mode: FieldDisplayMode) {
+    setFieldDisplayModes((current) => ({ ...current, [fieldName]: mode }));
   }
+}
+
+function FieldDisplayModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: FieldDisplayMode;
+  onChange: (mode: FieldDisplayMode) => void;
+}) {
+  const modes: Array<{ mode: FieldDisplayMode; label: string }> = [
+    { mode: "markdown", label: "Markdown" },
+    { mode: "link", label: "Link" },
+    { mode: "text", label: "Text" },
+  ];
+
+  return (
+    <div className="node-detail-display-toggle" role="group" aria-label="Field display mode">
+      {modes.map((option) => (
+        <button
+          key={option.mode}
+          className={`node-detail-display-toggle__btn${mode === option.mode ? " is-active" : ""}`}
+          type="button"
+          aria-pressed={mode === option.mode ? "true" : "false"}
+          onClick={() => onChange(option.mode)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function tryBuildRawJsonFromFieldValues(
@@ -338,14 +364,14 @@ function FullscreenIcon({ active }: { active: boolean }) {
 function NodeFieldPreview({
   field,
   value,
-  showMarkdown,
+  displayMode,
   relativeLinkRoot,
   onOpenRelativeLink,
   onRelativeLinkError,
 }: {
   field: EditableField;
   value: string;
-  showMarkdown: boolean;
+  displayMode: FieldDisplayMode;
   relativeLinkRoot: RelativeLinkRoot | null;
   onOpenRelativeLink: (url: string) => void;
   onRelativeLinkError: (message: string) => void;
@@ -353,7 +379,7 @@ function NodeFieldPreview({
   if (!value.trim()) {
     return <p className="node-detail-empty">(empty string)</p>;
   }
-  if (showMarkdown && supportsMarkdown(field)) {
+  if (displayMode === "markdown" && supportsDisplayMode(field)) {
     return (
       <MarkdownValue
         value={value}
@@ -364,12 +390,25 @@ function NodeFieldPreview({
       />
     );
   }
+  if (displayMode === "link" && supportsDisplayMode(field)) {
+    return (
+      <LinkValue
+        value={value}
+        previewSurface
+        relativeLinkRoot={relativeLinkRoot}
+        onOpenRelativeLink={onOpenRelativeLink}
+      />
+    );
+  }
   if (field.name === "key" || field.editorKind === "plainText" || field.editorKind === "multilineText") {
     return <p className="node-detail-text">{value}</p>;
   }
   return <pre className="node-detail-pre">{value}</pre>;
 }
 
-function buildDefaultMarkdownFieldState(fields: EditableField[]): Record<string, boolean> {
-  return Object.fromEntries(fields.filter((field) => supportsMarkdown(field)).map((field) => [field.name, true]));
+function buildDefaultFieldDisplayModes(fields: EditableField[]): Record<string, FieldDisplayMode> {
+  return Object.fromEntries(fields.filter((field) => supportsDisplayMode(field)).map((field) => {
+    const value = formatEditorValue(field);
+    return [field.name, hasDisplayLink(value) ? "link" : "markdown"];
+  }));
 }

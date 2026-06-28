@@ -12,6 +12,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 
 export type FieldEditorKind = "plainText" | "multilineText" | "json" | "relation";
+export type FieldDisplayMode = "markdown" | "link" | "text";
 
 export interface EditableField {
   name: string;
@@ -25,14 +26,14 @@ export interface EditableField {
 interface NodeFieldEditorProps {
   field: EditableField;
   value: string;
-  showMarkdown: boolean;
+  displayMode: FieldDisplayMode;
   relativeLinkRoot: RelativeLinkRoot | null;
   onOpenRelativeLink: (url: string) => void;
   onRelativeLinkError: (message: string) => void;
   onChange: (value: string) => void;
 }
 
-export default function NodeFieldEditor({ field, value, showMarkdown, relativeLinkRoot, onOpenRelativeLink, onRelativeLinkError, onChange }: NodeFieldEditorProps) {
+export default function NodeFieldEditor({ field, value, displayMode, relativeLinkRoot, onOpenRelativeLink, onRelativeLinkError, onChange }: NodeFieldEditorProps) {
   if (field.name === "key") {
     return <input className="node-detail-editor node-detail-editor--input" type="text" spellCheck={false} value={value} onChange={(event) => onChange(event.target.value)} />;
   }
@@ -46,13 +47,20 @@ export default function NodeFieldEditor({ field, value, showMarkdown, relativeLi
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
-      {showMarkdown && supportsMarkdown(field) ? (
+      {displayMode === "markdown" && supportsDisplayMode(field) ? (
         <MarkdownValue
           value={value}
           previewSurface
           relativeLinkRoot={relativeLinkRoot}
           onOpenRelativeLink={onOpenRelativeLink}
           onRelativeLinkError={onRelativeLinkError}
+        />
+      ) : displayMode === "link" && supportsDisplayMode(field) ? (
+        <LinkValue
+          value={value}
+          previewSurface
+          relativeLinkRoot={relativeLinkRoot}
+          onOpenRelativeLink={onOpenRelativeLink}
         />
       ) : null}
       {getEditorHint(field) ? <p className="node-detail-editor-hint">{getEditorHint(field)}</p> : null}
@@ -201,6 +209,182 @@ function RelativeMarkdownImage({
   );
 }
 
+export function LinkValue({
+  value,
+  previewSurface = false,
+  relativeLinkRoot = null,
+  onOpenRelativeLink,
+}: {
+  value: string;
+  previewSurface?: boolean;
+  relativeLinkRoot?: RelativeLinkRoot | null;
+  onOpenRelativeLink?: (url: string) => void;
+}) {
+  const parts = buildDisplayLinkParts(value);
+  if (!value.trim()) {
+    return <p className="node-detail-empty">(empty string)</p>;
+  }
+  if (!parts.some((part) => part.type === "link")) {
+    return <p className="node-detail-text">{value}</p>;
+  }
+
+  return (
+    <div className={`node-detail-link-text${previewSurface ? " node-detail-link-text--preview" : ""}`}>
+      {parts.map((part, index) => (
+        part.type === "link" ? (
+          <DisplayLink
+            key={`${part.url}-${index}`}
+            link={part}
+            relativeLinkRoot={relativeLinkRoot}
+            onOpenRelativeLink={onOpenRelativeLink}
+          />
+        ) : (
+          <span key={`text-${index}`}>{part.text}</span>
+        )
+      ))}
+    </div>
+  );
+}
+
+interface DisplayLinkItem {
+  type: "link";
+  label: string;
+  url: string;
+  start: number;
+  end: number;
+}
+
+interface DisplayTextItem {
+  type: "text";
+  text: string;
+}
+
+function DisplayLink({
+  link,
+  relativeLinkRoot,
+  onOpenRelativeLink,
+}: {
+  link: DisplayLinkItem;
+  relativeLinkRoot: RelativeLinkRoot | null;
+  onOpenRelativeLink?: (url: string) => void;
+}) {
+  if (isRelativeLink(link.url)) {
+    const resolved = resolveRelativePath(link.url);
+    return (
+      <a
+        className="node-detail-link"
+        href={link.url}
+        title={resolved.ok ? `Resolves to: ${relativeLinkRoot?.name || "(no resolve path selected)"}/${resolved.path}` : resolved.message}
+        onClick={(event) => {
+          event.preventDefault();
+          onOpenRelativeLink?.(link.url);
+        }}
+      >
+        {link.label}
+      </a>
+    );
+  }
+
+  return (
+    <a className="node-detail-link" href={link.url} target="_blank" rel="noreferrer">
+      {link.label}
+    </a>
+  );
+}
+
+export function hasDisplayLink(value: string): boolean {
+  return extractDisplayLinkMatches(value).length > 0;
+}
+
+function buildDisplayLinkParts(value: string): Array<DisplayLinkItem | DisplayTextItem> {
+  const text = String(value || "");
+  const links = extractDisplayLinkMatches(text);
+  const parts: Array<DisplayLinkItem | DisplayTextItem> = [];
+  let cursor = 0;
+
+  links.forEach((link) => {
+    if (link.start > cursor) {
+      parts.push({ type: "text", text: text.slice(cursor, link.start) });
+    }
+    parts.push(link);
+    cursor = link.end;
+  });
+
+  if (cursor < text.length) {
+    parts.push({ type: "text", text: text.slice(cursor) });
+  }
+
+  return parts;
+}
+
+function extractDisplayLinkMatches(value: string): DisplayLinkItem[] {
+  const text = String(value || "");
+  const links: DisplayLinkItem[] = [];
+  const occupied: Array<[number, number]> = [];
+  const markdownLinkPattern = /\[([^\]\n]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = markdownLinkPattern.exec(text))) {
+    const label = match[1].trim();
+    const url = match[2].trim();
+    if (isDisplayLinkUrl(url)) {
+      const start = match.index;
+      const end = match.index + match[0].length;
+      links.push({ type: "link", label: label || url, url, start, end });
+      occupied.push([start, end]);
+    }
+  }
+
+  const bareLinkPattern = /(?:https?:\/\/[^\s<>()]+|\/\/[^\s<>()]+|\/[^\s<>()]+|(?:\.{1,2}\/|[^/\s<>()]+\/)[^\s<>()]+|[^\s<>()]+\.[A-Za-z0-9]{1,8}(?:[?#][^\s<>()]+)?)/g;
+  while ((match = bareLinkPattern.exec(text))) {
+    const url = trimTrailingLinkPunctuation(match[0]);
+    const start = match.index;
+    const end = start + match[0].length;
+    if (!url || occupied.some(([occupiedStart, occupiedEnd]) => start < occupiedEnd && end > occupiedStart) || !isDisplayLinkUrl(url)) {
+      continue;
+    }
+    links.push({ type: "link", label: url, url, start, end: start + url.length });
+  }
+
+  return dedupeDisplayLinks(links).sort((first, second) => first.start - second.start);
+}
+
+function dedupeDisplayLinks(links: DisplayLinkItem[]): DisplayLinkItem[] {
+  const seen = new Set<string>();
+  return links.filter((link) => {
+    const key = `${link.start}\n${link.end}\n${link.label}\n${link.url}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function isDisplayLinkUrl(value: string): boolean {
+  const trimmed = String(value || "").trim();
+  if (!trimmed || trimmed.startsWith("#")) {
+    return false;
+  }
+  if (/^https?:\/\//i.test(trimmed) || /^\/\//.test(trimmed) || trimmed.startsWith("/")) {
+    return true;
+  }
+  return isLikelyRelativeLink(trimmed);
+}
+
+function isLikelyRelativeLink(value: string): boolean {
+  return isRelativeLink(value)
+    && (
+      /^\.{1,2}\//.test(value)
+      || value.includes("/")
+      || /\.[A-Za-z0-9]{1,8}(?:[?#].*)?$/.test(value)
+    );
+}
+
+function trimTrailingLinkPunctuation(value: string): string {
+  return value.replace(/[.,;:!?]+$/g, "");
+}
+
 export function buildEditableFields(nodeKey: NodeKey, node: Record<string, unknown>, fieldMapping: FieldMapping): EditableField[] {
   const clonedNode = { ...node };
   if (clonedNode.key === nodeKey) {
@@ -231,11 +415,13 @@ export function formatEditorValue(field: EditableField): string {
   return JSON.stringify(field.value, null, 2);
 }
 
-export function supportsMarkdown(field: EditableField): boolean {
+export function supportsDisplayMode(field: EditableField): boolean {
   return field.name !== "key"
     && typeof field.value === "string"
     && (field.editorKind === "plainText" || field.editorKind === "multilineText");
 }
+
+export const supportsMarkdown = supportsDisplayMode;
 
 export function parseNodeFieldValue(field: EditableField, rawValue: string): { ok: true; value: unknown } | { ok: false; message: string } {
   const text = String(rawValue || "");
