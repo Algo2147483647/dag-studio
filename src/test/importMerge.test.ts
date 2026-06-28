@@ -43,6 +43,7 @@ export const importMergeSuite = defineSuite("import merge", [
     assert.deepEqual(serializeDag(result.dag, result.mapping).C, {
       title: "Gamma",
       children: { D: "edge_cd" },
+      parents: {},
     });
   }),
 
@@ -69,5 +70,53 @@ export const importMergeSuite = defineSuite("import merge", [
     assert.ok(result.dag.A__second);
     assert.deepEqual(result.dag.A__second.children, { C: "edge_ac" });
     assert.deepEqual(result.dag.C.parents, { A__second: "edge_ac" });
+  }),
+
+  defineTest("reconciles parent-only and child-only relation declarations", () => {
+    const result = buildImportedDag([
+      {
+        name: "relations.json",
+        payload: {
+          A: { children: { B: "edge_ab" } },
+          B: { parents: { C: "edge_cb" } },
+          C: {},
+        },
+      },
+    ], getDefaultFieldMapping());
+
+    assert.deepEqual(result.dag.A.children, { B: "edge_ab" });
+    assert.deepEqual(result.dag.B.parents, { A: "edge_ab", C: "edge_cb" });
+    assert.deepEqual(result.dag.C.children, { B: "edge_cb" });
+  }),
+
+  defineTest("keeps children relation labels when imported parents disagree", () => {
+    const result = buildImportedDag([
+      {
+        name: "conflict.json",
+        payload: {
+          A: { children: { B: "child_label" } },
+          B: { parents: { A: "parent_label" } },
+        },
+      },
+    ], getDefaultFieldMapping());
+
+    assert.deepEqual(result.dag.A.children, { B: "child_label" });
+    assert.deepEqual(result.dag.B.parents, { A: "child_label" });
+    assert.ok(result.warnings.some((warning) => warning.type === "relation-conflict"));
+  }),
+
+  defineTest("creates empty nodes for missing relation endpoints", () => {
+    const result = buildImportedDag([
+      {
+        name: "missing.json",
+        payload: {
+          A: { children: { B: "edge_ab" } },
+        },
+      },
+    ], getDefaultFieldMapping());
+
+    assert.ok(result.dag.B);
+    assert.deepEqual(result.dag.B.parents, { A: "edge_ab" });
+    assert.ok(result.warnings.some((warning) => warning.type === "missing-relation-node"));
   }),
 ]);

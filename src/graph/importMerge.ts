@@ -1,5 +1,6 @@
 import { getMappedFieldName, inferFieldMapping, MAPPABLE_SYSTEM_FIELD_KEYS, type FieldMapping } from "./fieldMapping";
 import { normalizeDagInput } from "./normalize";
+import { reconcileDagRelations } from "./reconcileRelations";
 import { structuredCloneValue } from "./serialize";
 import type { DagNode, NodeKey, NormalizedDag } from "./types";
 
@@ -9,7 +10,7 @@ export interface ImportGraphDocument {
 }
 
 export interface ImportWarning {
-  type: "empty" | "duplicate-key" | "field-conflict";
+  type: "empty" | "duplicate-key" | "field-conflict" | "relation-conflict" | "missing-relation-node";
   message: string;
 }
 
@@ -54,8 +55,11 @@ export function buildImportedDag(documents: ImportGraphDocument[], fallbackMappi
     Object.assign(dag, merged.dag);
   });
 
+  const reconciled = reconcileDagRelations(dag, targetMapping);
+  warnings.push(...reconciled.warnings);
+
   return {
-    dag,
+    dag: reconciled.dag,
     mapping: targetMapping,
     warnings,
     documentCount: documents.length,

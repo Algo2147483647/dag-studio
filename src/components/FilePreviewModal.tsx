@@ -64,7 +64,6 @@ export default function FilePreviewModal({
       <section className="file-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="file-preview-title">
         <div className="file-preview-header">
           <div>
-            <p className="file-preview-eyebrow">File Preview</p>
             <h3 id="file-preview-title">{activePreview.path}</h3>
             <p className="file-preview-source">Original link: {activePreview.originalUrl}</p>
           </div>
