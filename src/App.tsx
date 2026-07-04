@@ -98,6 +98,7 @@ export default function App() {
   const topbarRef = useRef<HTMLElement>(null);
   const restoredAiHarnessGraphRef = useRef<string | null>(null);
   const restoredReviewCardRef = useRef<string | null>(null);
+  const pendingNodeClickTimeoutRef = useRef<number | null>(null);
 
   useDefaultGraph(dispatch, suppressDefaultGraphRef, setFieldMapping, defaultGraphAutoLoadEnabled);
   const {
@@ -178,6 +179,12 @@ export default function App() {
   useEffect(() => {
     setActiveSuggestionIndex(0);
   }, [consoleInput]);
+
+  useEffect(() => {
+    return () => {
+      clearPendingNodeClick();
+    };
+  }, []);
 
   const stage = useMemo(() => state.dag ? buildStageData({ dag: state.dag, mapping: fieldMapping, selection: state.selection, layoutMode: state.layout.mode, appearance, showNodeDetail, alignNodeWidthsToMax }) : null, [alignNodeWidthsToMax, appearance, fieldMapping, showNodeDetail, state.dag, state.layout.mode, state.selection]);
   const parentSelection = useMemo(() => state.dag && stage ? getParentLevelSelection(state.dag, stage.topLevelKeys, fieldMapping) : null, [fieldMapping, stage, state.dag]);
@@ -719,17 +726,30 @@ export default function App() {
   }
 
   function handleNodeClick(nodeKey: string) {
-    if (!state.selection || state.selection.type !== "node" || state.selection.key !== nodeKey) {
-      dispatch({ type: "selectionChanged", selection: { type: "node", key: nodeKey }, pushHistory: true });
-    }
+    clearPendingNodeClick();
+    pendingNodeClickTimeoutRef.current = window.setTimeout(() => {
+      pendingNodeClickTimeoutRef.current = null;
+      if (!state.selection || state.selection.type !== "node" || state.selection.key !== nodeKey) {
+        dispatch({ type: "selectionChanged", selection: { type: "node", key: nodeKey }, pushHistory: true });
+      }
+    }, 240);
   }
 
-  function handleRootNodeDoubleClick(nodeKey: string) {
-    if (!stage?.nodeMap[nodeKey]?.isRoot) {
+  function handleNodeDoubleClick(nodeKey: string) {
+    clearPendingNodeClick();
+    if (!stage?.nodeMap[nodeKey]) {
       return;
     }
     setNodeDetailInitialFocus("fields");
     dispatch({ type: "nodeDetailOpened", nodeKey });
+  }
+
+  function clearPendingNodeClick() {
+    if (pendingNodeClickTimeoutRef.current === null) {
+      return;
+    }
+    window.clearTimeout(pendingNodeClickTimeoutRef.current);
+    pendingNodeClickTimeoutRef.current = null;
   }
 
   function handleNodeContextMenu(event: React.MouseEvent<SVGGElement>, nodeKey: string) {
@@ -1094,7 +1114,7 @@ export default function App() {
         focusedKey={focusedKey}
         hideNodeBorders={hideNodeBorders}
         onNodeClick={handleNodeClick}
-        onRootNodeDoubleClick={handleRootNodeDoubleClick}
+        onNodeDoubleClick={handleNodeDoubleClick}
         onNodeContextMenu={handleNodeContextMenu}
         onFocusChange={setFocusedKey}
         onScroll={() => dispatch({ type: "contextMenuClosed" })}

@@ -16,7 +16,7 @@ interface WorkspaceProps {
   focusedKey: string | null;
   hideNodeBorders: boolean;
   onNodeClick: (key: string) => void;
-  onRootNodeDoubleClick: (key: string) => void;
+  onNodeDoubleClick: (key: string) => void;
   onNodeContextMenu: (event: React.MouseEvent<SVGGElement>, key: string) => void;
   onFocusChange: (key: string | null) => void;
   onScroll: () => void;
@@ -36,7 +36,7 @@ export default function Workspace({
   focusedKey,
   hideNodeBorders,
   onNodeClick,
-  onRootNodeDoubleClick,
+  onNodeDoubleClick,
   onNodeContextMenu,
   onFocusChange,
   onScroll,
@@ -70,7 +70,7 @@ export default function Workspace({
                 appearance={appearance}
                 svgRef={svgRef}
                 onNodeClick={onNodeClick}
-                onRootNodeDoubleClick={onRootNodeDoubleClick}
+                onNodeDoubleClick={onNodeDoubleClick}
                 onNodeContextMenu={onNodeContextMenu}
                 onFocusChange={onFocusChange}
               />

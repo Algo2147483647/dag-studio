@@ -15,8 +15,8 @@ type ContextMenuEntry =
 const entries: ContextMenuEntry[] = [
   { type: "action", action: "view-node", label: "View Node", requiresNode: true },
   { type: "action", action: "copy-key", label: "Copy Key", requiresNode: true },
+  { type: "action", action: "rename-node", label: "Rename Key", requiresNode: true },
   { type: "divider" },
-  { type: "action", action: "rename-node", label: "Rename Node Key", requiresNode: true },
   { type: "action", action: "copy-node", label: "Copy Node", requiresNode: true },
   { type: "action", action: "add-node", label: "Add Child Node" },
   { type: "action", action: "edit-children", label: "Edit Children", requiresNode: true },
