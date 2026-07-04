@@ -75,7 +75,7 @@ Key workflows:
 - `UI Configuration -> Import` loads a graph appearance JSON file.
 - `UI Configuration -> Export` downloads the current graph appearance as JSON.
 - `UI Configuration -> Reset` restores the default graph appearance.
-- `Presets` applies built-in looks such as `default`, `slate`, `blueprint`, `contrast`, `compact`, and `presentation`.
+- `Presets` applies built-in looks such as `simple`, `compact`, `default`, `slate`, `blueprint`, `contrast`, and `presentation`.
 - `Tokens` edits common `--dag-*` CSS variables without writing CSS.
 - `Custom CSS` replaces the graph CSS block used by the renderer and SVG export.
 - `Layout Tuning` adjusts spacing, node height, width, and stage minimums.

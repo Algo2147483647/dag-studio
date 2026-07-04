@@ -14,7 +14,7 @@ export type AppearanceCommand =
   | { type: "resetAppearance" }
   | { type: "applyPreset"; presetId: GraphAppearancePresetId };
 
-export type GraphAppearancePresetId = "default" | "slate" | "blueprint" | "contrast" | "compact" | "presentation";
+export type GraphAppearancePresetId = "simple" | "compact" | "default" | "slate" | "blueprint" | "contrast" | "presentation";
 
 export interface GraphAppearancePreset {
   id: GraphAppearancePresetId;
@@ -29,6 +29,58 @@ export interface AppearanceCommandResult {
 }
 
 export const GRAPH_APPEARANCE_PRESETS: GraphAppearancePreset[] = [
+  {
+    id: "simple",
+    label: "Simple",
+    appearance: sanitizeGraphAppearance({
+      ...DEFAULT_GRAPH_APPEARANCE,
+      layout: {
+        ...DEFAULT_GRAPH_APPEARANCE.layout,
+        columnGap: 60,
+        rowGap: 20,
+        edgeLaneGap: 10,
+        nodeHeight: 48,
+        maxNodeWidth: 240,
+      },
+      display: {
+        ...DEFAULT_GRAPH_APPEARANCE.display,
+        showEdgeLabels: false,
+      },
+      cssVars: {
+        ...DEFAULT_GRAPH_APPEARANCE.cssVars,
+        "--dag-title-font-size": "16px",
+      },
+      css: `${DEFAULT_GRAPH_APPEARANCE.css}
+
+.dag-edge__path { stroke-width: 1px; }
+
+.dag-node__shape { box-shadow: none !important; filter: none !important; }
+
+.dag-node__pin { display: none; }
+
+.dag-node__title { alignment-baseline: central; dominant-baseline: central; }`,
+    }),
+  },
+  {
+    id: "compact",
+    label: "Compact",
+    appearance: sanitizeGraphAppearance({
+      ...DEFAULT_GRAPH_APPEARANCE,
+      layout: {
+        ...DEFAULT_GRAPH_APPEARANCE.layout,
+        columnGap: 60,
+        rowGap: 20,
+        edgeLaneGap: 10,
+        nodeHeight: 48,
+        maxNodeWidth: 240,
+      },
+      display: {
+        ...DEFAULT_GRAPH_APPEARANCE.display,
+        showEdgeLabels: false,
+      },
+      css: `${DEFAULT_GRAPH_APPEARANCE.css}\n\n.dag-edge__path { stroke-width: 1px; }`,
+    }),
+  },
   { id: "default", label: "Default", appearance: DEFAULT_GRAPH_APPEARANCE },
   {
     id: "slate",
@@ -86,26 +138,6 @@ export const GRAPH_APPEARANCE_PRESETS: GraphAppearancePreset[] = [
   filter: none;
 }
 `.trim()),
-  },
-  {
-    id: "compact",
-    label: "Compact",
-    appearance: sanitizeGraphAppearance({
-      ...DEFAULT_GRAPH_APPEARANCE,
-      layout: {
-        ...DEFAULT_GRAPH_APPEARANCE.layout,
-        columnGap: 60,
-        rowGap: 20,
-        edgeLaneGap: 10,
-        nodeHeight: 48,
-        maxNodeWidth: 240,
-      },
-      display: {
-        ...DEFAULT_GRAPH_APPEARANCE.display,
-        showEdgeLabels: false,
-      },
-      css: `${DEFAULT_GRAPH_APPEARANCE.css}\n\n.dag-edge__path { stroke-width: 1px; }`,
-    }),
   },
   {
     id: "presentation",

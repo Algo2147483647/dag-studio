@@ -920,11 +920,12 @@ Applies one built-in graph appearance preset.
 
 | Preset | Intent |
 | --- | --- |
+| `simple` | Minimal graph styling with hidden pins and labels |
+| `compact` | Denser node spacing |
 | `default` | Balanced default UI |
 | `slate` | Quiet dark-neutral reading surface |
 | `blueprint` | Technical diagram look |
 | `contrast` | High-contrast inspection mode |
-| `compact` | Denser node spacing |
 | `presentation` | Larger, display-oriented graph styling |
 
 ### Examples

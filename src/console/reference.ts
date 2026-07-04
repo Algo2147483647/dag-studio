@@ -37,7 +37,7 @@ export const CONSOLE_COMMAND_REFERENCE: ConsoleCommandReference[] = [
   { label: "/style-css show", insertText: "/style-css show", help: "Print the current graph appearance CSS." },
   { label: "/style-css append <css>", insertText: "/style-css append ", help: "Append scoped graph CSS using stable .dag-* selectors." },
   { label: "/style-css replace <css>", insertText: "/style-css replace ", help: "Replace the full graph appearance CSS." },
-  { label: "/style-preset <id>", insertText: "/style-preset ", help: "Apply an appearance preset: default, slate, blueprint, contrast, compact, presentation." },
+  { label: "/style-preset <id>", insertText: "/style-preset ", help: "Apply an appearance preset: simple, compact, default, slate, blueprint, contrast, presentation." },
   { label: "/style-reset", insertText: "/style-reset", help: "Reset graph appearance to the default CSS, variables, and layout." },
   { label: "/clear", insertText: "/clear", help: "Clear the console output." },
 ];
@@ -69,7 +69,7 @@ export function buildConsoleHelpText(): string {
     '- /style-var <var> <value>: Set a --dag-* CSS variable for graph appearance.',
     '- /style-var --unset <var>: Remove a --dag-* CSS variable override.',
     '- /style-css show|append|replace: Show, append to, or replace graph CSS using stable .dag-* selectors.',
-    '- /style-preset <default|slate|blueprint|contrast|compact|presentation>: Apply a graph UI preset.',
+    '- /style-preset <simple|compact|default|slate|blueprint|contrast|presentation>: Apply a graph UI preset.',
     '- /style-reset: Reset graph appearance.',
     '- /clear | /cls: Clear the console output.',
   ].join("\n");

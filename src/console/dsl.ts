@@ -510,8 +510,8 @@ function parseStylePresetInstruction(tokens: ConsoleToken[], line: number) {
     return { ok: false, error: { line, message: "style-preset expects a preset id." } } as const;
   }
   const presetId = parseLiteralToken(tokens[1]);
-  if (!presetId || !["default", "slate", "blueprint", "contrast", "compact", "presentation"].includes(presetId)) {
-    return { ok: false, error: { line, message: "style-preset expects default, slate, blueprint, contrast, compact, or presentation." } } as const;
+  if (!presetId || !["simple", "compact", "default", "slate", "blueprint", "contrast", "presentation"].includes(presetId)) {
+    return { ok: false, error: { line, message: "style-preset expects simple, compact, default, slate, blueprint, contrast, or presentation." } } as const;
   }
   return { ok: true, instruction: { type: "appearance", command: { type: "applyPreset", presetId: presetId as GraphAppearancePresetId }, line } satisfies ConsoleInstruction } as const;
 }
