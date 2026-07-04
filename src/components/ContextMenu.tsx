@@ -1,7 +1,7 @@
 import type React from "react";
 import type { NodeKey } from "../graph/types";
 
-export type ContextMenuAction = "view-node" | "copy-key" | "rename-node" | "delete-node" | "delete-subtree" | "edit-parents" | "edit-children" | "add-node" | "copy-node";
+export type ContextMenuAction = "view-node" | "copy-key" | "rename-node" | "delete-node" | "delete-subtree" | "edit-parents" | "edit-children" | "add-node" | "copy-node" | "copy-node-to-child" | "paste-node" | "paste-node-to-child";
 
 interface ContextMenuProps {
   menu: null | { x: number; y: number; nodeKey: NodeKey | null };
@@ -12,12 +12,14 @@ type ContextMenuEntry =
   | { type: "action"; action: ContextMenuAction; label: string; requiresNode?: boolean; tone?: "default" | "danger" }
   | { type: "divider" };
 
-const entries: ContextMenuEntry[] = [
+const nodeEntries: ContextMenuEntry[] = [
   { type: "action", action: "view-node", label: "View Node", requiresNode: true },
   { type: "action", action: "copy-key", label: "Copy Key", requiresNode: true },
   { type: "action", action: "rename-node", label: "Rename Key", requiresNode: true },
   { type: "divider" },
   { type: "action", action: "copy-node", label: "Copy Node", requiresNode: true },
+  { type: "action", action: "copy-node-to-child", label: "Copy Node to Child", requiresNode: true },
+  { type: "action", action: "paste-node-to-child", label: "Paste Node to Child", requiresNode: true },
   { type: "action", action: "add-node", label: "Add Child Node" },
   { type: "action", action: "edit-children", label: "Edit Children", requiresNode: true },
   { type: "action", action: "edit-parents", label: "Edit Parents", requiresNode: true },
@@ -26,10 +28,16 @@ const entries: ContextMenuEntry[] = [
   { type: "action", action: "delete-subtree", label: "Delete Subtree", requiresNode: true, tone: "danger" },
 ];
 
+const backgroundEntries: ContextMenuEntry[] = [
+  { type: "action", action: "add-node", label: "Add Node" },
+  { type: "action", action: "paste-node", label: "Paste Node" },
+];
+
 export default function ContextMenu({ menu, onAction }: ContextMenuProps) {
   const isVisible = Boolean(menu);
   const left = menu ? Math.max(8, menu.x) : 0;
   const top = menu ? Math.max(8, menu.y) : 0;
+  const entries = menu?.nodeKey ? nodeEntries : backgroundEntries;
 
   return (
     <div id="node-context-menu" className={`node-context-menu${isVisible ? " is-visible" : ""}`} aria-hidden={!isVisible} style={{ left, top }}>
@@ -82,6 +90,9 @@ function renderContextMenuIcon(action: ContextMenuAction) {
       );
     case "copy-key":
     case "copy-node":
+    case "copy-node-to-child":
+    case "paste-node":
+    case "paste-node-to-child":
       return (
         <ContextMenuIcon>
           <rect x="8" y="8" width="11" height="11" rx="2" />

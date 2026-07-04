@@ -10,7 +10,7 @@ import {
 } from "./graph/fieldMapping";
 import { getFullGraphSelection, getInitialSelection, getParentLevelSelection, sanitizeNodeLabel } from "./graph/selectors";
 import { serializeDag } from "./graph/serialize";
-import { copyTextToClipboard } from "./adapters/clipboard";
+import { copyTextToClipboard, readTextFromClipboard } from "./adapters/clipboard";
 import { buildTimestampFileName, downloadJsonFile } from "./adapters/download";
 import { canOverwrite, openJsonFileWithAccess, readJsonFile } from "./adapters/fileAccess";
 import { downloadSvg } from "./rendering/export-svg";
@@ -765,6 +765,21 @@ export default function App() {
     });
   }
 
+  function handleBackgroundContextMenu(event: React.MouseEvent<Element>) {
+    if (!state.dag || event.target instanceof Element && event.target.closest(".dag-node")) {
+      return;
+    }
+    event.preventDefault();
+    const menuWidth = 190;
+    const menuHeight = 96;
+    dispatch({
+      type: "contextMenuOpened",
+      x: Math.min(event.clientX, window.innerWidth - menuWidth - 8),
+      y: Math.min(event.clientY, window.innerHeight - menuHeight - 8),
+      nodeKey: null,
+    });
+  }
+
   function handleContextMenuAction(action: ContextMenuAction, nodeKey: NodeKey | null) {
     dispatch({ type: "contextMenuClosed" });
     if (action === "view-node" && nodeKey) {
@@ -773,6 +788,10 @@ export default function App() {
     }
     if (action === "copy-key" && nodeKey) {
       void handleCopyNodeKey(nodeKey);
+      return;
+    }
+    if (action === "copy-node" && nodeKey) {
+      void handleCopyNodeJson(nodeKey);
       return;
     }
     if (action === "rename-node" && nodeKey) {
@@ -799,8 +818,16 @@ export default function App() {
       promptAddNode(nodeKey);
       return;
     }
-    if (action === "copy-node" && nodeKey) {
+    if (action === "copy-node-to-child" && nodeKey) {
       promptCopyNode(nodeKey);
+      return;
+    }
+    if (action === "paste-node") {
+      void handlePasteNode();
+      return;
+    }
+    if (action === "paste-node-to-child" && nodeKey) {
+      void handlePasteNode(nodeKey);
     }
   }
 
@@ -812,6 +839,55 @@ export default function App() {
       console.error(error);
       dispatch({ type: "statusChanged", status: `Unable to copy node key "${nodeKey}".` });
     }
+  }
+
+  async function handleCopyNodeJson(nodeKey: NodeKey) {
+    const node = state.dag?.[nodeKey];
+    if (!node) {
+      dispatch({ type: "statusChanged", status: `Node "${nodeKey}" does not exist.` });
+      return;
+    }
+    try {
+      await copyTextToClipboard(JSON.stringify(node, null, 2));
+      dispatch({ type: "statusChanged", status: `Copied node "${nodeKey}" JSON to the clipboard.` });
+    } catch (error) {
+      console.error(error);
+      dispatch({ type: "statusChanged", status: `Unable to copy node "${nodeKey}" JSON.` });
+    }
+  }
+
+  async function handlePasteNode(parentKey?: NodeKey) {
+    if (!state.dag) {
+      dispatch({ type: "statusChanged", status: "Load or initialize a graph before pasting a node." });
+      return;
+    }
+
+    try {
+      const clipboardText = await readTextFromClipboard();
+      const parsed = JSON.parse(clipboardText) as unknown;
+      const pasted = getPastedNodeFields(parsed);
+      if (!pasted) {
+        throw new Error("Clipboard does not contain a node JSON object.");
+      }
+
+      const nextKey = promptForPastedNodeKey(pasted.key);
+      if (nextKey === null) {
+        return;
+      }
+      commitCommand({ type: "addNodeFromFields", key: nextKey, fields: pasted.fields, parentKey }, { type: "node", key: nextKey });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to paste node from clipboard.";
+      console.error(error);
+      dispatch({ type: "statusChanged", status: message });
+      window.alert(message);
+    }
+  }
+
+  function promptForPastedNodeKey(rawKey: string): NodeKey | null {
+    const trimmedKey = rawKey.trim();
+    const defaultKey = trimmedKey && !state.dag?.[trimmedKey] ? trimmedKey : `${trimmedKey || "Pasted_Node"}_Copy`;
+    const input = window.prompt("Enter a new unique node key:", defaultKey);
+    return input === null ? null : input.trim();
   }
 
   function promptRenameNode(nodeKey: NodeKey) {
@@ -1116,6 +1192,7 @@ export default function App() {
         onNodeClick={handleNodeClick}
         onNodeDoubleClick={handleNodeDoubleClick}
         onNodeContextMenu={handleNodeContextMenu}
+        onBackgroundContextMenu={handleBackgroundContextMenu}
         onFocusChange={setFocusedKey}
         onScroll={() => dispatch({ type: "contextMenuClosed" })}
         onSidebarResizeStart={handleConsoleSidebarResizeStart}
@@ -1321,6 +1398,30 @@ function isExecutionApproval(message: string): boolean {
 
 function serializeDagToJson(dag: NormalizedDag, mapping: FieldMapping): string {
   return JSON.stringify(serializeDag(dag, mapping), null, 2);
+}
+
+function getPastedNodeFields(value: unknown): { key: NodeKey; fields: Record<string, unknown> } | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const directFields = value as Record<string, unknown>;
+  const directKey = typeof directFields.key === "string" ? directFields.key.trim() : "";
+  if (directKey) {
+    return { key: directKey, fields: directFields };
+  }
+
+  const entries = Object.entries(directFields);
+  if (entries.length !== 1) {
+    return null;
+  }
+
+  const [entryKey, entryValue] = entries[0];
+  if (!entryKey.trim() || !entryValue || typeof entryValue !== "object" || Array.isArray(entryValue)) {
+    return null;
+  }
+
+  return { key: entryKey.trim(), fields: entryValue as Record<string, unknown> };
 }
 
 function getSavedRevisionDag(

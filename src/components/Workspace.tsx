@@ -18,6 +18,7 @@ interface WorkspaceProps {
   onNodeClick: (key: string) => void;
   onNodeDoubleClick: (key: string) => void;
   onNodeContextMenu: (event: React.MouseEvent<SVGGElement>, key: string) => void;
+  onBackgroundContextMenu: (event: React.MouseEvent<Element>) => void;
   onFocusChange: (key: string | null) => void;
   onScroll: () => void;
   onSidebarResizeStart: (event: React.PointerEvent<HTMLDivElement>) => void;
@@ -38,6 +39,7 @@ export default function Workspace({
   onNodeClick,
   onNodeDoubleClick,
   onNodeContextMenu,
+  onBackgroundContextMenu,
   onFocusChange,
   onScroll,
   onSidebarResizeStart,
@@ -61,7 +63,7 @@ export default function Workspace({
         ) : null}
         <div className="workspace-stage-shell">
           <EmptyState message={status || "Loading graph data..."} hidden={Boolean(stage)} actionLabel="Initialize Canvas" onAction={onInitializeCanvas} />
-          <div id="main-content" ref={containerRef} className={stage ? "is-ready" : ""} aria-live="polite" onScroll={onScroll}>
+          <div id="main-content" ref={containerRef} className={stage ? "is-ready" : ""} aria-live="polite" onScroll={onScroll} onContextMenu={onBackgroundContextMenu}>
             {stage ? (
               <GraphStage
                 stage={stage}
@@ -72,6 +74,7 @@ export default function Workspace({
                 onNodeClick={onNodeClick}
                 onNodeDoubleClick={onNodeDoubleClick}
                 onNodeContextMenu={onNodeContextMenu}
+                onBackgroundContextMenu={onBackgroundContextMenu}
                 onFocusChange={onFocusChange}
               />
             ) : null}

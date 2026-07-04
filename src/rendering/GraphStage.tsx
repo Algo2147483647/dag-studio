@@ -20,10 +20,11 @@ interface GraphStageProps {
   onNodeClick: (key: string) => void;
   onNodeDoubleClick: (key: string) => void;
   onNodeContextMenu: (event: React.MouseEvent<SVGGElement>, key: string) => void;
+  onBackgroundContextMenu: (event: React.MouseEvent<Element>) => void;
   onFocusChange: (key: string | null) => void;
 }
 
-export default function GraphStage({ stage, focusedKey, hideNodeBorders, appearance, svgRef, onNodeClick, onNodeDoubleClick, onNodeContextMenu, onFocusChange }: GraphStageProps) {
+export default function GraphStage({ stage, focusedKey, hideNodeBorders, appearance, svgRef, onNodeClick, onNodeDoubleClick, onNodeContextMenu, onBackgroundContextMenu, onFocusChange }: GraphStageProps) {
   const hoveredKeyRef = useRef<string | null>(null);
   const focusedKeyRef = useRef<string | null>(focusedKey);
   const appliedInteractiveKeyRef = useRef<string | null>(null);
@@ -228,6 +229,7 @@ export default function GraphStage({ stage, focusedKey, hideNodeBorders, appeara
       style={stageStyle}
       role="img"
       aria-label={`DAG view focused on ${stage.selection.label}`}
+      onContextMenu={onBackgroundContextMenu}
     >
       <GraphDefs appearanceCss={appearance.css} />
       <GraphBackdrop stage={stage} />

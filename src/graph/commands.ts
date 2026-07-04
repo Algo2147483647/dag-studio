@@ -10,6 +10,7 @@ export type GraphCommand =
   | { type: "deleteNode"; key: NodeKey }
   | { type: "deleteSubtree"; rootKey: NodeKey }
   | { type: "addNode"; key: NodeKey; parentKey?: NodeKey }
+  | { type: "addNodeFromFields"; key: NodeKey; fields: Record<string, unknown>; parentKey?: NodeKey }
   | { type: "copyNode"; sourceKey: NodeKey; key: NodeKey; parentKey?: NodeKey }
   | { type: "setEdge"; parentKey: NodeKey; childKey: NodeKey; weight?: RelationValue }
   | { type: "removeEdge"; parentKey: NodeKey; childKey: NodeKey }
@@ -39,6 +40,8 @@ export function applyGraphCommand(sourceDag: NormalizedDag, command: GraphComman
       return deleteNodes(dag, mapping, collectSubtreeNodeKeys(dag, command.rootKey, mapping), `Deleted subtree rooted at ${command.rootKey}.`);
     case "addNode":
       return addNode(dag, mapping, command.key, command.parentKey);
+    case "addNodeFromFields":
+      return addNodeFromFields(dag, mapping, command.key, command.fields, command.parentKey);
     case "copyNode":
       return copyNode(dag, mapping, command.sourceKey, command.key, command.parentKey);
     case "setEdge":
@@ -132,6 +135,23 @@ function addNode(dag: NormalizedDag, mapping: FieldMapping, key: NodeKey, parent
   if (parentKey && dag[parentKey]) {
     syncBidirectionalRelations(dag, mapping, parentKey, "children", [...getNodeChildKeys(dag[parentKey], mapping), nextKey]);
   }
+  return { dag, changedKeys: parentKey ? [nextKey, parentKey] : [nextKey], message: `Added node ${nextKey}.` };
+}
+
+function addNodeFromFields(dag: NormalizedDag, mapping: FieldMapping, key: NodeKey, fields: Record<string, unknown>, parentKey?: NodeKey): CommandResult {
+  const nextKey = key.trim();
+  assertValidNewKey(dag, nextKey);
+
+  const nextNode = structuredCloneValue(fields) as DagNode;
+  nextNode.key = nextKey;
+  setNodeParents(nextNode, mapping, {});
+  setNodeChildren(nextNode, mapping, {});
+  dag[nextKey] = nextNode;
+
+  if (parentKey && dag[parentKey]) {
+    syncBidirectionalRelations(dag, mapping, parentKey, "children", [...getNodeChildKeys(dag[parentKey], mapping), nextKey]);
+  }
+
   return { dag, changedKeys: parentKey ? [nextKey, parentKey] : [nextKey], message: `Added node ${nextKey}.` };
 }
 
