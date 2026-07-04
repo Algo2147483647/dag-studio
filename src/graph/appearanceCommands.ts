@@ -94,17 +94,17 @@ export const GRAPH_APPEARANCE_PRESETS: GraphAppearancePreset[] = [
       ...DEFAULT_GRAPH_APPEARANCE,
       layout: {
         ...DEFAULT_GRAPH_APPEARANCE.layout,
-        columnGap: 86,
-        rowGap: 12,
-        edgeLaneGap: 16,
-        nodeHeight: 58,
-        minNodeWidth: 160,
-        maxNodeWidth: 220,
+        columnGap: 60,
+        rowGap: 20,
+        edgeLaneGap: 10,
+        nodeHeight: 48,
+        maxNodeWidth: 240,
       },
-      cssVars: {
-        ...DEFAULT_GRAPH_APPEARANCE.cssVars,
-        "--dag-title-font-size": "13px",
+      display: {
+        ...DEFAULT_GRAPH_APPEARANCE.display,
+        showEdgeLabels: false,
       },
+      css: `${DEFAULT_GRAPH_APPEARANCE.css}\n\n.dag-edge__path { stroke-width: 1px; }`,
     }),
   },
   {
