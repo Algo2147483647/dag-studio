@@ -874,7 +874,10 @@ export default function App() {
       if (nextKey === null) {
         return;
       }
-      commitCommand({ type: "addNodeFromFields", key: nextKey, fields: pasted.fields, parentKey }, { type: "node", key: nextKey });
+      commitCommand(
+        { type: "addNodeFromFields", key: nextKey, fields: pasted.fields, parentKey },
+        parentKey ? state.selection : { type: "node", key: nextKey },
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to paste node from clipboard.";
       console.error(error);
