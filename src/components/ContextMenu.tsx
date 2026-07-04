@@ -18,8 +18,8 @@ const nodeEntries: ContextMenuEntry[] = [
   { type: "action", action: "rename-node", label: "Rename Key", requiresNode: true },
   { type: "divider" },
   { type: "action", action: "copy-node", label: "Copy Node", requiresNode: true },
-  { type: "action", action: "copy-node-to-child", label: "Copy Node to Child", requiresNode: true },
   { type: "action", action: "paste-node-to-child", label: "Paste Node to Child", requiresNode: true },
+  { type: "action", action: "copy-node-to-child", label: "Copy Self to Child", requiresNode: true },
   { type: "action", action: "add-node", label: "Add Child Node" },
   { type: "action", action: "edit-children", label: "Edit Children", requiresNode: true },
   { type: "action", action: "edit-parents", label: "Edit Parents", requiresNode: true },
@@ -90,13 +90,29 @@ function renderContextMenuIcon(action: ContextMenuAction) {
       );
     case "copy-key":
     case "copy-node":
-    case "copy-node-to-child":
-    case "paste-node":
-    case "paste-node-to-child":
       return (
         <ContextMenuIcon>
           <rect x="8" y="8" width="11" height="11" rx="2" />
           <path d="M5 15V6C5 5.4 5.4 5 6 5H15" />
+        </ContextMenuIcon>
+      );
+    case "copy-node-to-child":
+      return (
+        <ContextMenuIcon>
+          <rect x="5" y="4" width="9" height="7" rx="2" />
+          <rect x="10" y="14" width="9" height="7" rx="2" />
+          <path d="M9.5 11V13.5H14.5" />
+          <path d="M14.5 13.5V14" />
+        </ContextMenuIcon>
+      );
+    case "paste-node":
+    case "paste-node-to-child":
+      return (
+        <ContextMenuIcon>
+          <path d="M9 4H15L16 6H18C18.6 6 19 6.4 19 7V19C19 19.6 18.6 20 18 20H6C5.4 20 5 19.6 5 19V7C5 6.4 5.4 6 6 6H8Z" />
+          <path d="M9 6H15" />
+          <path d="M12 10V16" />
+          <path d="M9.5 13.5L12 16L14.5 13.5" />
         </ContextMenuIcon>
       );
     case "add-node":
