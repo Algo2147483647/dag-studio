@@ -149,6 +149,22 @@ export function useGraphImport({
     event.target.value = "";
   }
 
+  async function handleDroppedFiles(fileList: FileList | File[]) {
+    const files = Array.from(fileList).map((file) => ({
+      file,
+      handle: null,
+      path: file.webkitRelativePath || file.name,
+    }));
+    if (!files.length) {
+      return;
+    }
+
+    await loadPickedJsonFiles({
+      files,
+      name: files.length === 1 ? files[0].file.name : "dropped-json-files.json",
+    });
+  }
+
   async function loadPickedJsonFiles(collection: PickedJsonCollection, fromFolder = false, cacheRecentImport = true) {
     suppressDefaultGraphRef.current = true;
     const { files: pickedFiles, name: sourceName } = collection;
@@ -272,6 +288,7 @@ export function useGraphImport({
     handleFileInputChange,
     handleFolderInputClick,
     handleFolderInputChange,
+    handleDroppedFiles,
   };
 }
 

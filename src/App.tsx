@@ -115,6 +115,7 @@ export default function App() {
     handleFileInputChange,
     handleFolderInputClick,
     handleFolderInputChange,
+    handleDroppedFiles,
   } = useGraphImport({
     dispatch,
     fieldMapping,
@@ -780,6 +781,23 @@ export default function App() {
     });
   }
 
+  function handleAppDragOver(event: React.DragEvent<HTMLDivElement>) {
+    if (!hasDraggedFiles(event.dataTransfer)) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  }
+
+  function handleAppDrop(event: React.DragEvent<HTMLDivElement>) {
+    if (!hasDraggedFiles(event.dataTransfer)) {
+      return;
+    }
+    event.preventDefault();
+    dispatch({ type: "contextMenuClosed" });
+    void handleDroppedFiles(event.dataTransfer.files);
+  }
+
   function handleContextMenuAction(action: ContextMenuAction, nodeKey: NodeKey | null) {
     dispatch({ type: "contextMenuClosed" });
     if (action === "view-node" && nodeKey) {
@@ -1053,7 +1071,7 @@ export default function App() {
   const detailNodeKey = state.ui.nodeDetail?.nodeKey || null;
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" onDragOver={handleAppDragOver} onDrop={handleAppDrop}>
       <Topbar
         topbarRef={topbarRef}
         layoutMode={state.layout.mode}
@@ -1425,6 +1443,10 @@ function getPastedNodeFields(value: unknown): { key: NodeKey; fields: Record<str
   }
 
   return { key: entryKey.trim(), fields: entryValue as Record<string, unknown> };
+}
+
+function hasDraggedFiles(dataTransfer: DataTransfer): boolean {
+  return Array.from(dataTransfer.types || []).includes("Files");
 }
 
 function getSavedRevisionDag(
