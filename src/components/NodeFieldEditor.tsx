@@ -220,145 +220,68 @@ export function LinkValue({
   relativeLinkRoot?: RelativeLinkRoot | null;
   onOpenRelativeLink?: (url: string) => void;
 }) {
-  const parts = buildDisplayLinkParts(value);
+  const text = String(value || "");
+  const url = text.trim();
   if (!value.trim()) {
     return <p className="node-detail-empty">(empty string)</p>;
   }
-  if (!parts.some((part) => part.type === "link")) {
+  if (!hasDisplayLink(text)) {
     return <p className="node-detail-text">{value}</p>;
   }
 
   return (
     <div className={`node-detail-link-text${previewSurface ? " node-detail-link-text--preview" : ""}`}>
-      {parts.map((part, index) => (
-        part.type === "link" ? (
-          <DisplayLink
-            key={`${part.url}-${index}`}
-            link={part}
-            relativeLinkRoot={relativeLinkRoot}
-            onOpenRelativeLink={onOpenRelativeLink}
-          />
-        ) : (
-          <span key={`text-${index}`}>{part.text}</span>
-        )
-      ))}
+      <DisplayLink
+        label={url}
+        url={url}
+        relativeLinkRoot={relativeLinkRoot}
+        onOpenRelativeLink={onOpenRelativeLink}
+      />
     </div>
   );
 }
 
-interface DisplayLinkItem {
-  type: "link";
-  label: string;
-  url: string;
-  start: number;
-  end: number;
-}
-
-interface DisplayTextItem {
-  type: "text";
-  text: string;
-}
-
 function DisplayLink({
-  link,
+  label,
+  url,
   relativeLinkRoot,
   onOpenRelativeLink,
 }: {
-  link: DisplayLinkItem;
+  label: string;
+  url: string;
   relativeLinkRoot: RelativeLinkRoot | null;
   onOpenRelativeLink?: (url: string) => void;
 }) {
-  if (isRelativeLink(link.url)) {
-    const resolved = resolveRelativePath(link.url);
+  if (isRelativeLink(url)) {
+    const resolved = resolveRelativePath(url);
     return (
       <a
         className="node-detail-link"
-        href={link.url}
+        href={url}
         title={resolved.ok ? `Resolves to: ${relativeLinkRoot?.name || "(no resolve path selected)"}/${resolved.path}` : resolved.message}
         onClick={(event) => {
           event.preventDefault();
-          onOpenRelativeLink?.(link.url);
+          onOpenRelativeLink?.(url);
         }}
       >
-        {link.label}
+        {label}
       </a>
     );
   }
 
   return (
-    <a className="node-detail-link" href={link.url} target="_blank" rel="noreferrer">
-      {link.label}
+    <a className="node-detail-link" href={url} target="_blank" rel="noreferrer">
+      {label}
     </a>
   );
 }
 
 export function hasDisplayLink(value: string): boolean {
-  return extractDisplayLinkMatches(value).length > 0;
-}
-
-function buildDisplayLinkParts(value: string): Array<DisplayLinkItem | DisplayTextItem> {
-  const text = String(value || "");
-  const links = extractDisplayLinkMatches(text);
-  const parts: Array<DisplayLinkItem | DisplayTextItem> = [];
-  let cursor = 0;
-
-  links.forEach((link) => {
-    if (link.start > cursor) {
-      parts.push({ type: "text", text: text.slice(cursor, link.start) });
-    }
-    parts.push(link);
-    cursor = link.end;
-  });
-
-  if (cursor < text.length) {
-    parts.push({ type: "text", text: text.slice(cursor) });
-  }
-
-  return parts;
-}
-
-function extractDisplayLinkMatches(value: string): DisplayLinkItem[] {
-  const text = String(value || "");
-  const links: DisplayLinkItem[] = [];
-  const occupied: Array<[number, number]> = [];
-  const markdownLinkPattern = /\[([^\]\n]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = markdownLinkPattern.exec(text))) {
-    const label = match[1].trim();
-    const url = match[2].trim();
-    if (isDisplayLinkUrl(url)) {
-      const start = match.index;
-      const end = match.index + match[0].length;
-      links.push({ type: "link", label: label || url, url, start, end });
-      occupied.push([start, end]);
-    }
-  }
-
-  const bareLinkPattern = /(?:https?:\/\/[^\s<>()]+|\/\/[^\s<>()]+|\/[^\s<>()]+|(?:\.{1,2}\/|[^/\s<>()]+\/)[^\s<>()]+|[^\s<>()]+\.[A-Za-z0-9]{1,8}(?:[?#][^\s<>()]+)?)/g;
-  while ((match = bareLinkPattern.exec(text))) {
-    const url = trimTrailingLinkPunctuation(match[0]);
-    const start = match.index;
-    const end = start + match[0].length;
-    if (!url || occupied.some(([occupiedStart, occupiedEnd]) => start < occupiedEnd && end > occupiedStart) || !isDisplayLinkUrl(url)) {
-      continue;
-    }
-    links.push({ type: "link", label: url, url, start, end: start + url.length });
-  }
-
-  return dedupeDisplayLinks(links).sort((first, second) => first.start - second.start);
-}
-
-function dedupeDisplayLinks(links: DisplayLinkItem[]): DisplayLinkItem[] {
-  const seen = new Set<string>();
-  return links.filter((link) => {
-    const key = `${link.start}\n${link.end}\n${link.label}\n${link.url}`;
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
+  const text = String(value || "").trim();
+  return Boolean(text)
+    && !/\s/.test(text)
+    && !/[{}\\]/.test(text)
+    && isDisplayLinkUrl(text);
 }
 
 function isDisplayLinkUrl(value: string): boolean {
@@ -377,12 +300,8 @@ function isLikelyRelativeLink(value: string): boolean {
     && (
       /^\.{1,2}\//.test(value)
       || value.includes("/")
-      || /\.[A-Za-z0-9]{1,8}(?:[?#].*)?$/.test(value)
+      || /\.[A-Za-z0-9]{2,8}(?:[?#].*)?$/.test(value)
     );
-}
-
-function trimTrailingLinkPunctuation(value: string): string {
-  return value.replace(/[.,;:!?]+$/g, "");
 }
 
 export function buildEditableFields(nodeKey: NodeKey, node: Record<string, unknown>, fieldMapping: FieldMapping): EditableField[] {
