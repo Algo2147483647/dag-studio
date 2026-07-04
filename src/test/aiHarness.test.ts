@@ -7,6 +7,7 @@ import {
   referencesPreviousWork,
   validateCommandBatch,
 } from "../ai/harness";
+import { parseAiResponse } from "../ai/providers";
 import { buildAiHarnessStorageKey, parsePersistedAiHarnessState } from "../ai/persistence";
 import { getDefaultFieldMapping } from "../graph/fieldMapping";
 import { DEFAULT_GRAPH_APPEARANCE } from "../graph/appearance";
@@ -18,6 +19,22 @@ export const aiHarnessSuite = defineSuite("ai harness", [
     assert.equal(referencesPreviousWork("Based on your previous analysis, complete the changes."), true);
     assert.equal(referencesPreviousWork("Continue from the plan above and apply it."), true);
     assert.equal(referencesPreviousWork("What does Group mean?"), false);
+  }),
+
+  defineTest("parses AI JSON responses wrapped in a markdown fence", () => {
+    const parsed = parseAiResponse([
+      "```json",
+      "{\"kind\":\"answer\",\"answer\":\"ok\"}",
+      "```",
+    ].join("\n"));
+    assert.deepEqual(parsed, { kind: "answer", answer: "ok" });
+  }),
+
+  defineTest("reports invalid AI JSON with command quoting guidance", () => {
+    assert.throws(
+      () => parseAiResponse("{\"kind\":\"run_console\",\"answer\":\"x\",\"commandBatch\":{\"commands\":[\"/set Water define \"2H2 + O2 -> 2H2O\"\"]}}"),
+      /Command strings must escape nested double quotes/,
+    );
   }),
 
   defineTest("creates an active plan with a pending command batch from proposed changes", () => {

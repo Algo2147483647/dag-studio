@@ -724,6 +724,14 @@ export default function App() {
     }
   }
 
+  function handleRootNodeDoubleClick(nodeKey: string) {
+    if (!stage?.nodeMap[nodeKey]?.isRoot) {
+      return;
+    }
+    setNodeDetailInitialFocus("fields");
+    dispatch({ type: "nodeDetailOpened", nodeKey });
+  }
+
   function handleNodeContextMenu(event: React.MouseEvent<SVGGElement>, nodeKey: string) {
     event.preventDefault();
     event.stopPropagation();
@@ -1086,6 +1094,7 @@ export default function App() {
         focusedKey={focusedKey}
         hideNodeBorders={hideNodeBorders}
         onNodeClick={handleNodeClick}
+        onRootNodeDoubleClick={handleRootNodeDoubleClick}
         onNodeContextMenu={handleNodeContextMenu}
         onFocusChange={setFocusedKey}
         onScroll={() => dispatch({ type: "contextMenuClosed" })}

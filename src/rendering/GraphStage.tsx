@@ -18,11 +18,12 @@ interface GraphStageProps {
   appearance: GraphAppearance;
   svgRef: React.RefObject<SVGSVGElement>;
   onNodeClick: (key: string) => void;
+  onRootNodeDoubleClick: (key: string) => void;
   onNodeContextMenu: (event: React.MouseEvent<SVGGElement>, key: string) => void;
   onFocusChange: (key: string | null) => void;
 }
 
-export default function GraphStage({ stage, focusedKey, hideNodeBorders, appearance, svgRef, onNodeClick, onNodeContextMenu, onFocusChange }: GraphStageProps) {
+export default function GraphStage({ stage, focusedKey, hideNodeBorders, appearance, svgRef, onNodeClick, onRootNodeDoubleClick, onNodeContextMenu, onFocusChange }: GraphStageProps) {
   const hoveredKeyRef = useRef<string | null>(null);
   const focusedKeyRef = useRef<string | null>(focusedKey);
   const appliedInteractiveKeyRef = useRef<string | null>(null);
@@ -246,6 +247,7 @@ export default function GraphStage({ stage, focusedKey, hideNodeBorders, appeara
             node={node}
             isActive={node.key === stage.root}
             onClick={onNodeClick}
+            onDoubleClick={node.isRoot ? onRootNodeDoubleClick : undefined}
             onContextMenu={onNodeContextMenu}
             onFocusChange={onFocusChange}
           />

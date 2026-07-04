@@ -11,6 +11,7 @@ interface GraphNodeProps {
   node: StageNode;
   isActive: boolean;
   onClick: (key: string) => void;
+  onDoubleClick?: (key: string) => void;
   onContextMenu: (event: React.MouseEvent<SVGGElement>, key: string) => void;
   onFocusChange: (key: string | null) => void;
 }
@@ -19,6 +20,7 @@ const GraphNode = memo(function GraphNode({
   node,
   isActive,
   onClick,
+  onDoubleClick,
   onContextMenu,
   onFocusChange,
 }: GraphNodeProps) {
@@ -75,6 +77,7 @@ const GraphNode = memo(function GraphNode({
       role="button"
       aria-label={nodeAriaDescription}
       onClick={() => onClick(node.key)}
+      onDoubleClick={() => onDoubleClick?.(node.key)}
       onContextMenu={(event) => onContextMenu(event, node.key)}
       onFocus={() => onFocusChange(node.key)}
       onBlur={() => onFocusChange(null)}
@@ -119,6 +122,7 @@ function areEqualGraphNodeProps(previous: GraphNodeProps, next: GraphNodeProps):
   return previous.node === next.node
     && previous.isActive === next.isActive
     && previous.onClick === next.onClick
+    && previous.onDoubleClick === next.onDoubleClick
     && previous.onContextMenu === next.onContextMenu
     && previous.onFocusChange === next.onFocusChange;
 }
